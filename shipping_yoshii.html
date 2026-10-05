@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="ja" translate="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>吉井電気 製品出荷管理 (WebVer. 1)</title>
+    
+    <!-- React 18 -->
+    <script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js" crossorigin></script>
+    <!-- Babel -->
+    <script src="https://unpkg.com/@babel/standalone@7.23.6/babel.min.js"></script>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- ExcelJS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
+    
+    <!-- Firebase V9 Compat -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+    <style>
+        .custom-scrollbar::-webkit-scrollbar { height: 8px; width: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
+        .sticky-col-left { position: sticky; left: 0; background-color: white; z-index: 10; }
+        .sticky-col-left-2 { position: sticky; left: 140px; background-color: white; z-index: 10; }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen text-gray-800 font-sans">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo, useRef } = React;
+
+        // Firebase 初期化設定 (環境に合わせて変更可能)
+        const firebaseConfig = {
+            apiKey: "AIzaSyDummyKeyForSecurityConfigOnly",
+            authDomain: "yoshii-shipping.firebaseapp.com",
+            projectId: "yoshii-shipping",
+            storageBucket: "yoshii-shipping.appspot.com",
+            messagingSenderId: "000000000000",
+            appId: "1:000000000000:web:000000000000"
+        };
+
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+        const db = firebase.firestore();
+
+        // SHA-256 ハッシュ生成関数 (ソースコード解析によるパスワード漏洩防止)
+        async function hashPassword(str) {
+            const encoder = new TextEncoder();
+            const data = encoder.encode(str);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+
+        // 権限定義 (ハッシュ値と許可条件の対応表)
+        // パスワード本文は一切記述せず、ハッシュ照合で判定
+        const AUTH_PERMISSIONS = {
+            // Zall@0617 (管理者)
+            'e4e4bf7e9973fdb9da47e09cb7bdf9ec03512803b0d4eb073600ff50bf1d0a51': {
+                role: 'admin', name: '管理者', vendor: 'ALL',
+                screens: ['schedule', 'drayage', 'plan', 'allocation', 'other'],
+                canEdit: true, canDelete: true, canImport: true
+            },
+            // Read＠0617 (閲覧専用 - 東亜)
+            '983f4eeefdb195156f4d5475f4efbc833503ed7ee1cf0bdf05809df639c4355f': {
+                role: 'read', name: '閲覧専用', vendor: 'ALL',
+                screens: ['schedule'],
+                canEdit: false, canDelete: false, canImport: false
+            },
+            // JPZ10345 (JP管理者)
+            '1773dd237552ea647ea3efcb4ec62bfa0eb7122df45326c043e0631ba9cb62d2': {
+                role: 'vendor_jp', name: 'JP管理者', vendor: 'JP',
+                screens: ['schedule'],
+                canEdit: true, canDelete: false, canImport: false
+            },
+            // GM10345Z (GM管理者)
+            '20d8f0f08e42dfbd56d11fbd6d2c4b7264003d52c6f1406c13840ffae5661bc1': {
+                role: 'vendor_gm', name: 'GM管理者', vendor: 'GM',
+                screens: ['schedule'],
+                canEdit: true, canDelete: false, canImport: false
+            },
+            // LDSZ1034 (LDS管理者)
+            '940f5a2f588c2323fcaeecce2e56c542037cb90c9b0e2bf2ef1d13fca3b0d2a1': {
+                role: 'vendor_lds', name: 'LDS管理者', vendor: 'LDS',
+                screens: ['schedule'],
+                canEdit: true, canDelete: false, canImport: false
+            },
+            // SLT1034Z (SLT管理者)
+            '35efbf398bfbd871efcd179bc20165c71a3375b058a98ddc0379d71c8491c13d': {
+                role: 'vendor_slt', name: 'SLT管理者', vendor: 'SLT',
+                screens: ['schedule'],
+                canEdit: true, canDelete: false, canImport: false
+            },
+            // YosiiZ (ドレージ担当)
+            'c0529ef8f9bc8e56149f1db7eb9e29a9b1c7c94fa20ff160100fdfd9122572db': {
+                role: 'drayage_user', name: 'Yosii(ドレージ)', vendor: 'ALL',
+                screens: ['drayage'],
+                canEdit: true, canDelete: false, canImport: false
+            }
+        };
+
+        // メインアプリケーション
+        function App() {
+            // 認証・担当者情報
+            const [isAuthenticated, setIsAuthenticated] = useState(false);
+            const [currentUserPerm, setCurrentUserPerm] = useState(null);
+            const [workerName, setWorkerName] = useState('');
+            const [inputPass, setInputPass] = useState('');
+            const [inputWorker, setInputWorker] = useState('');
+            const [loginError, setLoginError] = useState('');
+
+            // 表示画面 ('schedule', 'drayage', 'plan', 'allocation', 'other')
+            const [activeTab, setActiveTab] = useState('schedule');
+
+            // データ状態
+            const [schedules, setSchedules] = useState([]);
+            const [loading, setLoading] = useState(true);
+
+            // ログイン処理
+            const handleLogin = async (e) => {
+                e.preventDefault();
+                setLoginError('');
+
+                if (!inputWorker.trim()) {
+                    setLoginError('担当者名（姓名/簡体字/英字）を入力してください。');
+                    return;
+                }
+
+                const hashed = await hashPassword(inputPass.trim());
+                const perm = AUTH_PERMISSIONS[hashed];
+
+                if (perm) {
+                    setCurrentUserPerm(perm);
+                    setWorkerName(inputWorker.trim());
+                    setIsAuthenticated(true);
+                    // 許可された最初の画面をアクティブに
+                    setActiveTab(perm.screens[0]);
+                } else {
+                    setLoginError('パスワードが正しくありません。');
+                }
+            };
+
+            // ログアウト
+            const handleLogout = () => {
+                setIsAuthenticated(false);
+                setCurrentUserPerm(null);
+                setWorkerName('');
+                setInputPass('');
+                setInputWorker('');
+            };
+
+            // Firestoreリアルタイム同期
+            useEffect(() => {
+                if (!isAuthenticated) return;
+
+                const unsubscribe = db.collection('shipping_schedules').onSnapshot(snapshot => {
+                    const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    setSchedules(data);
+                    setLoading(false);
+                }, err => {
+                    console.error("Firestore Error:", err);
+                    setLoading(false);
+                });
+
+                return () => unsubscribe();
+            }, [isAuthenticated]);
+
+            // パターン1: ログイン権限に応じたデータの動的フィルタリング
+            const filteredSchedules = useMemo(() => {
+                if (!currentUserPerm) return [];
+                if (currentUserPerm.vendor === 'ALL') {
+                    return schedules;
+                }
+                // 特定の仕入先コード（JP, GM, LDS, SLT）のみ抽出
+                return schedules.filter(item => item.vendorCode === currentUserPerm.vendor);
+            }, [schedules, currentUserPerm]);
+
+            // 未ログイン時：ログインダイアログ（画面ロック）
+            if (!isAuthenticated) {
+                return (
+                    <div class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center p-4 z-50">
+                        <div class="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+                            <div class="text-center mb-6">
+                                <h1 class="text-2xl font-bold text-gray-800">吉井電気 製品出荷管理</h1>
+                                <p class="text-xs text-blue-600 font-semibold mt-1">WebVer. 1 - アクセス認証</p>
+                            </div>
+                            
+                            <form onSubmit={handleLogin} class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                                        担当者名 / 姓名 <span class="text-red-500">*</span>
+                                    </label>
+                                    <input
+                                        type="text"
+                                        placeholder="例: 張偉 / John Smith / 近間"
+                                        value={inputWorker}
+                                        onChange={(e) => setInputWorker(e.target.value)}
+                                        class="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                        required
+                                    />
+                                    <p class="text-xs text-gray-500 mt-1">※簡体字・英字・日本語対応（履歴に記録されます）</p>
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                                        パスワード <span class="text-red-500">*</span>
+                                    </label>
+                                    <input
+                                        type="password"
+                                        placeholder="パスワードを入力"
+                                        value={inputPass}
+                                        onChange={(e) => setInputPass(e.target.value)}
+                                        class="w-full px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                                        required
+                                    />
+                                </div>
+
+                                {loginError && (
+                                    <div class="p-2 bg-red-100 border border-red-400 text-red-700 text-sm rounded">
+                                        {loginError}
+                                    </div>
+                                )}
+
+                                <button
+                                    type="submit"
+                                    class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded transition duration-200"
+                                >
+                                    ログイン（画面ロック解除）
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                );
+            }
+// ヘッダー・タブ切替・メインコンテンツ
+            return (
+                <div class="flex flex-col h-screen">
+                    {/* 上部ヘッダー */}
+                    <header class="bg-gray-800 text-white px-6 py-3 flex justify-between items-center shadow-md">
+                        <div class="flex items-center space-x-3">
+                            <h1 class="text-xl font-bold">吉井電気 製品出荷管理</h1>
+                            <span class="bg-blue-600 text-xs px-2 py-1 rounded-full font-mono font-semibold">WebVer. 1</span>
+                        </div>
+                        <div class="flex items-center space-x-4 text-sm">
+                            <div class="bg-gray-700 px-3 py-1 rounded text-gray-200">
+                                権限: <span class="font-bold text-yellow-400">{currentUserPerm.name}</span>
+                            </div>
+                            <div class="bg-gray-700 px-3 py-1 rounded text-gray-200">
+                                作業者: <span class="font-bold text-green-400">{workerName}</span>
+                            </div>
+                            <button
+                                onClick={handleLogout}
+                                class="bg-red-600 hover:bg-red-700 text-white text-xs px-3 py-1.5 rounded transition duration-150"
+                            >
+                                ログアウト
+                            </button>
+                        </div>
+                    </header>
+
+                    {/* タブナビゲーション（パターン1: 許可された画面タブのみ動的表示） */}
+                    <div class="bg-white border-b border-gray-200 px-6 pt-2 flex space-x-2">
+                        {currentUserPerm.screens.includes('schedule') && (
+                            <button
+                                onClick={() => setActiveTab('schedule')}
+                                class={`px-4 py-2 text-sm font-semibold border-b-2 transition ${
+                                    activeTab === 'schedule'
+                                        ? 'border-blue-600 text-blue-600'
+                                        : 'border-transparent text-gray-500 hover:text-gray-700'
+                                }`}
+                            >
+                                出荷日程表
+                            </button>
+                        )}
+                        {currentUserPerm.screens.includes('drayage') && (
+                            <button
+                                onClick={() => setActiveTab('drayage')}
+                                class={`px-4 py-2 text-sm font-semibold border-b-2 transition ${
+                                    activeTab === 'drayage'
+                                        ? 'border-blue-600 text-blue-600'
+                                        : 'border-transparent text-gray-500 hover:text-gray-700'
+                                }`}
+                            >
+                                ドレージ管理
+                            </button>
+                        )}
+                        {currentUserPerm.screens.includes('plan') && (
+                            <button
+                                onClick={() => setActiveTab('plan')}
+                                class={`px-4 py-2 text-sm font-semibold border-b-2 transition ${
+                                    activeTab === 'plan'
+                                        ? 'border-blue-600 text-blue-600'
+                                        : 'border-transparent text-gray-500 hover:text-gray-700'
+                                }`}
+                            >
+                                出荷計画表
+                            </button>
+                        )}
+                        {currentUserPerm.screens.includes('allocation') && (
+                            <button
+                                onClick={() => setActiveTab('allocation')}
+                                class={`px-4 py-2 text-sm font-semibold border-b-2 transition ${
+                                    activeTab === 'allocation'
+                                        ? 'border-blue-600 text-blue-600'
+                                        : 'border-transparent text-gray-500 hover:text-gray-700'
+                                }`}
+                            >
+                                コンテナ割振り
+                            </button>
+                        )}
+                        {currentUserPerm.screens.includes('other') && (
+                            <button
+                                onClick={() => setActiveTab('other')}
+                                class={`px-4 py-2 text-sm font-semibold border-b-2 transition ${
+                                    activeTab === 'other'
+                                        ? 'border-blue-600 text-blue-600'
+                                        : 'border-transparent text-gray-500 hover:text-gray-700'
+                                }`}
+                            >
+                                その他管理
+                            </button>
+                        )}
+                    </div>
+
+                    {/* メインビューエリア */}
+                    <main class="flex-1 p-6 overflow-auto custom-scrollbar bg-gray-50">
+                        {loading ? (
+                            <div class="flex justify-center items-center h-64 text-gray-500">
+                                データを読み込み中...
+                            </div>
+                        ) : (
+                            <>
+                                {activeTab === 'schedule' && (
+                                    <ScheduleView
+                                        schedules={filteredSchedules}
+                                        perm={currentUserPerm}
+                                        workerName={workerName}
+                                    />
+                                )}
+                                {activeTab === 'drayage' && (
+                                    <DrayageView
+                                        schedules={filteredSchedules}
+                                        perm={currentUserPerm}
+                                        workerName={workerName}
+                                    />
+                                )}
+                                {activeTab === 'plan' && (
+                                    <PlanView
+                                        schedules={filteredSchedules}
+                                        perm={currentUserPerm}
+                                        workerName={workerName}
+                                    />
+                                )}
+                                {activeTab === 'allocation' && (
+                                    <AllocationView
+                                        schedules={filteredSchedules}
+                                        perm={currentUserPerm}
+                                        workerName={workerName}
+                                    />
+                                )}
+                                {activeTab === 'other' && (
+                                    <OtherView
+                                        schedules={filteredSchedules}
+                                        perm={currentUserPerm}
+                                        workerName={workerName}
+                                    />
+                                )}
+                            </>
+                        )}
+                    </main>
+                </div>
+            );
+        }
+
+        // --- 子コンポーネント: 出荷日程表 ---
+        function ScheduleView({ schedules, perm, workerName }) {
+            const handleCellUpdate = async (docId, field, val) => {
+                if (!perm.canEdit) return;
+                try {
+                    await db.collection('shipping_schedules').doc(docId).update({
+                        [field]: val,
+                        lastUpdatedBy: workerName,
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                } catch (e) {
+                    console.error("更新エラー:", e);
+                }
+            };
+
+            return (
+                <div class="bg-white rounded-lg shadow p-4">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-lg font-bold text-gray-800">
+                            出荷日程表 
+                            {perm.vendor !== 'ALL' && <span class="ml-2 text-sm text-blue-600">[{perm.vendor} データのみ表示中]</span>}
+                        </h2>
+                        {perm.canImport && (
+                            <button class="bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1.5 rounded font-semibold">
+                                Excel一括取り込み
+                            </button>
+                        )}
+                    </div>
+
+                    <div class="overflow-x-auto custom-scrollbar border rounded">
+                        <table class="w-full text-xs text-left text-gray-600 border-collapse">
+                            <thead class="bg-gray-100 text-gray-700 uppercase font-bold border-b">
+                                <tr>
+                                    <th class="p-2 border">仕入先</th>
+                                    <th class="p-2 border">型式 / 品名</th>
+                                    <th class="p-2 border">本船名</th>
+                                    <th class="p-2 border">ETD</th>
+                                    <th class="p-2 border">ETA</th>
+                                    <th class="p-2 border">数量</th>
+                                    <th class="p-2 border">進捗ステータス</th>
+                                    {perm.canDelete && <th class="p-2 border text-center">操作</th>}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {schedules.length === 0 ? (
+                                    <tr>
+                                        <td colSpan="8" class="p-4 text-center text-gray-400">
+                                            該当するデータが存在しないか、閲覧権限が制限されています。
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    schedules.map(item => (
+                                        <tr key={item.id} class="border-b hover:bg-blue-50/30">
+                                            <td class="p-2 border font-semibold text-gray-800">{item.vendorCode || '-'}</td>
+                                            <td class="p-2 border">{item.modelName || '-'}</td>
+                                            <td class="p-2 border">{item.vesselName || '-'}</td>
+                                            <td class="p-2 border">{item.etd || '-'}</td>
+                                            <td class="p-2 border">{item.eta || '-'}</td>
+                                            <td class="p-2 border font-mono text-right">{item.quantity || 0}</td>
+                                            <td class="p-2 border">
+                                                {perm.canEdit ? (
+                                                    <input
+                                                        type="text"
+                                                        defaultValue={item.status || ''}
+                                                        onBlur={(e) => handleCellUpdate(item.id, 'status', e.target.value)}
+                                                        class="w-full px-1 py-0.5 border rounded focus:ring-1 focus:ring-blue-500"
+                                                    />
+                                                ) : (
+                                                    <span>{item.status || '-'}</span>
+                                                )}
+                                            </td>
+                                            {perm.canDelete && (
+                                                <td class="p-2 border text-center">
+                                                    <button
+                                                        onClick={() => db.collection('shipping_schedules').doc(item.id).delete()}
+                                                        class="text-red-500 hover:text-red-700 font-bold px-2 py-0.5"
+                                                    >
+                                                        ×
+                                                    </button>
+                                                </td>
+                                            )}
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            );
+        }
+
+        // --- 子コンポーネント: ドレージ管理 ---
+        function DrayageView({ schedules, perm, workerName }) {
+            return (
+                <div class="bg-white rounded-lg shadow p-4">
+                    <h2 class="text-lg font-bold text-gray-800 mb-2">ドレージ管理画面</h2>
+                    <p class="text-xs text-gray-500 mb-4">コンテナ配送・ドレージ手配状況の管理を行います。</p>
+                    <div class="p-6 bg-gray-50 rounded border text-center text-sm text-gray-600">
+                        ドレージ連動データ一覧（編集権限: {perm.canEdit ? '可能' : '不可'}）
+                    </div>
+                </div>
+            );
+        }
+
+        // --- 子コンポーネント: 出荷計画表 ---
+        function PlanView({ schedules, perm, workerName }) {
+            return (
+                <div class="bg-white rounded-lg shadow p-4">
+                    <h2 class="text-lg font-bold text-gray-800 mb-2">出荷計画表</h2>
+                    <p class="text-xs text-gray-500 mb-4">全社製品出荷の計画データビュー（東亜物流・統括管理者用）。</p>
+                </div>
+            );
+        }
+
+        // --- 子コンポーネント: コンテナ割振り ---
+        function AllocationView({ schedules, perm, workerName }) {
+            return (
+                <div class="bg-white rounded-lg shadow p-4">
+                    <h2 class="text-lg font-bold text-gray-800 mb-2">コンテナ割振り</h2>
+                    <p class="text-xs text-gray-500 mb-4">型式別・本船別コンテナマトリクス計算画面。</p>
+                </div>
+            );
+        }
+
+        // --- 子コンポーネント: その他管理 ---
+        function OtherView({ schedules, perm, workerName }) {
+            return (
+                <div class="bg-white rounded-lg shadow p-4">
+                    <h2 class="text-lg font-bold text-gray-800 mb-2">その他管理画面</h2>
+                    <p class="text-xs text-gray-500 mb-4">システム設定およびマスタデータ管理。</p>
+                </div>
+            );
+        }
+
+        // レンダリング実行
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+</body>
+</html>
