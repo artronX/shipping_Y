@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>吉井電気 製品出荷管理システム (WebVer. 52)</title>
+    <title>吉井電気 製品出荷管理システム (WebVer. 53)</title>
     
     <!-- React 18 -->
     <script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js" crossorigin></script>
@@ -325,7 +325,7 @@
                     <div className="bg-white rounded-xl shadow-2xl border border-slate-200 max-w-sm w-full p-6 space-y-5">
                         <div className="text-center space-y-1">
                             <h2 className="text-lg font-bold text-slate-800">吉井電気 製品出荷管理システム</h2>
-                            <p className="text-xs text-indigo-600 font-mono font-bold">権限認証ログイン (WebVer. 52)</p>
+                            <p className="text-xs text-indigo-600 font-mono font-bold">権限認証ログイン (WebVer. 53)</p>
                         </div>
 
                         {errorMsg && (
@@ -3511,9 +3511,10 @@
             const isDraggingOrSortingRef = useRef(false);
 
             // 有効なビュー計算（ユーザーのログイン権限を基準にし、フィルター切替で画面追い出しを行わない）
-            const getEffectiveAllowedViews = () => {
-                if (authUser && authUser.allowedViews && authUser.allowedViews.length > 0) {
-                    return authUser.allowedViews;
+            const getEffectiveAllowedViews = (userObj) => {
+                const targetUser = userObj || authUser;
+                if (targetUser && targetUser.allowedViews && targetUser.allowedViews.length > 0) {
+                    return targetUser.allowedViews;
                 }
                 return ['yoshii_plan', 'yoshii_alloc', 'yoshii_ship', 'yoshii_drayage'];
             };
@@ -3526,7 +3527,7 @@
                 setIsLoggedIn(true);
                 const initialVendor = user.vendorRestriction || 'ALL';
                 setSelectedVendorFilter(initialVendor);
-                const initViews = getEffectiveAllowedViews(initialVendor);
+                const initViews = getEffectiveAllowedViews(user);
                 if (initViews.length > 0) {
                     setCurrentView(initViews[0]);
                 }
@@ -3728,7 +3729,7 @@
                         <header className="h-[44px] bg-indigo-700 text-white flex items-center justify-between px-4 shadow no-print flex-shrink-0">
                             <div className="flex items-center gap-4">
                                 <a href="shipping.html" className="hover:bg-indigo-600 px-2 py-1 border rounded text-sm transition">ホーム</a>
-                                <h1 className="text-lg font-bold hidden md:block">吉井電気<span className="text-sm font-bold bg-indigo-900/80 px-2 py-0.5 rounded text-amber-300 font-mono text-xs ml-2">WebVer. 52</span></h1>
+                                <h1 className="text-lg font-bold hidden md:block">吉井電気<span className="text-sm font-bold bg-indigo-900/80 px-2 py-0.5 rounded text-amber-300 font-mono text-xs ml-2">WebVer. 53</span></h1>
                             </div>
                             
                             <div className="flex items-center gap-3">
