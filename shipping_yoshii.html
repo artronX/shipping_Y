@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>吉井電気 製品出荷管理システム (WebVer. 53)</title>
+    <title>吉井電気 製品出荷管理システム (WebVer. 55)</title>
     
     <!-- React 18 -->
     <script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js" crossorigin></script>
@@ -131,15 +131,17 @@
             bottom: 100%;
             left: 50%;
             transform: translateX(-50%);
-            background-color: #1f2937;
-            color: #ffffff;
-            padding: 3px 8px;
-            border-radius: 4px;
+            background-color: #111827;
+            color: #f9fafb;
+            padding: 4px 9px;
+            border-radius: 5px;
             font-size: 11px;
+            font-weight: bold;
             white-space: nowrap;
-            z-index: 50;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.25);
+            z-index: 1000 !important;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.35);
             pointer-events: none;
+            margin-bottom: 2px;
         }
     </style>
 </head>
@@ -325,7 +327,7 @@
                     <div className="bg-white rounded-xl shadow-2xl border border-slate-200 max-w-sm w-full p-6 space-y-5">
                         <div className="text-center space-y-1">
                             <h2 className="text-lg font-bold text-slate-800">吉井電気 製品出荷管理システム</h2>
-                            <p className="text-xs text-indigo-600 font-mono font-bold">権限認証ログイン (WebVer. 53)</p>
+                            <p className="text-xs text-indigo-600 font-mono font-bold">権限認証ログイン (WebVer. 55)</p>
                         </div>
 
                         {errorMsg && (
@@ -523,9 +525,10 @@
             let currentType = type;
             let extraClass = '';
 
-            const hasOrig = originalValue !== undefined && originalValue !== null && String(originalValue) !== '';
+            const hasOrig = originalValue !== undefined && originalValue !== null;
             const isChanged = hasOrig && String(originalValue) !== String(val);
-            const tooltipClass = hasOrig ? 'has-original-tooltip' : '';
+            const hasOrigValueText = hasOrig && String(originalValue) !== '';
+            const tooltipClass = hasOrigValueText ? 'has-original-tooltip' : '';
             const changedClass = (ctx.isChangeTrackingMode && isChanged) ? 'is-changed-cell' : '';
 
             const metaStr = originalMeta || `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}`;
@@ -545,7 +548,7 @@
                 }
 
                 return (
-                    <div className={`relative flex items-center justify-between w-full h-full overflow-hidden group bg-transparent text-center min-w-[85px] ${changedClass} ${tooltipClass}`} data-original-val={originalValue} data-original-meta={metaStr} onMouseDown={preventRowDrag}>
+                    <div className={`relative flex items-center justify-between w-full h-full group bg-transparent text-center min-w-[85px] ${changedClass} ${tooltipClass}`} data-original-val={originalValue} data-original-meta={metaStr} onMouseDown={preventRowDrag}>
                         <input 
                             ref={inputRef}
                             type="text" 
@@ -591,7 +594,7 @@
                 }
 
                 return (
-                    <div className={`relative flex items-center justify-between w-full h-full overflow-hidden group bg-transparent text-center min-w-[68px] ${changedClass} ${tooltipClass}`} data-original-val={originalValue} data-original-meta={metaStr} onMouseDown={preventRowDrag}>
+                    <div className={`relative flex items-center justify-between w-full h-full group bg-transparent text-center min-w-[68px] ${changedClass} ${tooltipClass}`} data-original-val={originalValue} data-original-meta={metaStr} onMouseDown={preventRowDrag}>
                         <input 
                             ref={inputRef}
                             type="text" 
@@ -659,9 +662,10 @@
                 }
             };
 
-            const hasOrig = originalValue !== undefined && originalValue !== null && String(originalValue) !== '';
+            const hasOrig = originalValue !== undefined && originalValue !== null;
             const isChanged = hasOrig && String(originalValue) !== String(val);
-            const tooltipClass = hasOrig ? 'has-original-tooltip' : '';
+            const hasOrigValueText = hasOrig && String(originalValue) !== '';
+            const tooltipClass = hasOrigValueText ? 'has-original-tooltip' : '';
             const changedClass = (ctx.isChangeTrackingMode && isChanged) ? 'is-changed-cell' : '';
 
             const metaStr = originalMeta || `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}`;
@@ -735,9 +739,10 @@
                 e.stopPropagation();
             };
 
-            const hasOrig = originalValue !== undefined && originalValue !== null && String(originalValue) !== '';
+            const hasOrig = originalValue !== undefined && originalValue !== null;
             const isChanged = hasOrig && String(originalValue) !== String(val);
-            const tooltipClass = hasOrig ? 'has-original-tooltip' : '';
+            const hasOrigValueText = hasOrig && String(originalValue) !== '';
+            const tooltipClass = hasOrigValueText ? 'has-original-tooltip' : '';
             const changedClass = (ctx.isChangeTrackingMode && isChanged) ? 'is-changed-cell' : '';
 
             const metaStr = originalMeta || `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}`;
@@ -758,50 +763,110 @@
             );
         };
 
-        const LogViewModal = ({ isOpen, onClose, logs }) => {
+        const LogViewModal = ({ isOpen, onClose, logs, sessions }) => {
+            const [activeTab, setActiveTab] = useState('data_logs');
+
             if (!isOpen) return null;
 
             return (
-                <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl h-[80vh] flex flex-col">
-                        <div className="p-4 bg-emerald-700 text-white flex justify-between items-center rounded-t-lg">
-                            <h3 className="font-bold text-lg flex items-center gap-2">⚙ 操作ログ履歴 (吉井電気 出荷管理)</h3>
-                            <button onClick={onClose} className="text-2xl font-bold hover:text-gray-300">×</button>
+                <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl h-[82vh] flex flex-col border border-slate-300 overflow-hidden">
+                        <div className="p-4 bg-indigo-900 text-white flex justify-between items-center">
+                            <div className="flex items-center gap-3">
+                                <h3 className="font-bold text-base flex items-center gap-2">⚙ システム管理ログ・接続履歴</h3>
+                                <span className="bg-amber-400 text-slate-900 text-[10px] font-extrabold px-2 py-0.5 rounded font-mono">WebVer. 55</span>
+                            </div>
+                            <button onClick={onClose} className="text-2xl font-bold hover:text-gray-300 leading-none">×</button>
                         </div>
-                        <div className="p-4 overflow-y-auto flex-grow">
-                            <table className="w-full text-xs border-collapse">
-                                <thead className="bg-gray-100 sticky top-0">
-                                    <tr className="border-b text-left">
-                                        <th className="p-2 border">日時</th>
-                                        <th className="p-2 border">作業者</th>
-                                        <th className="p-2 border">対象シート</th>
-                                        <th className="p-2 border">操作種別</th>
-                                        <th className="p-2 border">詳細内容</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {logs.length === 0 ? (
-                                        <tr><td colSpan="5" className="p-4 text-center text-gray-500">操作ログはまだありません。</td></tr>
-                                    ) : (
-                                        logs.map(log => (
-                                            <tr key={log.id} className="border-b hover:bg-gray-50">
-                                                <td className="p-2 border whitespace-nowrap text-gray-600">{log.timestamp}</td>
-                                                <td className="p-2 border font-bold text-emerald-900 whitespace-nowrap">{log.operator || '未設定'}</td>
-                                                <td className="p-2 border whitespace-nowrap">{log.sheetName}</td>
-                                                <td className="p-2 border whitespace-nowrap">
-                                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${log.action === '追加' ? 'bg-blue-100 text-blue-800' : log.action === '削除' ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
-                                                        {log.action}
-                                                    </span>
-                                                </td>
-                                                <td className="p-2 border leading-relaxed">{log.detail}</td>
-                                            </tr>
-                                        ))
-                                    )}
-                                </tbody>
-                            </table>
+
+                        <div className="flex bg-slate-100 border-b px-4 pt-2 gap-2 text-xs font-bold">
+                            <button 
+                                onClick={() => setActiveTab('data_logs')}
+                                className={`px-4 py-2 rounded-t-lg transition flex items-center gap-1.5 ${activeTab === 'data_logs' ? 'bg-white border-t-2 border-indigo-600 text-indigo-900 shadow-sm' : 'text-slate-600 hover:bg-slate-200'}`}
+                            >
+                                📝 データ操作履歴 ({logs.length})
+                            </button>
+                            <button 
+                                onClick={() => setActiveTab('access_logs')}
+                                className={`px-4 py-2 rounded-t-lg transition flex items-center gap-1.5 ${activeTab === 'access_logs' ? 'bg-white border-t-2 border-indigo-600 text-indigo-900 shadow-sm' : 'text-slate-600 hover:bg-slate-200'}`}
+                            >
+                                🔑 ログイン・接続時間履歴 ({(sessions || []).length})
+                            </button>
                         </div>
-                        <div className="p-3 bg-gray-100 border-t flex justify-end">
-                            <button onClick={onClose} className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-1.5 rounded text-xs font-bold">閉じる</button>
+
+                        <div className="p-4 overflow-y-auto flex-grow bg-white">
+                            {activeTab === 'data_logs' ? (
+                                <table className="w-full text-xs border-collapse">
+                                    <thead className="bg-slate-100 sticky top-0 shadow-sm">
+                                        <tr className="border-b text-left text-slate-700">
+                                            <th className="p-2 border">日時</th>
+                                            <th className="p-2 border">作業者</th>
+                                            <th className="p-2 border">対象シート</th>
+                                            <th className="p-2 border">操作種別</th>
+                                            <th className="p-2 border">詳細内容</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {logs.length === 0 ? (
+                                            <tr><td colSpan="5" className="p-4 text-center text-gray-500 font-bold">データ操作ログはまだありません。</td></tr>
+                                        ) : (
+                                            logs.map(log => (
+                                                <tr key={log.id} className="border-b hover:bg-slate-50">
+                                                    <td className="p-2 border whitespace-nowrap text-slate-600 font-mono">{log.timestamp}</td>
+                                                    <td className="p-2 border font-bold text-indigo-950 whitespace-nowrap">{log.operator || '未設定'}</td>
+                                                    <td className="p-2 border whitespace-nowrap font-bold text-slate-700">{log.sheetName}</td>
+                                                    <td className="p-2 border whitespace-nowrap">
+                                                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${log.action === '追加' ? 'bg-blue-100 text-blue-800' : log.action === '削除' ? 'bg-red-100 text-red-800' : 'bg-emerald-100 text-emerald-800'}`}>
+                                                            {log.action}
+                                                        </span>
+                                                    </td>
+                                                    <td className="p-2 border leading-relaxed text-slate-800">{log.detail}</td>
+                                                </tr>
+                                            ))
+                                        )}
+                                    </tbody>
+                                </table>
+                            ) : (
+                                <table className="w-full text-xs border-collapse">
+                                    <thead className="bg-slate-100 sticky top-0 shadow-sm">
+                                        <tr className="border-b text-left text-slate-700">
+                                            <th className="p-2 border">作業者名</th>
+                                            <th className="p-2 border">権限・グループ</th>
+                                            <th className="p-2 border">ログイン日時</th>
+                                            <th className="p-2 border">ログオフ日時</th>
+                                            <th className="p-2 border text-center">接続時間 (分)</th>
+                                            <th className="p-2 border text-center">ステータス</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {(!sessions || sessions.length === 0) ? (
+                                            <tr><td colSpan="6" className="p-4 text-center text-gray-500 font-bold">接続履歴はまだありません。</td></tr>
+                                        ) : (
+                                            sessions.map(s => (
+                                                <tr key={s.id} className="border-b hover:bg-slate-50">
+                                                    <td className="p-2 border font-bold text-indigo-950 whitespace-nowrap">{s.operator || '未設定'}</td>
+                                                    <td className="p-2 border whitespace-nowrap text-slate-600 font-bold">{s.roleLabel || '一般'}</td>
+                                                    <td className="p-2 border whitespace-nowrap font-mono text-emerald-800 font-bold">{s.loginTimeStr}</td>
+                                                    <td className="p-2 border whitespace-nowrap font-mono text-slate-600">{s.logoutTimeStr || '― (接続中)'}</td>
+                                                    <td className="p-2 border text-center whitespace-nowrap font-mono font-bold text-indigo-900">
+                                                        {s.durationMinutes !== undefined ? `${s.durationMinutes} 分` : '進行中'}
+                                                    </td>
+                                                    <td className="p-2 border text-center whitespace-nowrap">
+                                                        {s.logoutTimeStr ? (
+                                                            <span className="bg-gray-100 text-gray-700 px-2 py-0.5 rounded text-[10px] font-bold">切断完了</span>
+                                                        ) : (
+                                                            <span className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded text-[10px] font-bold animate-pulse">● 接続中</span>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        )}
+                                    </tbody>
+                                </table>
+                            )}
+                        </div>
+                        <div className="p-3 bg-slate-100 border-t flex justify-end">
+                            <button onClick={onClose} className="bg-slate-700 hover:bg-slate-800 text-white px-5 py-1.5 rounded-lg text-xs font-bold shadow">閉じる</button>
                         </div>
                     </div>
                 </div>
@@ -1620,7 +1685,7 @@
             const handleQuantityChange = async (model, month, newQtyStr, originalVal) => {
                 const targetPlan = getPlanData(model, month);
                 const newQty = newQtyStr === '' ? 0 : Number(newQtyStr);
-                const todayYYMMDD = '26/09/14';
+                const todayYYMMDD = ctx.getFormattedShortDate();
 
                 const matchModelDetails = ctx.masterData.yoshii?.modelDetails?.[model] || {};
                 const normTarget = normalizeModelCode(model);
@@ -1691,7 +1756,7 @@
             const endStr = `${displayMonths[displayMonths.length - 1]?.split('-')[0]}年${displayMonths[displayMonths.length - 1]?.split('-')[1]}月`;
             const dynamicTitle = `吉井電気（株）様向け 納品・出荷計画（${startStr}～${endStr}）`;
 
-            const rowPaddingClass = showHistory ? 'p-1' : 'py-0 px-0.5 h-[24px]';
+            const rowPaddingClass = 'py-0 px-0.5 h-[24px]';
 
             return (
                 <div className="p-4 bg-white flex-grow flex flex-col h-full">
@@ -1989,32 +2054,32 @@
                                                             onGridKeyDown={handleGridNav} 
                                                         />
 
-                                                        {showHistory && (
-                                                            <div className="mt-0.5 pt-0.5 border-t border-gray-200 text-[9px] text-gray-500 flex flex-col gap-0.5 leading-tight">
-                                                                {(historyList.length === 0 && currentQty !== '') ? (
-                                                                    <div className="flex justify-between items-center bg-gray-50 px-0.5 rounded">
-                                                                        <span>{Number(currentQty).toLocaleString()}</span>
-                                                                        <span className="text-[8px] text-gray-400">26/09/14</span>
-                                                                    </div>
-                                                                ) : (
-                                                                    historyList.map((hist, hIdx) => (
-                                                                        <div key={hIdx} className="flex justify-between items-center bg-gray-50 px-0.5 rounded border border-gray-100">
-                                                                            <span className="font-semibold text-gray-600 truncate">
-                                                                                {hist.qty.toLocaleString()}
-                                                                            </span>
-                                                                            <div className="flex items-center gap-0.5">
-                                                                                <span className="text-[8px] text-gray-400">{hist.date || '26/09/14'}</span>
-                                                                                <button 
-                                                                                    onClick={() => handleDeleteHistory(plan.id, hIdx, model, mo)}
-                                                                                    disabled={ctx.authUser && !ctx.authUser.canEdit}
-                                                                                    className="text-red-400 hover:text-red-600 font-bold disabled:opacity-30" 
-                                                                                >
-                                                                                    ×
-                                                                                </button>
+                                                        {showHistory && historyList.length > 0 && (
+                                                            <div className="relative group/hist no-print">
+                                                                <span className="absolute -top-5 right-0.5 text-[9px] bg-amber-100 text-amber-800 border border-amber-300 px-1 rounded cursor-pointer font-bold z-10 shadow-sm">
+                                                                    📜{historyList.length}
+                                                                </span>
+                                                                <div className="hidden group-hover/hist:block absolute right-0 top-0 mt-1 w-44 bg-slate-800 text-white p-2 rounded shadow-xl z-50 text-[10px] space-y-1 border border-slate-600">
+                                                                    <div className="font-bold border-b border-slate-600 pb-1 text-amber-300">履歴一覧 ({model} {mo})</div>
+                                                                    <div className="max-h-36 overflow-y-auto space-y-1">
+                                                                        {historyList.map((hist, hIdx) => (
+                                                                            <div key={hIdx} className="flex justify-between items-center bg-slate-700 px-1.5 py-0.5 rounded">
+                                                                                <span className="font-mono font-bold text-emerald-300">{hist.qty.toLocaleString()} 台</span>
+                                                                                <div className="flex items-center gap-1">
+                                                                                    <span className="text-[9px] text-slate-300">{hist.date || ctx.getFormattedShortDate()}</span>
+                                                                                    <button 
+                                                                                        onClick={() => handleDeleteHistory(plan.id, hIdx, model, mo)}
+                                                                                        disabled={ctx.authUser && !ctx.authUser.canEdit}
+                                                                                        className="text-red-400 hover:text-red-200 font-bold ml-1 text-xs" 
+                                                                                        title="この履歴を削除"
+                                                                                    >
+                                                                                        ×
+                                                                                    </button>
+                                                                                </div>
                                                                             </div>
-                                                                        </div>
-                                                                    ))
-                                                                )}
+                                                                        ))}
+                                                                    </div>
+                                                                </div>
                                                             </div>
                                                         )}
                                                     </td>
@@ -3480,6 +3545,9 @@
             const [plans, setPlans] = useState([]);
             const [containers, setContainers] = useState([]);
             const [logs, setLogs] = useState([]);
+            const [sessions, setSessions] = useState([]);
+            const currentSessionIdRef = useRef(null);
+            const loginTimestampRef = useRef(null);
 
             const [operatorName, setOperatorName] = useState('');
             const [isLogModalOpen, setIsLogModalOpen] = useState(false);
@@ -3521,7 +3589,24 @@
 
             const effectiveViews = getEffectiveAllowedViews();
 
-            const handleLoginSuccess = (user) => {
+            const recordLogoutSession = async () => {
+                if (!currentSessionIdRef.current || !loginTimestampRef.current) return;
+                const now = new Date();
+                const nowStr = `${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+                const durationMinutes = Math.max(1, Math.round((now.getTime() - loginTimestampRef.current.getTime()) / (1000 * 60)));
+                
+                try {
+                    await db.collection('user_sessions').doc(currentSessionIdRef.current).update({
+                        logoutTimeStr: nowStr,
+                        logoutTimestamp: now.toISOString(),
+                        durationMinutes: durationMinutes
+                    });
+                } catch (e) { console.error("Session update error:", e); }
+                currentSessionIdRef.current = null;
+                loginTimestampRef.current = null;
+            };
+
+            const handleLoginSuccess = async (user) => {
                 setAuthUser(user);
                 setOperatorName(user.name);
                 setIsLoggedIn(true);
@@ -3531,12 +3616,35 @@
                 if (initViews.length > 0) {
                     setCurrentView(initViews[0]);
                 }
+
+                // Record Login Session to Firestore
+                const now = new Date();
+                const loginStr = `${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+                loginTimestampRef.current = now;
+                try {
+                    const docRef = await db.collection('user_sessions').add({
+                        operator: user.name,
+                        roleLabel: user.label,
+                        loginTimeStr: loginStr,
+                        createdAt: now.toISOString()
+                    });
+                    currentSessionIdRef.current = docRef.id;
+                } catch (e) { console.error("Session log error:", e); }
             };
 
-            const handleLogout = () => {
+            const handleLogout = async () => {
+                await recordLogoutSession();
                 setAuthUser(null);
                 setIsLoggedIn(false);
             };
+
+            useEffect(() => {
+                const handleBeforeUnload = () => {
+                    if (currentSessionIdRef.current) recordLogoutSession();
+                };
+                window.addEventListener('beforeunload', handleBeforeUnload);
+                return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+            }, []);
 
             const logOperation = async (sheetName, action, detail) => {
                 const now = new Date();
@@ -3559,7 +3667,7 @@
 
             const handleStartTracking = () => {
                 setIsChangeTrackingMode(true);
-                alert("変更記録モードを開始しました。\nこれ以降に変更された箇所は「赤文字」で強調され、変更前の値と日付・作業者名が記録されます。");
+                alert("変更記録モードを開始しました。\nこれ以降に変更された箇所（空欄からの入力も含む）は「赤文字」で強調表示されます。");
             };
 
             const handleClearTracking = async () => {
@@ -3569,7 +3677,7 @@
             };
 
             useEffect(() => {
-                let unsubMaster = () => {}; let unsubPlans = () => {}; let unsubContainers = () => {}; let unsubLogs = () => {};
+                let unsubMaster = () => {}; let unsubPlans = () => {}; let unsubContainers = () => {}; let unsubLogs = () => {}; let unsubSessions = () => {};
 
                 auth.signInAnonymously().then(() => {
                     unsubMaster = db.collection('shipping_settings').doc('master_data_v5').onSnapshot(doc => {
@@ -3586,9 +3694,12 @@
                     unsubLogs = db.collection('operation_logs').orderBy('createdAt', 'desc').limit(300).onSnapshot(snapshot => {
                         setLogs(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
                     });
+                    unsubSessions = db.collection('user_sessions').orderBy('createdAt', 'desc').limit(200).onSnapshot(snapshot => {
+                        setSessions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+                    });
                 }).catch(error => { console.error("Auth Error:", error); alert("認証エラー"); });
 
-                return () => { unsubMaster(); unsubPlans(); unsubContainers(); unsubLogs(); };
+                return () => { unsubMaster(); unsubPlans(); unsubContainers(); unsubLogs(); unsubSessions(); };
             }, []);
 
             const getSheetLabel = (company, view) => {
@@ -3656,11 +3767,24 @@
                 const currentCompanyMaster = masterData[company] || {};
                 const currentDetails = currentCompanyMaster.modelDetails || {};
                 const modelObj = currentDetails[model] || {};
+                
+                const origObj = modelObj.originals || {};
+                const metaObj = modelObj.originalMetas || {};
+                const prevVal = modelObj[field] || '';
+
                 const updatedDetails = {
                     ...currentDetails,
                     [model]: {
                         ...modelObj,
-                        [field]: value
+                        [field]: value,
+                        originals: {
+                            ...origObj,
+                            [field]: origObj[field] !== undefined ? origObj[field] : prevVal
+                        },
+                        originalMetas: {
+                            ...metaObj,
+                            [field]: metaObj[field] !== undefined ? metaObj[field] : `${getFormattedShortDate()} ${operatorName || '未設定'}`
+                        }
                     }
                 };
                 const newMaster = {
@@ -3729,7 +3853,7 @@
                         <header className="h-[44px] bg-indigo-700 text-white flex items-center justify-between px-4 shadow no-print flex-shrink-0">
                             <div className="flex items-center gap-4">
                                 <a href="shipping.html" className="hover:bg-indigo-600 px-2 py-1 border rounded text-sm transition">ホーム</a>
-                                <h1 className="text-lg font-bold hidden md:block">吉井電気<span className="text-sm font-bold bg-indigo-900/80 px-2 py-0.5 rounded text-amber-300 font-mono text-xs ml-2">WebVer. 53</span></h1>
+                                <h1 className="text-lg font-bold hidden md:block">吉井電気<span className="text-sm font-bold bg-indigo-900/80 px-2 py-0.5 rounded text-amber-300 font-mono text-xs ml-2">WebVer. 55</span></h1>
                             </div>
                             
                             <div className="flex items-center gap-3">
@@ -3796,7 +3920,7 @@
                             {currentView === 'yoshii_drayage' && effectiveViews.includes('yoshii_drayage') && <YoshiiDrayageView />}
                         </main>
 
-                        <LogViewModal isOpen={isLogModalOpen} onClose={() => setIsLogModalOpen(false)} logs={logs} />
+                        <LogViewModal isOpen={isLogModalOpen} onClose={() => setIsLogModalOpen(false)} logs={logs} sessions={sessions} />
                     </div>
                 </AppContext.Provider>
             );
