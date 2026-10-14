@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>吉井電気 製品出荷管理システム (WebVer. 75)</title>
+    <title>吉井電気 製品出荷管理システム (WebVer. 81)</title>
     
     <!-- React 18 -->
     <script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js" crossorigin></script>
@@ -353,7 +353,7 @@ const { useState, useEffect, useRef, createContext, useContext } = React;
                     <div className="bg-white rounded-xl shadow-2xl border border-slate-200 max-w-sm w-full p-6 space-y-5">
                         <div className="text-center space-y-1">
                             <h2 className="text-lg font-bold text-slate-800">吉井電気 製品出荷管理システム</h2>
-                            <p className="text-xs text-indigo-600 font-mono font-bold">権限認証ログイン (WebVer. 75)</p>
+                            <p className="text-xs text-indigo-600 font-mono font-bold">権限認証ログイン (WebVer. 81)</p>
                         </div>
 
                         {errorMsg && (
@@ -813,7 +813,7 @@ const { useState, useEffect, useRef, createContext, useContext } = React;
                         <div className="p-4 bg-indigo-900 text-white flex justify-between items-center">
                             <div className="flex items-center gap-3">
                                 <h3 className="font-bold text-base flex items-center gap-2">⚙ システム管理ログ・接続履歴</h3>
-                                <span className="bg-amber-400 text-slate-900 text-[10px] font-extrabold px-2 py-0.5 rounded font-mono">WebVer. 75</span>
+                                <span className="bg-amber-400 text-slate-900 text-[10px] font-extrabold px-2 py-0.5 rounded font-mono">WebVer. 81</span>
                             </div>
                             <button onClick={onClose} className="text-2xl font-bold hover:text-gray-300 leading-none">×</button>
                         </div>
@@ -2321,26 +2321,55 @@ const { useState, useEffect, useRef, createContext, useContext } = React;
                     return (a.createdAt || '').localeCompare(b.createdAt || '');
                 });
             
-            const monthPlans = ctx.plans
-                .filter(p => p.company === 'yoshii' && p.deliveryMonth === ctx.yoshiiAllocMonth)
-                .sort((a,b) => (a.sortOrder || 999999) - (b.sortOrder || 999999));
-            
-            const modelTotals = {};
-            const modelsSet = new Set();
-            
-            monthPlans.forEach(p => {
+            const getModelVendorCode = (m) => {
+                const matchModelDetails = ctx.masterData.yoshii?.modelDetails?.[m] || {};
+                const normTarget = normalizeModelCode(m);
+                const matchPlanInfo = ctx.plans.find(p => normalizeModelCode(p.model) === normTarget && p.vendorCode);
+                return matchModelDetails.vendorCode !== undefined ? matchModelDetails.vendorCode : (matchPlanInfo?.vendorCode || '');
+            };
+
+            const yoshiiPlans = ctx.plans.filter(p => p.company === 'yoshii');
+
+            const getDirectPlanQty = (model, month) => {
+                const normTarget = normalizeModelCode(model);
+                const matchPlan = yoshiiPlans.find(p => normalizeModelCode(p.model) === normTarget && p.deliveryMonth === month);
+                return matchPlan ? Number(matchPlan.quantity || 0) : 0;
+            };
+
+            const getContainerAllocationQty = (allocationsObj, masterModel) => {
+                if (!allocationsObj) return '';
+                const normTarget = normalizeModelCode(masterModel);
+                for (const [key, qty] of Object.entries(allocationsObj)) {
+                    if (normalizeModelCode(key) === normTarget && qty > 0) {
+                        return qty;
+                    }
+                }
+                return '';
+            };
+
+const modelsSet = new Set();
+            yoshiiPlans.forEach(p => {
                 if (p.model) {
-                    modelTotals[p.model] = (modelTotals[p.model] || 0) + Number(p.quantity || 0);
-                    modelsSet.add(p.model);
+                    const vCode = getModelVendorCode(p.model);
+                    if (!ctx.selectedVendorFilter || ctx.selectedVendorFilter === 'ALL' || vCode === ctx.selectedVendorFilter) {
+                        modelsSet.add(p.model);
+                    }
                 }
             });
             monthContainers.forEach(c => {
                 Object.keys(c.allocations || {}).forEach(m => {
                     if (c.allocations[m] > 0) {
-                        modelsSet.add(m);
-                        if (!modelTotals[m]) modelTotals[m] = 0;
+                        const vCode = getModelVendorCode(m);
+                        if (!ctx.selectedVendorFilter || ctx.selectedVendorFilter === 'ALL' || vCode === ctx.selectedVendorFilter) {
+                            modelsSet.add(m);
+                        }
                     }
                 });
+            });
+
+            const modelTotals = {};
+            modelsSet.forEach(m => {
+                modelTotals[m] = getDirectPlanQty(m, ctx.yoshiiAllocMonth);
             });
             
             const modelOrders = ctx.masterData.yoshii?.modelOrder || {};
@@ -2362,16 +2391,14 @@ const { useState, useEffect, useRef, createContext, useContext } = React;
                 });
             }
 
-            const getContainerAllocationQty = (allocationsObj, masterModel) => {
-                if (!allocationsObj) return '';
-                const normTarget = normalizeModelCode(masterModel);
-                for (const [key, qty] of Object.entries(allocationsObj)) {
-                    if (normalizeModelCode(key) === normTarget && qty > 0) {
-                        return qty;
-                    }
-                }
-                return '';
-            };
+            // Hide models where plan quantity is 0 AND container allocations are 0
+            models = models.filter(m => {
+                const planQty = modelTotals[m] || 0;
+                const hasAlloc = monthContainers.some(c => (Number(getContainerAllocationQty(c.allocations, m)) || 0) > 0);
+                return planQty > 0 || hasAlloc;
+            });
+
+            
 
             const handleAllocationValueChange = (container, masterModel, val, orig) => {
                 const currentAllocs = container.allocations || {};
@@ -2497,16 +2524,23 @@ const { useState, useEffect, useRef, createContext, useContext } = React;
                                     <tr className="bg-gray-50 font-bold text-xs text-gray-700 border-b">
                                         <td className="p-1 border sticky left-0 bg-gray-50 z-40 text-center no-print">-</td>
                                         <td className="p-1 border sticky left-10 bg-gray-50 z-40 text-center">計画数</td>
-                                        <td className="p-1 border sticky left-[104px] bg-gray-50 z-40 text-center">-</td>
-                                        <td className="p-1 border sticky left-[194px] bg-gray-50 z-40 text-center">-</td>
+                                        <td className="p-1 border sticky left-[104px] bg-gray-50 z-40 text-center text-gray-500 font-normal">(合計)</td>
+                                        <td className="p-1 border sticky left-[194px] bg-gray-50 z-40 text-right pr-1.5 font-extrabold text-emerald-900 bg-emerald-100/60">
+                                            {models.reduce((sum, m) => sum + (Number(modelTotals[m]) || 0), 0).toLocaleString()}
+                                        </td>
                                         {models.map(m => <td key={m} className={`p-1 border font-bold text-right pr-1.5 text-xs ${getModelColWidth(m)} ${modelTotals[m] === 0 ? 'text-red-500' : ''}`}>{Number(modelTotals[m]).toLocaleString()}</td>)}
                                         <td className="p-1 border bg-gray-50 no-print"></td>
                                     </tr>
                                     <tr className="bg-gray-100 font-bold text-xs text-gray-800 border-b-2 border-gray-300">
                                         <td className="p-1 border sticky left-0 bg-gray-100 z-40 text-center no-print">-</td>
                                         <td className="p-1 border sticky left-10 bg-gray-100 z-40 text-center">残数</td>
-                                        <td className="p-1 border sticky left-[104px] bg-gray-100 z-40 text-center">-</td>
-                                        <td className="p-1 border sticky left-[194px] bg-gray-100 z-40 text-center">-</td>
+                                        <td className="p-1 border sticky left-[104px] bg-gray-100 z-40 text-center text-gray-500 font-normal">(合計)</td>
+                                        <td className="p-1 border sticky left-[194px] bg-gray-100 z-40 text-right pr-1.5 font-extrabold text-indigo-900 bg-indigo-100/60">
+                                            {models.reduce((sum, m) => {
+                                                const allocated = monthContainers.reduce((cSum, c) => cSum + (Number(getContainerAllocationQty(c.allocations, m)) || 0), 0);
+                                                return sum + (modelTotals[m] - allocated);
+                                            }, 0).toLocaleString()}
+                                        </td>
                                         {models.map(m => {
                                             const allocated = monthContainers.reduce((sum, c) => {
                                                 const q = getContainerAllocationQty(c.allocations, m);
@@ -3750,7 +3784,9 @@ const { useState, useEffect, useRef, createContext, useContext } = React;
                 const initialVendor = user.vendorRestriction || 'ALL';
                 setSelectedVendorFilter(initialVendor);
                 const initViews = getEffectiveAllowedViews(user);
-                if (initViews.length > 0) {
+                if (user.vendorRestriction && initViews.includes('yoshii_ship')) {
+                    setCurrentView('yoshii_ship');
+                } else if (initViews.length > 0) {
                     setCurrentView(initViews[0]);
                 }
 
@@ -3794,7 +3830,7 @@ const { useState, useEffect, useRef, createContext, useContext } = React;
                     const docRef = await db.collection('user_sessions').add({
                         operator: user.name,
                         roleLabel: user.label,
-                        appVersion: 'WebVer. 75',
+                        appVersion: 'WebVer. 81',
                         loginTimeStr: loginStr,
                         ipAddress: ipAddress,
                         ipLocation: ipLocation,
@@ -3911,7 +3947,7 @@ const { useState, useEffect, useRef, createContext, useContext } = React;
                         timestamp: timestampStr,
                         createdAt: now.toISOString(),
                         operator: operatorName || '未設定',
-                        appVersion: 'WebVer. 75',
+                        appVersion: 'WebVer. 81',
                         sheetName, action, detail
                     });
                 } catch (e) { console.error("Log Error:", e); }
@@ -4245,7 +4281,7 @@ const contextValue = {
                         <header className="h-[44px] bg-indigo-700 text-white flex items-center justify-between px-4 shadow no-print flex-shrink-0">
                             <div className="flex items-center gap-4">
                                 <a href="shipping.html" className="hover:bg-indigo-600 px-2 py-1 border rounded text-sm transition">ホーム</a>
-                                <h1 className="text-lg font-bold hidden md:block">吉井電気<span className="text-sm font-bold bg-indigo-900/80 px-2 py-0.5 rounded text-amber-300 font-mono text-xs ml-2">WebVer. 75</span></h1>
+                                <h1 className="text-lg font-bold hidden md:block">吉井電気<span className="text-sm font-bold bg-indigo-900/80 px-2 py-0.5 rounded text-amber-300 font-mono text-xs ml-2">WebVer. 81</span></h1>
                             </div>
                             
                             <div className="flex items-center gap-3">
