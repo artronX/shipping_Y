@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>吉井電気 製品出荷管理システム (WebVer. 55)</title>
+    <title>吉井電気 製品出荷管理システム (WebVer. 75)</title>
     
     <!-- React 18 -->
     <script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js" crossorigin></script>
@@ -143,13 +143,23 @@
             pointer-events: none;
             margin-bottom: 2px;
         }
+    
+        .readonly-cell {
+            background-color: #f3f4f6 !important;
+            color: #374151 !important;
+        }
+
     </style>
 </head>
 <body class="bg-gray-100 text-gray-800">
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useRef, createContext, useContext } = React;
+                // Auto-logout & Idle settings
+        const AUTO_LOGOUT_MINUTES = 15; // 可変設定可能（標準: 15分）
+        const LAST_OPERATOR_STORAGE_KEY = 'shipping_last_operator_name';
+        const LAST_ACTIVE_TIME_KEY = 'shipping_last_active_time';
+const { useState, useEffect, useRef, createContext, useContext } = React;
         const AppContext = createContext();
 
         // Firebase Configuration
@@ -170,6 +180,7 @@
                 role: 'ADMIN_ALL',
                 label: '東亜全体 (全画面編集)',
                 allowedViews: ['yoshii_plan', 'yoshii_alloc', 'yoshii_ship', 'yoshii_drayage'],
+                editableViews: ['yoshii_plan', 'yoshii_alloc', 'yoshii_ship', 'yoshii_drayage'],
                 vendorRestriction: null,
                 canEdit: true
             },
@@ -178,38 +189,43 @@
                 role: 'READ_ONLY',
                 label: '閲覧専用',
                 allowedViews: ['yoshii_plan', 'yoshii_alloc', 'yoshii_ship', 'yoshii_drayage'],
+                editableViews: [],
                 vendorRestriction: null,
                 canEdit: false
             },
             {
                 passwords: ['JPZ10345'],
                 role: 'VENDOR_JP',
-                label: 'JP専用編集',
-                allowedViews: ['yoshii_ship'],
+                label: 'JP専用 (出荷日程編集/割振り閲覧)',
+                allowedViews: ['yoshii_alloc', 'yoshii_ship'],
+                editableViews: ['yoshii_ship'],
                 vendorRestriction: 'JP',
                 canEdit: true
             },
             {
                 passwords: ['GM10345Z'],
                 role: 'VENDOR_GM',
-                label: 'GM専用編集',
-                allowedViews: ['yoshii_ship'],
+                label: 'GM専用 (出荷日程編集/割振り閲覧)',
+                allowedViews: ['yoshii_alloc', 'yoshii_ship'],
+                editableViews: ['yoshii_ship'],
                 vendorRestriction: 'GM',
                 canEdit: true
             },
             {
                 passwords: ['LDSZ1034'],
                 role: 'VENDOR_LDS',
-                label: 'LDS専用編集',
-                allowedViews: ['yoshii_ship'],
+                label: 'LDS専用 (出荷日程編集/割振り閲覧)',
+                allowedViews: ['yoshii_alloc', 'yoshii_ship'],
+                editableViews: ['yoshii_ship'],
                 vendorRestriction: 'LDS',
                 canEdit: true
             },
             {
                 passwords: ['SLT1034Z'],
                 role: 'VENDOR_SLT',
-                label: 'SLT専用編集',
-                allowedViews: ['yoshii_ship'],
+                label: 'SLT専用 (出荷日程編集/割振り閲覧)',
+                allowedViews: ['yoshii_alloc', 'yoshii_ship'],
+                editableViews: ['yoshii_ship'],
                 vendorRestriction: 'SLT',
                 canEdit: true
             },
@@ -218,6 +234,7 @@
                 role: 'DRAYAGE_YO',
                 label: 'ドレージ (YO) 専用',
                 allowedViews: ['yoshii_drayage'],
+                editableViews: ['yoshii_drayage'],
                 vendorRestriction: 'YO',
                 canEdit: true
             }
@@ -270,9 +287,16 @@
 
         // Login Modal for Authority Authentication
         const LoginModal = ({ onLogin }) => {
-            const [workerId, setWorkerId] = useState('');
+            const [workerId, setWorkerId] = useState(() => {
+                return localStorage.getItem(LAST_OPERATOR_STORAGE_KEY) || '';
+            });
             const [password, setPassword] = useState('');
             const [errorMsg, setErrorMsg] = useState('');
+
+            const handleClearWorkerId = () => {
+                setWorkerId('');
+                localStorage.removeItem(LAST_OPERATOR_STORAGE_KEY);
+            };
 
             const handleSubmit = (e) => {
                 e.preventDefault();
@@ -300,8 +324,9 @@
                         const vendorPrefix = matchPattern[1].trim().toUpperCase();
                         matchedRule = {
                             role: `VENDOR_${vendorPrefix}`,
-                            label: `${vendorPrefix}専用編集`,
-                            allowedViews: ['yoshii_ship'], // 当該仕入先の出荷日程画面のみ
+                            label: `${vendorPrefix}専用 (出荷日程編集/割振り閲覧)`,
+                            allowedViews: ['yoshii_alloc', 'yoshii_ship'],
+                            editableViews: ['yoshii_ship'],
                             vendorRestriction: vendorPrefix,
                             canEdit: true
                         };
@@ -314,6 +339,7 @@
                         role: matchedRule.role,
                         label: matchedRule.label,
                         allowedViews: matchedRule.allowedViews,
+                        editableViews: matchedRule.editableViews || [],
                         vendorRestriction: matchedRule.vendorRestriction,
                         canEdit: matchedRule.canEdit
                     });
@@ -327,7 +353,7 @@
                     <div className="bg-white rounded-xl shadow-2xl border border-slate-200 max-w-sm w-full p-6 space-y-5">
                         <div className="text-center space-y-1">
                             <h2 className="text-lg font-bold text-slate-800">吉井電気 製品出荷管理システム</h2>
-                            <p className="text-xs text-indigo-600 font-mono font-bold">権限認証ログイン (WebVer. 55)</p>
+                            <p className="text-xs text-indigo-600 font-mono font-bold">権限認証ログイン (WebVer. 75)</p>
                         </div>
 
                         {errorMsg && (
@@ -339,14 +365,26 @@
                         <form onSubmit={handleSubmit} className="space-y-4">
                             <div>
                                 <label className="block text-xs font-bold text-slate-700 mb-1">作業者ID / お名前</label>
-                                <input 
-                                    type="text" 
-                                    className="w-full border rounded px-3 py-1.5 text-xs bg-white font-bold" 
-                                    placeholder=""
-                                    value={workerId}
-                                    onChange={e => setWorkerId(e.target.value)}
-                                    required
-                                />
+                                <div className="relative flex items-center">
+                                    <input 
+                                        type="text" 
+                                        className="w-full border rounded pl-3 pr-8 py-1.5 text-xs bg-white font-bold" 
+                                        placeholder="例: クレール"
+                                        value={workerId}
+                                        onChange={e => setWorkerId(e.target.value)}
+                                        required
+                                    />
+                                    {workerId && (
+                                        <button 
+                                            type="button" 
+                                            onClick={handleClearWorkerId}
+                                            className="absolute right-2 text-slate-400 hover:text-slate-600 font-bold text-xs bg-slate-100 hover:bg-slate-200 rounded-full w-4 h-4 flex items-center justify-center transition"
+                                            title="入力欄を一括クリア"
+                                        >
+                                            ×
+                                        </button>
+                                    )}
+                                </div>
                             </div>
 
                             <div>
@@ -474,7 +512,9 @@
                 setIsEditing(false);
                 const currentStr = value !== undefined && value !== null ? String(value) : '';
                 if (val !== currentStr) {
-                    onChange(val, currentStr); 
+                    // Ensure orig is preserved even when clearing/setting to empty
+                    const origToPass = originalValue !== undefined && originalValue !== null ? originalValue : currentStr;
+                    onChange(val, origToPass); 
                 }
             };
             
@@ -525,10 +565,9 @@
             let currentType = type;
             let extraClass = '';
 
-            const hasOrig = originalValue !== undefined && originalValue !== null;
+            const hasOrig = originalValue !== undefined && originalValue !== null && String(originalValue) !== '';
             const isChanged = hasOrig && String(originalValue) !== String(val);
-            const hasOrigValueText = hasOrig && String(originalValue) !== '';
-            const tooltipClass = hasOrigValueText ? 'has-original-tooltip' : '';
+            const tooltipClass = isChanged ? 'has-original-tooltip' : '';
             const changedClass = (ctx.isChangeTrackingMode && isChanged) ? 'is-changed-cell' : '';
 
             const metaStr = originalMeta || `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}`;
@@ -548,7 +587,7 @@
                 }
 
                 return (
-                    <div className={`relative flex items-center justify-between w-full h-full group bg-transparent text-center min-w-[85px] ${changedClass} ${tooltipClass}`} data-original-val={originalValue} data-original-meta={metaStr} onMouseDown={preventRowDrag}>
+                    <div className={`relative flex items-center justify-between w-full h-full group bg-transparent text-center min-w-[85px] ${changedClass} ${tooltipClass}`} data-original-val={originalValue === "" ? "【消去】" : originalValue} data-original-meta={metaStr} onMouseDown={preventRowDrag}>
                         <input 
                             ref={inputRef}
                             type="text" 
@@ -594,7 +633,7 @@
                 }
 
                 return (
-                    <div className={`relative flex items-center justify-between w-full h-full group bg-transparent text-center min-w-[68px] ${changedClass} ${tooltipClass}`} data-original-val={originalValue} data-original-meta={metaStr} onMouseDown={preventRowDrag}>
+                    <div className={`relative flex items-center justify-between w-full h-full group bg-transparent text-center min-w-[68px] ${changedClass} ${tooltipClass}`} data-original-val={originalValue === "" ? "【消去】" : originalValue} data-original-meta={metaStr} onMouseDown={preventRowDrag}>
                         <input 
                             ref={inputRef}
                             type="text" 
@@ -627,7 +666,7 @@
             }
 
             return (
-                <div className={`w-full h-full ${tooltipClass}`} data-original-val={originalValue} data-original-meta={metaStr}>
+                <div className={`w-full h-full ${tooltipClass}`} data-original-val={originalValue === "" ? "【消去】" : originalValue} data-original-meta={metaStr}>
                     <input 
                         ref={inputRef} type={currentType} list={listId} value={displayVal} 
                         onChange={handleChange} onFocus={handleFocus} onBlur={handleBlur} onKeyDown={handleKeyDown}
@@ -662,16 +701,15 @@
                 }
             };
 
-            const hasOrig = originalValue !== undefined && originalValue !== null;
+            const hasOrig = originalValue !== undefined && originalValue !== null && String(originalValue) !== '';
             const isChanged = hasOrig && String(originalValue) !== String(val);
-            const hasOrigValueText = hasOrig && String(originalValue) !== '';
-            const tooltipClass = hasOrigValueText ? 'has-original-tooltip' : '';
+            const tooltipClass = isChanged ? 'has-original-tooltip' : '';
             const changedClass = (ctx.isChangeTrackingMode && isChanged) ? 'is-changed-cell' : '';
 
             const metaStr = originalMeta || `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}`;
 
             return (
-                <div className={`w-full h-full ${tooltipClass}`} data-original-val={originalValue} data-original-meta={metaStr}>
+                <div className={`w-full h-full ${tooltipClass}`} data-original-val={originalValue === "" ? "【消去】" : originalValue} data-original-meta={metaStr}>
                     <textarea 
                         value={val}
                         onChange={e => setVal(e.target.value)}
@@ -711,10 +749,12 @@
 
             const handleChange = (e) => {
                 const newVal = e.target.value;
+                const currentVal = value !== undefined && value !== null ? String(value) : '';
+                const origToPass = originalValue !== undefined && originalValue !== null ? originalValue : currentVal;
                 if (newVal === '__ADD_NEW__') { 
-                    onChange('__ADD_NEW__', category, val); 
+                    onChange('__ADD_NEW__', category, origToPass); 
                 } else { 
-                    setVal(newVal); onChange(newVal, category, val); 
+                    setVal(newVal); onChange(newVal, category, origToPass); 
                 }
             };
 
@@ -739,16 +779,15 @@
                 e.stopPropagation();
             };
 
-            const hasOrig = originalValue !== undefined && originalValue !== null;
+            const hasOrig = originalValue !== undefined && originalValue !== null && String(originalValue) !== '';
             const isChanged = hasOrig && String(originalValue) !== String(val);
-            const hasOrigValueText = hasOrig && String(originalValue) !== '';
-            const tooltipClass = hasOrigValueText ? 'has-original-tooltip' : '';
+            const tooltipClass = isChanged ? 'has-original-tooltip' : '';
             const changedClass = (ctx.isChangeTrackingMode && isChanged) ? 'is-changed-cell' : '';
 
             const metaStr = originalMeta || `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}`;
 
             return (
-                <div className={`w-full h-full ${tooltipClass}`} data-original-val={originalValue} data-original-meta={metaStr}>
+                <div className={`w-full h-full ${tooltipClass}`} data-original-val={originalValue === "" ? "【消去】" : originalValue} data-original-meta={metaStr}>
                     <select 
                         ref={selectRef}
                         value={val} onChange={handleChange} onFocus={handleFocus} onKeyDown={handleKeyDown} onMouseDown={preventRowDrag} data-grid-id={dataGridId}
@@ -770,11 +809,11 @@
 
             return (
                 <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl h-[82vh] flex flex-col border border-slate-300 overflow-hidden">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl h-[85vh] flex flex-col border border-slate-300 overflow-hidden">
                         <div className="p-4 bg-indigo-900 text-white flex justify-between items-center">
                             <div className="flex items-center gap-3">
                                 <h3 className="font-bold text-base flex items-center gap-2">⚙ システム管理ログ・接続履歴</h3>
-                                <span className="bg-amber-400 text-slate-900 text-[10px] font-extrabold px-2 py-0.5 rounded font-mono">WebVer. 55</span>
+                                <span className="bg-amber-400 text-slate-900 text-[10px] font-extrabold px-2 py-0.5 rounded font-mono">WebVer. 75</span>
                             </div>
                             <button onClick={onClose} className="text-2xl font-bold hover:text-gray-300 leading-none">×</button>
                         </div>
@@ -829,33 +868,41 @@
                             ) : (
                                 <table className="w-full text-xs border-collapse">
                                     <thead className="bg-slate-100 sticky top-0 shadow-sm">
-                                        <tr className="border-b text-left text-slate-700">
-                                            <th className="p-2 border">作業者名</th>
-                                            <th className="p-2 border">権限・グループ</th>
-                                            <th className="p-2 border">ログイン日時</th>
-                                            <th className="p-2 border">ログオフ日時</th>
-                                            <th className="p-2 border text-center">接続時間 (分)</th>
-                                            <th className="p-2 border text-center">ステータス</th>
+                                        <tr className="border-b text-left text-slate-700 text-[11px]">
+                                            <th className="p-1.5 border">作業者名</th>
+                                            <th className="p-1.5 border">権限・グループ</th>
+                                            <th className="p-1.5 border">アプリVer</th>
+                                            <th className="p-1.5 border">IPアドレス</th>
+                                            <th className="p-1.5 border">接続元地域</th>
+                                            <th className="p-1.5 border">端末・環境</th>
+                                            <th className="p-1.5 border">ログイン日時</th>
+                                            <th className="p-1.5 border">最終操作日時</th>
+                                            <th className="p-1.5 border text-center min-w-[130px]">接続状況</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {(!sessions || sessions.length === 0) ? (
-                                            <tr><td colSpan="6" className="p-4 text-center text-gray-500 font-bold">接続履歴はまだありません。</td></tr>
+                                            <tr><td colSpan="9" className="p-4 text-center text-gray-500 font-bold">接続履歴はまだありません。</td></tr>
                                         ) : (
                                             sessions.map(s => (
-                                                <tr key={s.id} className="border-b hover:bg-slate-50">
-                                                    <td className="p-2 border font-bold text-indigo-950 whitespace-nowrap">{s.operator || '未設定'}</td>
-                                                    <td className="p-2 border whitespace-nowrap text-slate-600 font-bold">{s.roleLabel || '一般'}</td>
-                                                    <td className="p-2 border whitespace-nowrap font-mono text-emerald-800 font-bold">{s.loginTimeStr}</td>
-                                                    <td className="p-2 border whitespace-nowrap font-mono text-slate-600">{s.logoutTimeStr || '― (接続中)'}</td>
-                                                    <td className="p-2 border text-center whitespace-nowrap font-mono font-bold text-indigo-900">
-                                                        {s.durationMinutes !== undefined ? `${s.durationMinutes} 分` : '進行中'}
-                                                    </td>
-                                                    <td className="p-2 border text-center whitespace-nowrap">
+                                                <tr key={s.id} className="border-b hover:bg-slate-50 text-[11px]">
+                                                    <td className="p-1.5 border font-bold text-indigo-950 whitespace-nowrap">{s.operator || '未設定'}</td>
+                                                    <td className="p-1.5 border whitespace-nowrap text-slate-600 font-bold">{s.roleLabel || '一般'}</td>
+                                                    <td className="p-1.5 border whitespace-nowrap font-mono font-bold text-amber-700 bg-amber-50 text-center">{s.appVersion || 'ー'}</td>
+                                                    <td className="p-1.5 border whitespace-nowrap font-mono text-blue-700 font-bold">{s.ipAddress || '―'}</td>
+                                                    <td className="p-1.5 border whitespace-nowrap text-slate-700 font-bold">{s.ipLocation || '―'}</td>
+                                                    <td className="p-1.5 border whitespace-nowrap text-slate-600 font-mono">{s.deviceInfo || '―'}</td>
+                                                    <td className="p-1.5 border whitespace-nowrap font-mono text-emerald-800 font-bold">{s.loginTimeStr}</td>
+                                                    <td className="p-1.5 border whitespace-nowrap font-mono text-slate-600">{s.logoutTimeStr || '― (操作中)'}</td>
+                                                    <td className="p-1.5 border text-center whitespace-nowrap font-mono font-bold">
                                                         {s.logoutTimeStr ? (
-                                                            <span className="bg-gray-100 text-gray-700 px-2 py-0.5 rounded text-[10px] font-bold">切断完了</span>
+                                                            <span className="bg-gray-100 text-gray-700 px-2 py-0.5 rounded text-[10px] font-bold whitespace-nowrap">
+                                                                切断完了 {s.durationMinutes !== undefined ? `(${s.durationMinutes.toLocaleString()}分)` : ''}
+                                                            </span>
                                                         ) : (
-                                                            <span className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded text-[10px] font-bold animate-pulse">● 接続中</span>
+                                                            <span className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded text-[10px] font-bold animate-pulse whitespace-nowrap">
+                                                                ● 接続中 {s.durationMinutes !== undefined ? `(${s.durationMinutes.toLocaleString()}分経過)` : ''}
+                                                            </span>
                                                         )}
                                                     </td>
                                                 </tr>
@@ -2231,14 +2278,47 @@
             const [focusTargetIdx, setFocusTargetIdx] = useState(null);
             const [deleteConfirmTarget, setDeleteConfirmTarget] = useState(null);
 
-            const monthContainers = ctx.containers
-                .filter(c => c.company === 'yoshii' && c.deliveryMonth === ctx.yoshiiAllocMonth)
-                .sort((a, b) => {
-                    const mgmtA = a.managementNo || 'ZZZZ';
-                    const mgmtB = b.managementNo || 'ZZZZ';
-                    const cmp = mgmtA.localeCompare(mgmtB, 'ja', { numeric: true });
-                    if (cmp !== 0) return cmp;
-                    return (a.sortOrder || 999999) - (b.sortOrder || 999999);
+            // Helper to get natural sequence key for management numbers (A584=1, YK1=2, YK2=3..., empty=bottom)
+            const getNaturalMgmtKey = (c) => {
+                if (c.allocNo !== undefined && c.allocNo !== null) return c.allocNo;
+                if (c.sortOrder !== undefined && c.sortOrder !== null) return c.sortOrder;
+                
+                const mgmt = String(c.managementNo || '').trim();
+                if (!mgmt || mgmt === '-') return 999999;
+
+                const match = mgmt.match(/^([A-Za-z]+)(\d+)(?:-(\d+))?$/);
+                if (match) {
+                    const prefix = match[1].toUpperCase();
+                    const num1 = parseInt(match[2], 10);
+                    const num2 = match[3] ? parseInt(match[3], 10) : 0;
+                    const prefixPriority = prefix === 'A' ? 0 : (prefix === 'YK' ? 1 : 2);
+                    return prefixPriority * 10000 + num1 * 10 + num2;
+                }
+                return 500000;
+            };
+
+            let rawMonthContainers = ctx.containers
+                .filter(c => c.company === 'yoshii' && c.deliveryMonth === ctx.yoshiiAllocMonth);
+
+            if (ctx.selectedVendorFilter && ctx.selectedVendorFilter !== 'ALL') {
+                rawMonthContainers = rawMonthContainers.filter(c => {
+                    return Object.keys(c.allocations || {}).some(m => {
+                        const q = c.allocations[m];
+                        if (q <= 0) return false;
+                        const matchModelDetails = ctx.masterData.yoshii?.modelDetails?.[m] || {};
+                        const normTarget = normalizeModelCode(m);
+                        const matchPlanInfo = ctx.plans.find(p => normalizeModelCode(p.model) === normTarget && p.vendorCode);
+                        const vCode = matchModelDetails.vendorCode !== undefined ? matchModelDetails.vendorCode : (matchPlanInfo?.vendorCode || '');
+                        return vCode === ctx.selectedVendorFilter;
+                    });
+                });
+            }
+
+            const monthContainers = rawMonthContainers.sort((a, b) => {
+                    const keyA = getNaturalMgmtKey(a);
+                    const keyB = getNaturalMgmtKey(b);
+                    if (keyA !== keyB) return keyA - keyB;
+                    return (a.createdAt || '').localeCompare(b.createdAt || '');
                 });
             
             const monthPlans = ctx.plans
@@ -2270,6 +2350,17 @@
                 if (orderA !== orderB) return orderA - orderB;
                 return a.localeCompare(b, 'ja');
             });
+
+            // Filter models by selectedVendorFilter
+            if (ctx.selectedVendorFilter && ctx.selectedVendorFilter !== 'ALL') {
+                models = models.filter(m => {
+                    const matchModelDetails = ctx.masterData.yoshii?.modelDetails?.[m] || {};
+                    const normTarget = normalizeModelCode(m);
+                    const matchPlanInfo = ctx.plans.find(p => normalizeModelCode(p.model) === normTarget && p.vendorCode);
+                    const vCode = matchModelDetails.vendorCode !== undefined ? matchModelDetails.vendorCode : (matchPlanInfo?.vendorCode || '');
+                    return vCode === ctx.selectedVendorFilter;
+                });
+            }
 
             const getContainerAllocationQty = (allocationsObj, masterModel) => {
                 if (!allocationsObj) return '';
@@ -2434,7 +2525,7 @@
                                             <tr 
                                                 key={container.id || `new-${idx}`}
                                                 onDragOver={(e) => ctx.handleDragOver(e, container.id)}
-                                                onDrop={(e) => ctx.handleDrop(e, container.id, monthContainers, 'containers')}
+                                                onDrop={(e) => ctx.handleDrop(e, container.id, monthContainers)}
                                                 onDragEnd={ctx.handleDragEnd}
                                                 className={`hover:bg-emerald-50 ${ctx.dragOverRowId === container.id ? (ctx.dragDirection === 'top' ? 'drag-over-top' : 'drag-over-bottom') : ''} ${ctx.draggedRowId === container.id ? 'dragging-row' : ''}`}
                                             >
@@ -2666,23 +2757,29 @@
                     for (const s of sortConfig) {
                         let valA = a[s.key] || '';
                         let valB = b[s.key] || '';
+                        if (s.key === 'drayageDeliveryDateCombo') {
+                            valA = (a.drayageDeliveryDate || '') + (a.drayageDeliveryTime || '');
+                            valB = (b.drayageDeliveryDate || '') + (b.drayageDeliveryTime || '');
+                        }
                         if (valA !== valB) {
                             const cmp = String(valA).localeCompare(String(valB), 'ja', { numeric: true });
                             return s.direction === 'asc' ? cmp : -cmp;
                         }
                     }
-                    return (a.sortOrder || 999999) - (b.sortOrder || 999999);
+                    const orderA = a.allocNo !== undefined ? a.allocNo : (a.sortOrder !== undefined ? a.sortOrder : 999999);
+                    const orderB = b.allocNo !== undefined ? b.allocNo : (b.sortOrder !== undefined ? b.sortOrder : 999999);
+                    return orderA - orderB;
                 });
             } else {
+                // Absolute Single Sort Rule: deliveryMonth -> allocNo / sortOrder (Allocation View Sequence)
                 displayContainers.sort((a, b) => {
                     const mA = a.deliveryMonth || '9999-99';
                     const mB = b.deliveryMonth || '9999-99';
                     if (mA !== mB) return mA.localeCompare(mB);
-                    const mgmtA = a.managementNo || 'ZZZZ';
-                    const mgmtB = b.managementNo || 'ZZZZ';
-                    const cmp = mgmtA.localeCompare(mgmtB, 'ja', { numeric: true });
-                    if (cmp !== 0) return cmp;
-                    return (a.sortOrder || 999999) - (b.sortOrder || 999999);
+
+                    const orderA = a.allocNo !== undefined ? a.allocNo : (a.sortOrder !== undefined ? a.sortOrder : 999999);
+                    const orderB = b.allocNo !== undefined ? b.allocNo : (b.sortOrder !== undefined ? b.sortOrder : 999999);
+                    return orderA - orderB;
                 });
             }
 
@@ -2786,7 +2883,7 @@
             let currentMonth = null;
             displayContainers.forEach(c => {
                 const m = c.deliveryMonth || '未設定';
-                if (sortConfig.length === 0 && m !== currentMonth) { groupedRows.push({ isDivider: true, monthLabel: m }); currentMonth = m; }
+                if (m !== currentMonth) { groupedRows.push({ isDivider: true, monthLabel: m }); currentMonth = m; }
                 groupedRows.push(c);
             });
 
@@ -2846,28 +2943,28 @@
                                     <th rowSpan="2" onClick={e => handleSortClick('containerNo', 'コンテナNO.', e)} className="p-1 w-[110px] cursor-pointer hover:bg-emerald-100 text-emerald-900 border-r">
                                         コンテナNO.{getSortIndicator('containerNo')}
                                     </th>
-                                    <th rowSpan="2" className="p-1 min-w-[110px] border-r">積載型式</th>
+                                    <th rowSpan="2" className="p-1 w-[125px] min-w-[120px] border-r">積載型式</th>
                                     
                                     <th colSpan="3" className="p-1 bg-emerald-50 text-emerald-900 border-r text-center font-bold">
                                         補充部品 (PCS)
                                     </th>
 
-                                    <th rowSpan="2" className="p-1 min-w-[55px] border-r">割振数</th>
-                                    <th rowSpan="2" className="p-1 w-[55px] border-r">総数量</th>
-                                    <th rowSpan="2" onClick={e => handleSortClick('port', '到着港', e)} className="p-1 w-[48px] min-w-[45px] cursor-pointer hover:bg-emerald-100 text-emerald-900 border-r">
+                                    <th rowSpan="2" className="p-1 w-[48px] min-w-[45px] border-r">割振数</th>
+                                    <th rowSpan="2" className="p-1 w-[48px] min-w-[45px] border-r">総数量</th>
+                                    <th rowSpan="2" onClick={e => handleSortClick('port', '到着港', e)} className="p-1 w-[70px] min-w-[65px] cursor-pointer hover:bg-emerald-100 text-emerald-900 border-r">
                                         到着港{getSortIndicator('port')}
                                     </th>
-                                    <th rowSpan="2" onClick={e => handleSortClick('etd', 'ETD', e)} className="p-1 w-[50px] min-w-[48px] cursor-pointer hover:bg-emerald-100 text-emerald-900 border-r">
+                                    <th rowSpan="2" onClick={e => handleSortClick('etd', 'ETD', e)} className="p-1 w-[58px] min-w-[54px] cursor-pointer hover:bg-emerald-100 text-emerald-900 border-r">
                                         ETD{getSortIndicator('etd')}
                                     </th>
-                                    <th rowSpan="2" onClick={e => handleSortClick('eta', 'ETA', e)} className="p-1 w-[50px] min-w-[48px] cursor-pointer hover:bg-emerald-100 text-emerald-900 border-r">
+                                    <th rowSpan="2" onClick={e => handleSortClick('eta', 'ETA', e)} className="p-1 w-[58px] min-w-[54px] cursor-pointer hover:bg-emerald-100 text-emerald-900 border-r">
                                         ETA{getSortIndicator('eta')}
                                     </th>
-                                    <th rowSpan="2" className="p-1 w-[45px] min-w-[42px] border-r">サイズ</th>
-                                    <th rowSpan="2" onClick={e => handleSortClick('vessel', '本船名', e)} className="p-1 w-[130px] min-w-[120px] cursor-pointer hover:bg-emerald-100 text-emerald-900 border-r">
+                                    <th rowSpan="2" className="p-1 w-[62px] min-w-[58px] border-r">サイズ</th>
+                                    <th rowSpan="2" onClick={e => handleSortClick('vessel', '本船名', e)} className="p-1 w-[170px] min-w-[160px] cursor-pointer hover:bg-emerald-100 text-emerald-900 border-r">
                                         本船名{getSortIndicator('vessel')}
                                     </th>
-                                    <th rowSpan="2" className="p-1 min-w-[200px] notes-col">備考</th>
+                                    <th rowSpan="2" className="p-1 min-w-[160px] notes-col">備考</th>
                                 </tr>
                                 <tr className="bg-emerald-50/70 text-emerald-800 text-[10px] font-bold border-b">
                                     <th className="p-1 border-r text-center w-10">外装箱</th>
@@ -2912,7 +3009,7 @@
                                             <td className={`p-0.5 ${['出港済', '出荷済み', '納品完了'].includes(item.status) ? 'bg-green-200 print-bg-green' : ''}`}><DynamicSelect value={item.status} originalValue={(item.originals || {}).status} originalMeta={(item.originalMetas || {}).status} onChange={(val, cat, orig) => ctx.handleSelectChange(item.id, 'status', true, 'yoshii', true, '進行状況')(val, cat, orig)} category="statuses" options={ctx.masterData.common.statuses} /></td>
                                             <td className="p-0.5"><LocalInput value={item.containerNo} originalValue={(item.originals || {}).containerNo} originalMeta={(item.originalMetas || {}).containerNo} onChange={(v, orig) => ctx.updateContainer(item.id, { containerNo: v, originals: { ...(item.originals || {}), containerNo: item.originals?.containerNo !== undefined ? item.originals.containerNo : orig }, originalMetas: { ...(item.originalMetas || {}), containerNo: item.originalMetas?.containerNo !== undefined ? item.originalMetas.containerNo : `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}` } }, item.deliveryMonth, 'yoshii', 'コンテナNO.')} className="text-center font-bold" /></td>
                                             
-                                            <td className="p-0.5 bg-gray-50 text-center align-middle font-bold text-gray-800">
+                                            <td className="p-0.5 readonly-cell text-center align-middle font-bold">
                                                 {cModels.map(m => (
                                                     <div key={m} className="h-5 flex items-center justify-center border-b last:border-b-0 border-gray-200 py-0 text-xs">{m}</div>
                                                 ))}
@@ -2994,15 +3091,49 @@
                                                 })}
                                             </td>
 
-                                            <td className="p-0.5 bg-gray-50 text-right align-middle">
-                                                {cModels.map(m => (
-                                                    <div key={m} className="h-5 flex items-center justify-end border-b last:border-b-0 border-gray-200 px-1 py-0 text-xs font-mono">
-                                                        {Number(item.allocations[m] || 0).toLocaleString()}
-                                                    </div>
-                                                ))}
+                                            <td className="p-0.5 bg-white text-right align-middle">
+                                                {cModels.map(m => {
+                                                    const allocVal = item.allocations[m];
+                                                    const origAlloc = (item.originals?.allocations || {})[m];
+                                                    const metaAlloc = (item.originalMetas?.allocations || {})[m];
+                                                    return (
+                                                        <div key={m} className="h-5 flex items-center justify-end border-b last:border-b-0 border-gray-200 px-0 py-0">
+                                                            <LocalInput 
+                                                                type="number" 
+                                                                value={allocVal !== undefined && allocVal !== null ? allocVal : ''} 
+                                                                originalValue={origAlloc}
+                                                                originalMeta={metaAlloc}
+                                                                onChange={(v, orig) => {
+                                                                    const newQty = v === '' ? 0 : Number(v);
+                                                                    const currentAllocs = item.allocations || {};
+                                                                    const updatedAllocs = { ...currentAllocs, [m]: newQty };
+
+                                                                    const updatedOrigs = {
+                                                                        ...(item.originals || {}),
+                                                                        allocations: {
+                                                                            ...(item.originals?.allocations || {}),
+                                                                            [m]: (item.originals?.allocations || {})[m] !== undefined ? (item.originals.allocations)[m] : (orig || '')
+                                                                        }
+                                                                    };
+
+                                                                    const updatedMetas = {
+                                                                        ...(item.originalMetas || {}),
+                                                                        allocations: {
+                                                                            ...(item.originalMetas?.allocations || {}),
+                                                                            [m]: (item.originalMetas?.allocations || {})[m] !== undefined ? (item.originalMetas.allocations)[m] : `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}`
+                                                                        }
+                                                                    };
+
+                                                                    ctx.updateContainer(item.id, { allocations: updatedAllocs, originals: updatedOrigs, originalMetas: updatedMetas }, item.deliveryMonth, 'yoshii', `型式 [${m}] 割振数`);
+                                                                }}
+                                                                className="text-right font-bold font-mono text-xs h-[20px] pr-1 border-none bg-transparent"
+                                                            />
+                                                        </div>
+                                                    );
+                                                })}
                                             </td>
 
-                                            <td className="p-1 bg-gray-50 text-right font-bold">{totalQty.toLocaleString()}</td>
+                                            <td className="p-1 readonly-cell text-right font-bold">{totalQty.toLocaleString()}</td>
                                             <td className="p-0.5"><DynamicSelect value={item.port} originalValue={(item.originals || {}).port} originalMeta={(item.originalMetas || {}).port} onChange={(val, cat, orig) => ctx.handleSelectChange(item.id, 'port', true, 'yoshii', false, '到着港')(val, cat, orig)} category="ports" options={ctx.masterData.yoshii.ports} /></td>
                                             <td className="p-0.5"><LocalInput type="date" value={item.etd} originalValue={(item.originals || {}).etd} originalMeta={(item.originalMetas || {}).etd} onChange={(v, orig) => ctx.updateContainer(item.id, { etd: v, originals: { ...(item.originals || {}), etd: item.originals?.etd !== undefined ? item.originals.etd : orig }, originalMetas: { ...(item.originalMetas || {}), etd: item.originalMetas?.etd !== undefined ? item.originalMetas.etd : `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}` } }, item.deliveryMonth, 'yoshii', 'ETD')} /></td>
                                             <td className="p-0.5"><LocalInput type="date" value={item.eta} originalValue={(item.originals || {}).eta} originalMeta={(item.originalMetas || {}).eta} refDate={item.etd} onChange={(v, orig) => ctx.updateContainer(item.id, { eta: v, originals: { ...(item.originals || {}), eta: item.originals?.eta !== undefined ? item.originals.eta : orig }, originalMetas: { ...(item.originalMetas || {}), eta: item.originalMetas?.eta !== undefined ? item.originalMetas.eta : `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}` } }, item.deliveryMonth, 'yoshii', 'ETA')} /></td>
@@ -3208,18 +3339,20 @@
                             return s.direction === 'asc' ? cmp : -cmp;
                         }
                     }
-                    return (a.sortOrder || 999999) - (b.sortOrder || 999999);
+                    const orderA = a.allocNo !== undefined ? a.allocNo : (a.sortOrder !== undefined ? a.sortOrder : 999999);
+                    const orderB = b.allocNo !== undefined ? b.allocNo : (b.sortOrder !== undefined ? b.sortOrder : 999999);
+                    return orderA - orderB;
                 });
             } else {
+                // Absolute Single Sort Rule: deliveryMonth -> allocNo / sortOrder (Allocation View Sequence)
                 displayContainers.sort((a, b) => {
                     const mA = a.deliveryMonth || '9999-99';
                     const mB = b.deliveryMonth || '9999-99';
                     if (mA !== mB) return mA.localeCompare(mB);
-                    const mgmtA = a.managementNo || 'ZZZZ';
-                    const mgmtB = b.managementNo || 'ZZZZ';
-                    const cmp = mgmtA.localeCompare(mgmtB, 'ja', { numeric: true });
-                    if (cmp !== 0) return cmp;
-                    return (a.sortOrder || 999999) - (b.sortOrder || 999999);
+
+                    const orderA = a.allocNo !== undefined ? a.allocNo : (a.sortOrder !== undefined ? a.sortOrder : 999999);
+                    const orderB = b.allocNo !== undefined ? b.allocNo : (b.sortOrder !== undefined ? b.sortOrder : 999999);
+                    return orderA - orderB;
                 });
             }
 
@@ -3285,7 +3418,7 @@
             let currentMonth = null;
             displayContainers.forEach(c => {
                 const m = c.deliveryMonth || '未設定';
-                if (sortConfig.length === 0 && m !== currentMonth) { groupedRows.push({ isDivider: true, monthLabel: m }); currentMonth = m; }
+                if (m !== currentMonth) { groupedRows.push({ isDivider: true, monthLabel: m }); currentMonth = m; }
                 groupedRows.push(c);
             });
 
@@ -3340,34 +3473,34 @@
                         <table className="w-full text-xs text-left border-collapse">
                             <thead className="bg-gray-100 border-b-2 sticky top-0 z-20">
                                 <tr className="bg-gray-100 border-b">
-                                    <th rowSpan="2" className="p-1 w-[80px] border-r">管理番号</th>
-                                    <th rowSpan="2" className="p-1 w-[80px] border-r">進行状況</th>
-                                    <th rowSpan="2" onClick={e => handleSortClick('containerNo', 'コンテナNO.', e)} className="p-1 w-[110px] cursor-pointer hover:bg-emerald-100 text-emerald-900 border-r">
+                                    <th rowSpan="2" className="p-1 w-[60px] border-r">管理番号</th>
+                                    <th rowSpan="2" className="p-1 w-[58px] border-r">進行状況</th>
+                                    <th rowSpan="2" onClick={e => handleSortClick('containerNo', 'コンテナNO.', e)} className="p-1 w-[98px] cursor-pointer hover:bg-emerald-100 text-emerald-900 border-r">
                                         コンテナNO.{getSortIndicator('containerNo')}
                                     </th>
-                                    <th rowSpan="2" className="p-1 min-w-[150px] border-r">積載型式</th>
+                                    <th rowSpan="2" className="p-1 w-[125px] min-w-[120px] border-r">積載型式</th>
                                     <th colSpan="3" className="p-1 bg-emerald-50 text-emerald-900 border-r text-center font-bold">補充部品 (PCS)</th>
-                                    <th rowSpan="2" className="p-1 min-w-[55px] border-r">割振数</th>
-                                    <th rowSpan="2" className="p-1 w-[55px] border-r">総数量</th>
-                                    <th rowSpan="2" onClick={e => handleSortClick('port', '到着港', e)} className="p-1 w-[48px] min-w-[45px] cursor-pointer hover:bg-emerald-100 text-emerald-900 border-r">
+                                    <th rowSpan="2" className="p-1 w-[48px] min-w-[45px] border-r">割振数</th>
+                                    <th rowSpan="2" className="p-1 w-[48px] min-w-[45px] border-r">総数量</th>
+                                    <th rowSpan="2" onClick={e => handleSortClick('port', '到着港', e)} className="p-1 w-[54px] min-w-[50px] cursor-pointer hover:bg-emerald-100 text-emerald-900 border-r">
                                         到着港{getSortIndicator('port')}
                                     </th>
-                                    <th rowSpan="2" onClick={e => handleSortClick('etd', 'ETD', e)} className="p-1 w-[50px] min-w-[48px] cursor-pointer hover:bg-emerald-100 text-emerald-900 border-r">
+                                    <th rowSpan="2" onClick={e => handleSortClick('etd', 'ETD', e)} className="p-1 w-[54px] min-w-[50px] cursor-pointer hover:bg-emerald-100 text-emerald-900 border-r">
                                         ETD{getSortIndicator('etd')}
                                     </th>
-                                    <th rowSpan="2" onClick={e => handleSortClick('eta', 'ETA', e)} className="p-1 w-[50px] min-w-[48px] cursor-pointer hover:bg-emerald-100 text-emerald-900 border-r">
+                                    <th rowSpan="2" onClick={e => handleSortClick('eta', 'ETA', e)} className="p-1 w-[54px] min-w-[50px] cursor-pointer hover:bg-emerald-100 text-emerald-900 border-r">
                                         ETA{getSortIndicator('eta')}
                                     </th>
-                                    <th rowSpan="2" className="p-1 w-[50px] min-w-[48px] border-r">フリータイム</th>
-                                    <th rowSpan="2" onClick={e => handleSortClick('drayageDeliveryDateCombo', '納品日時', e)} className="p-1 w-[85px] min-w-[80px] cursor-pointer hover:bg-emerald-100 text-emerald-900 border-r" colSpan="2">
+                                    <th rowSpan="2" className="p-1 w-[54px] min-w-[50px] border-r">フリータイム</th>
+                                    <th rowSpan="2" onClick={e => handleSortClick('drayageDeliveryDateCombo', '納品日時', e)} className="p-1 w-[82px] min-w-[78px] cursor-pointer hover:bg-emerald-100 text-emerald-900 border-r" colSpan="2">
                                         納品日時{getSortIndicator('drayageDeliveryDateCombo')}
                                     </th>
-                                    <th rowSpan="2" onClick={e => handleSortClick('drayageDestination', '納品先', e)} className="p-1 w-[100px] min-w-[90px] cursor-pointer hover:bg-emerald-100 text-emerald-900 border-r">
+                                    <th rowSpan="2" onClick={e => handleSortClick('drayageDestination', '納品先', e)} className="p-1 w-[190px] min-w-[180px] cursor-pointer hover:bg-emerald-100 text-emerald-900 border-r">
                                         納品先{getSortIndicator('drayageDestination')}
                                     </th>
-                                    <th rowSpan="2" className="p-1 min-w-[200px] notes-col border-r">備考</th>
-                                    <th rowSpan="2" className="p-1 w-[45px] min-w-[42px] border-r">サイズ</th>
-                                    <th rowSpan="2" className="p-1 w-[130px] min-w-[120px]">本船名</th>
+                                    <th rowSpan="2" className="p-1 w-[110px] min-w-[100px] notes-col border-r">備考</th>
+                                    <th rowSpan="2" className="p-1 w-[42px] min-w-[40px] border-r">サイズ</th>
+                                    <th rowSpan="2" className="p-1 w-[170px] min-w-[160px]">本船名</th>
                                 </tr>
                                 <tr className="bg-emerald-50/70 text-emerald-800 text-[10px] font-bold border-b">
                                     <th className="p-1 border-r text-center w-10">外装箱</th>
@@ -3397,11 +3530,11 @@
 
                                     return (
                                         <tr key={item.id} className={`border-b hover:bg-emerald-50 ${['出港済', '出荷済み', '納品完了'].includes(item.status) ? 'bg-green-50' : ''}`} data-month={item.deliveryMonth || '未設定'}>
-                                            <td className="p-1 bg-gray-50 text-center font-bold">{item.managementNo || '-'}</td>
-                                            <td className="p-1 bg-gray-50 text-center">{item.status || '-'}</td>
+                                            <td className="p-1 readonly-cell text-center font-bold">{item.managementNo || '-'}</td>
+                                            <td className="p-1 readonly-cell text-center">{item.status || '-'}</td>
                                             <td className="p-1 bg-gray-50 font-bold text-center">{item.containerNo || '-'}</td>
                                             
-                                            <td className="p-0.5 bg-gray-50 text-center align-middle font-bold text-gray-800">
+                                            <td className="p-0.5 readonly-cell text-center align-middle font-bold">
                                                 {cModels.map(m => (
                                                     <div key={m} className="h-5 flex items-center justify-center border-b last:border-b-0 border-gray-200 py-0 text-xs">{m}</div>
                                                 ))}
@@ -3483,22 +3616,20 @@
                                                 })}
                                             </td>
 
-                                            <td className="p-0.5 bg-gray-50 text-right align-middle">
+                                                                                        <td className="p-0.5 readonly-cell text-right align-middle font-mono">
                                                 {cModels.map(m => (
-                                                    <div key={m} className="h-5 flex items-center justify-end border-b last:border-b-0 border-gray-200 px-1 py-0 text-xs font-mono">
+                                                    <div key={m} className="h-5 flex items-center justify-end border-b last:border-b-0 border-gray-200 px-1 py-0 text-xs font-bold text-gray-700">
                                                         {Number(item.allocations[m] || 0).toLocaleString()}
                                                     </div>
                                                 ))}
-                                            </td>
-
-                                            <td className="p-1 bg-gray-50 text-right font-bold">{totalQty.toLocaleString()}</td>
-                                            <td className="p-1 bg-gray-50 text-center">{item.port || '-'}</td>
-                                            <td className="p-1 bg-gray-50 text-center">{item.etd || '-'}</td>
-                                            <td className="p-1 bg-gray-50 text-center">{item.eta || '-'}</td>
+                                            </td>  <td className="p-1 readonly-cell text-right font-bold">{totalQty.toLocaleString()}</td>
+                                            <td className="p-1 readonly-cell text-center">{item.port || '-'}</td>
+                                            <td className="p-0.5"><LocalInput type="date" value={item.etd} originalValue={(item.originals || {}).etd} originalMeta={(item.originalMetas || {}).etd} onChange={(v, orig) => ctx.updateContainer(item.id, { etd: v, originals: { ...(item.originals || {}), etd: item.originals?.etd !== undefined ? item.originals.etd : orig }, originalMetas: { ...(item.originalMetas || {}), etd: item.originalMetas?.etd !== undefined ? item.originalMetas.etd : `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}` } }, item.deliveryMonth, 'yoshii', 'ETD')} /></td>
+                                            <td className="p-0.5"><LocalInput type="date" value={item.eta} originalValue={(item.originals || {}).eta} originalMeta={(item.originalMetas || {}).eta} refDate={item.etd} onChange={(v, orig) => ctx.updateContainer(item.id, { eta: v, originals: { ...(item.originals || {}), eta: item.originals?.eta !== undefined ? item.originals.eta : orig }, originalMetas: { ...(item.originalMetas || {}), eta: item.originalMetas?.eta !== undefined ? item.originalMetas.eta : `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}` } }, item.deliveryMonth, 'yoshii', 'ETA')} /></td>
                                             <td className="p-0.5"><LocalInput type="date" value={item.freeTime} originalValue={(item.originals || {}).freeTime} originalMeta={(item.originalMetas || {}).freeTime} onChange={(v, orig) => ctx.updateContainer(item.id, { freeTime: v, originals: { ...(item.originals || {}), freeTime: item.originals?.freeTime !== undefined ? item.originals.freeTime : orig }, originalMetas: { ...(item.originalMetas || {}), freeTime: item.originalMetas?.freeTime !== undefined ? item.originalMetas.freeTime : `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}` } }, item.deliveryMonth, 'yoshii', 'フリータイム')} /></td>
                                             <td className="p-0.5"><LocalInput type="date" value={item.drayageDeliveryDate} originalValue={(item.originals || {}).drayageDeliveryDate} originalMeta={(item.originalMetas || {}).drayageDeliveryDate} refDate={item.freeTime || item.eta} onChange={(v, orig) => ctx.updateContainer(item.id, { drayageDeliveryDate: v, originals: { ...(item.originals || {}), drayageDeliveryDate: item.originals?.drayageDeliveryDate !== undefined ? item.originals.drayageDeliveryDate : orig }, originalMetas: { ...(item.originalMetas || {}), drayageDeliveryDate: item.originalMetas?.drayageDeliveryDate !== undefined ? item.originalMetas.drayageDeliveryDate : `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}` } }, item.deliveryMonth, 'yoshii', '納品日')} /></td>
                                             <td className="p-0.5"><LocalInput type="time" value={item.drayageDeliveryTime} originalValue={(item.originals || {}).drayageDeliveryTime} originalMeta={(item.originalMetas || {}).drayageDeliveryTime} onChange={(v, orig) => ctx.updateContainer(item.id, { drayageDeliveryTime: v, originals: { ...(item.originals || {}), drayageDeliveryTime: item.originals?.drayageDeliveryTime !== undefined ? item.originals.drayageDeliveryTime : orig }, originalMetas: { ...(item.originalMetas || {}), drayageDeliveryTime: item.originalMetas?.drayageDeliveryTime !== undefined ? item.originalMetas.drayageDeliveryTime : `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}` } }, item.deliveryMonth, 'yoshii', '納品時間')} className="text-center" /></td>
-                                            <td className="p-0.5"><DynamicSelect value={item.drayageDestination} originalValue={(item.originals || {}).drayageDestination} originalMeta={(item.originalMetas || {}).drayageDestination} onChange={(val, cat, orig) => ctx.handleSelectChange(item.id, 'drayageDestination', true, 'yoshii', false, '納品先')(val, cat, orig)} category="destinations" options={ctx.masterData.yoshii.destinations} /></td>
+                                            <td className="p-0.5 w-[190px] min-w-[180px]"><DynamicSelect value={item.drayageDestination} originalValue={(item.originals || {}).drayageDestination} originalMeta={(item.originalMetas || {}).drayageDestination} onChange={(val, cat, orig) => ctx.handleSelectChange(item.id, 'drayageDestination', true, 'yoshii', false, '納品先')(val, cat, orig)} category="destinations" options={ctx.masterData.yoshii.destinations} className="text-xs font-bold w-full text-center" /></td>
                                             <td className="p-0.5 notes-cell">
                                                 <LocalTextArea 
                                                     value={item.drayageNotes} 
@@ -3509,8 +3640,10 @@
                                                     className="text-left text-xs whitespace-normal break-all"
                                                 />
                                             </td>
-                                            <td className="p-1 bg-gray-50 text-center">{item.containerSize || '-'}</td>
-                                            <td className="p-1 bg-gray-50 text-center">{item.vessel || '-'}</td>
+                                            <td className="p-1 readonly-cell text-center">{item.containerSize || '-'}</td>
+                                                                                        <td className="p-0.5 readonly-cell text-center font-bold text-xs">
+                                                {item.vessel || '-'}
+                                            </td>
                                         </tr>
                                     )
                                 })}
@@ -3566,7 +3699,7 @@
                 const yr = String(d.getFullYear()).slice(-2);
                 const mo = String(d.getMonth() + 1).padStart(2, '0');
                 const dy = String(d.getDate()).padStart(2, '0');
-                return `${yr}/${mo}/${dy}`;
+                return `${yr}/${mo}/${dy} `;
             };
 
             const [yoshiiAllocMonth, setYoshiiAllocMonth] = useState(currentMonthStr);
@@ -3607,6 +3740,10 @@
             };
 
             const handleLoginSuccess = async (user) => {
+                if (user && user.name) {
+                    localStorage.setItem(LAST_OPERATOR_STORAGE_KEY, user.name);
+                }
+                localStorage.setItem(LAST_ACTIVE_TIME_KEY, new Date().toISOString());
                 setAuthUser(user);
                 setOperatorName(user.name);
                 setIsLoggedIn(true);
@@ -3617,15 +3754,51 @@
                     setCurrentView(initViews[0]);
                 }
 
-                // Record Login Session to Firestore
+                // Record Login Session with IP and Device Info to Firestore
                 const now = new Date();
                 const loginStr = `${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
                 loginTimestampRef.current = now;
+
+                const ua = navigator.userAgent || '';
+                let os = 'Unknown OS';
+                if (ua.includes('Win')) os = 'Windows';
+                else if (ua.includes('Mac')) os = 'Mac';
+                else if (ua.includes('Linux')) os = 'Linux';
+                else if (ua.includes('Android')) os = 'Android';
+                else if (ua.includes('iPhone') || ua.includes('iPad')) os = 'iOS';
+
+                let browser = 'Unknown Browser';
+                if (ua.includes('Edg')) browser = 'Edge';
+                else if (ua.includes('Chrome')) browser = 'Chrome';
+                else if (ua.includes('Safari')) browser = 'Safari';
+                else if (ua.includes('Firefox')) browser = 'Firefox';
+
+                const deviceInfo = `${os} / ${browser}`;
+
+                let ipAddress = '取得中...';
+                let ipLocation = '不明';
+
+                try {
+                    const res = await fetch('https://ipapi.co/json/').then(r => r.json()).catch(() => null);
+                    if (res && res.ip) {
+                        ipAddress = res.ip;
+                        const city = res.city || '';
+                        const country = res.country_name || res.country || '';
+                        ipLocation = [city, country].filter(Boolean).join(', ') || '不明';
+                    }
+                } catch (e) {
+                    console.log("IP fetch error fallback");
+                }
+
                 try {
                     const docRef = await db.collection('user_sessions').add({
                         operator: user.name,
                         roleLabel: user.label,
+                        appVersion: 'WebVer. 75',
                         loginTimeStr: loginStr,
+                        ipAddress: ipAddress,
+                        ipLocation: ipLocation,
+                        deviceInfo: deviceInfo,
                         createdAt: now.toISOString()
                     });
                     currentSessionIdRef.current = docRef.id;
@@ -3638,13 +3811,97 @@
                 setIsLoggedIn(false);
             };
 
+            // Perform logout due to idle or 23:59 curfew
+            const triggerAutoLogout = async (reasonText) => {
+                if (!isLoggedIn) return;
+                await recordLogoutSessionWithReason(reasonText);
+                setAuthUser(null);
+                setIsLoggedIn(false);
+            };
+
+            const recordLogoutSessionWithReason = async (reasonText) => {
+                if (!currentSessionIdRef.current || !loginTimestampRef.current) return;
+                const lastActiveIso = localStorage.getItem(LAST_ACTIVE_TIME_KEY);
+                const now = new Date();
+                
+                // Use last active time as actual logout time if available
+                const logoutDate = lastActiveIso ? new Date(lastActiveIso) : now;
+                const nowStr = `${logoutDate.getFullYear()}/${String(logoutDate.getMonth()+1).padStart(2,'0')}/${String(logoutDate.getDate()).padStart(2,'0')} ${String(logoutDate.getHours()).padStart(2,'0')}:${String(logoutDate.getMinutes()).padStart(2,'0')}:${String(logoutDate.getSeconds()).padStart(2,'0')}`;
+                const durationMinutes = Math.max(1, Math.round((logoutDate.getTime() - loginTimestampRef.current.getTime()) / (1000 * 60)));
+                
+                try {
+                    await db.collection('user_sessions').doc(currentSessionIdRef.current).update({
+                        logoutTimeStr: `${nowStr} (${reasonText || '切断'})`,
+                        logoutTimestamp: logoutDate.toISOString(),
+                        durationMinutes: durationMinutes
+                    });
+                } catch (e) { console.error("Session update error:", e); }
+                currentSessionIdRef.current = null;
+                loginTimestampRef.current = null;
+            };
+
             useEffect(() => {
+                if (!isLoggedIn) return;
+
+                // Activity listener to update last active timestamp
+                const updateActivity = () => {
+                    localStorage.setItem(LAST_ACTIVE_TIME_KEY, new Date().toISOString());
+                };
+
+                const events = ['mousemove', 'keydown', 'mousedown', 'touchstart', 'scroll'];
+                events.forEach(evt => window.addEventListener(evt, updateActivity));
+
+                // 1. Inactivity & 23:59 Interval Check (Every 10 seconds)
+                const checkInterval = setInterval(() => {
+                    const now = new Date();
+                    
+                    // 23:59 Night Curfew Check
+                    if (now.getHours() === 23 && now.getMinutes() === 59) {
+                        triggerAutoLogout('23:59強制切断');
+                        return;
+                    }
+
+                    // 15-minute Inactivity Check (Active or Tab Return)
+                    const lastActiveIso = localStorage.getItem(LAST_ACTIVE_TIME_KEY);
+                    if (lastActiveIso) {
+                        const lastActive = new Date(lastActiveIso);
+                        const diffMin = (now.getTime() - lastActive.getTime()) / (1000 * 60);
+                        if (diffMin >= AUTO_LOGOUT_MINUTES) {
+                            triggerAutoLogout(`⚠️ ${AUTO_LOGOUT_MINUTES}分無操作切断`);
+                        }
+                    }
+                }, 10000);
+
+                // Check immediately on tab visibility change
+                const handleVisibilityChange = () => {
+                    if (document.visibilityState === 'visible') {
+                        const now = new Date();
+                        const lastActiveIso = localStorage.getItem(LAST_ACTIVE_TIME_KEY);
+                        if (lastActiveIso) {
+                            const lastActive = new Date(lastActiveIso);
+                            const diffMin = (now.getTime() - lastActive.getTime()) / (1000 * 60);
+                            if (diffMin >= AUTO_LOGOUT_MINUTES) {
+                                triggerAutoLogout(`⚠️ ${AUTO_LOGOUT_MINUTES}分無操作切断`);
+                            }
+                        }
+                    }
+                };
+                document.addEventListener('visibilitychange', handleVisibilityChange);
+
                 const handleBeforeUnload = () => {
-                    if (currentSessionIdRef.current) recordLogoutSession();
+                    if (currentSessionIdRef.current) {
+                        recordLogoutSessionWithReason('画面閉じ切断');
+                    }
                 };
                 window.addEventListener('beforeunload', handleBeforeUnload);
-                return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-            }, []);
+
+                return () => {
+                    events.forEach(evt => window.removeEventListener(evt, updateActivity));
+                    clearInterval(checkInterval);
+                    document.removeEventListener('visibilitychange', handleVisibilityChange);
+                    window.removeEventListener('beforeunload', handleBeforeUnload);
+                };
+            }, [isLoggedIn]);
 
             const logOperation = async (sheetName, action, detail) => {
                 const now = new Date();
@@ -3654,6 +3911,7 @@
                         timestamp: timestampStr,
                         createdAt: now.toISOString(),
                         operator: operatorName || '未設定',
+                        appVersion: 'WebVer. 75',
                         sheetName, action, detail
                     });
                 } catch (e) { console.error("Log Error:", e); }
@@ -3743,8 +4001,35 @@
                         }
                     }
 
-                    const payload = { ...data, company: 'yoshii', deliveryMonth: targetMonth, updatedAt: new Date().toISOString() };
+                    let payload = { ...data, company: 'yoshii', deliveryMonth: targetMonth, updatedAt: new Date().toISOString() };
                     if (id) {
+                        const existingDoc = containers.find(c => c.id === id);
+                        if (existingDoc) {
+                            let mergedOrigs = { ...(existingDoc.originals || {}) };
+                            let mergedMetas = { ...(existingDoc.originalMetas || {}) };
+
+                            if (data.originals) {
+                                Object.keys(data.originals).forEach(fKey => {
+                                    const newOrigVal = data.originals[fKey];
+                                    const prevFieldVal = existingDoc[fKey] !== undefined ? String(existingDoc[fKey]) : '';
+                                    const newFieldVal = data[fKey] !== undefined ? String(data[fKey]) : prevFieldVal;
+
+                                    if (prevFieldVal === '' && mergedOrigs[fKey] === undefined) {
+                                        mergedOrigs[fKey] = newFieldVal;
+                                    } else if (prevFieldVal !== newFieldVal) {
+                                        mergedOrigs[fKey] = prevFieldVal;
+                                    } else {
+                                        mergedOrigs[fKey] = newOrigVal;
+                                    }
+                                });
+                                payload.originals = mergedOrigs;
+                            }
+
+                            if (data.originalMetas) {
+                                mergedMetas = { ...mergedMetas, ...data.originalMetas };
+                                payload.originalMetas = mergedMetas;
+                            }
+                        }
                         await db.collection('containers').doc(id).update(payload);
                         logOperation(sheet, '修正', fieldName ? `項目 [${fieldName}] を更新` : 'コンテナ情報を更新');
                     } else {
@@ -3835,13 +4120,120 @@
 
             const isAdmin = authUser && (authUser.role === 'ADMIN_ALL' || authUser.role === 'READ_ONLY');
 
-            const contextValue = { 
+            
+            const handleSelectChange = (id, field, isContainer = true, company = 'yoshii', autoLog = true, fieldLabel = '') => async (newVal, category, origPassed) => {
+                if (authUser && !authUser.canEdit) return;
+                
+                if (newVal === '__ADD_NEW__') {
+                    const newItem = prompt(`新しい【${fieldLabel || category}】を入力してください:`);
+                    if (newItem && newItem.trim()) {
+                        await addMasterItem(company, category, newItem.trim());
+                        newVal = newItem.trim();
+                    } else {
+                        return;
+                    }
+                }
+
+                if (isContainer) {
+                    const targetContainer = containers.find(c => c.id === id);
+                    if (!targetContainer) return;
+                    const prevVal = targetContainer[field] !== undefined && targetContainer[field] !== null ? String(targetContainer[field]) : '';
+                    if (prevVal === newVal) return;
+
+                    const metaStr = `${getFormattedShortDate()} ${operatorName || '未設定'}`;
+                    const existingOrig = targetContainer.originals?.[field];
+
+                    let origValToStore = prevVal;
+                    if (prevVal === '' && existingOrig === undefined) {
+                        origValToStore = newVal;
+                    }
+
+                    const updatedOrigs = {
+                        ...(targetContainer.originals || {}),
+                        [field]: origValToStore
+                    };
+
+                    const updatedMetas = {
+                        ...(targetContainer.originalMetas || {}),
+                        [field]: metaStr
+                    };
+
+                    await updateContainer(id, {
+                        [field]: newVal,
+                        originals: updatedOrigs,
+                        originalMetas: updatedMetas
+                    }, targetContainer.deliveryMonth, company, fieldLabel || field);
+                }
+            };
+
+
+            const handleDragStart = (e, containerId) => {
+                setDraggedRowId(containerId);
+                isDraggingOrSortingRef.current = true;
+                e.dataTransfer.setData('text/plain', containerId);
+                e.dataTransfer.effectAllowed = 'move';
+            };
+
+            const handleDragOver = (e, targetId) => {
+                e.preventDefault();
+                if (draggedRowId && draggedRowId !== targetId) {
+                    setDragOverRowId(targetId);
+                }
+            };
+
+            const handleDragEnd = () => {
+                setDraggedRowId(null);
+                setDragOverRowId(null);
+                isDraggingOrSortingRef.current = false;
+            };
+
+            const handleDrop = async (e, targetId, containerList) => {
+                e.preventDefault();
+                if (!draggedRowId || draggedRowId === targetId) {
+                    handleDragEnd();
+                    return;
+                }
+
+                const currentList = [...containerList];
+                const fromIdx = currentList.findIndex(c => c.id === draggedRowId);
+                const toIdx = currentList.findIndex(c => c.id === targetId);
+
+                if (fromIdx === -1 || toIdx === -1) {
+                    handleDragEnd();
+                    return;
+                }
+
+                const [movedItem] = currentList.splice(fromIdx, 1);
+                currentList.splice(toIdx, 0, movedItem);
+
+                // Update allocNo and sortOrder sequentially (1, 2, 3...)
+                const batch = db.batch();
+                currentList.forEach((c, idx) => {
+                    if (c.id) {
+                        const ref = db.collection('containers').doc(c.id);
+                        batch.update(ref, {
+                            allocNo: idx + 1,
+                            sortOrder: idx + 1,
+                            updatedAt: new Date().toISOString()
+                        });
+                    }
+                });
+
+                await batch.commit();
+                logOperation(getSheetLabel('yoshii', currentView), '並び替え', `コンテナ順序を手動変更 (1〜${currentList.length})`);
+                handleDragEnd();
+            };
+
+const contextValue = { 
                 masterData, plans, containers, yoshiiAllocMonth, setYoshiiAllocMonth, 
                 tableContainerRef, currentMonthStr, todayDateStr, operatorName, 
                 getFormattedShortDate, isChangeTrackingMode, handleStartTracking, 
                 handleClearTracking, updatePlan, updateContainer, deleteContainer, 
-                updateModelDetail, addMasterItem,
-                createGridNav, logOperation, authUser, selectedVendorFilter, setSelectedVendorFilter, shipScrollPosRef, drayScrollPosRef 
+                updateModelDetail, addMasterItem, handleSelectChange,
+                createGridNav, logOperation, authUser: authUser ? {
+                    ...authUser,
+                    canEdit: authUser.canEdit && (!authUser.editableViews || authUser.editableViews.length === 0 || authUser.editableViews.includes(currentView))
+                } : null, selectedVendorFilter, setSelectedVendorFilter, shipScrollPosRef, drayScrollPosRef, handleDragStart, handleDragOver, handleDragEnd, handleDrop, draggedRowId, dragOverRowId, dragDirection 
             };
 
             if (!appReady) return <div className="flex h-screen items-center justify-center font-bold">データ同期中...</div>;
@@ -3853,7 +4245,7 @@
                         <header className="h-[44px] bg-indigo-700 text-white flex items-center justify-between px-4 shadow no-print flex-shrink-0">
                             <div className="flex items-center gap-4">
                                 <a href="shipping.html" className="hover:bg-indigo-600 px-2 py-1 border rounded text-sm transition">ホーム</a>
-                                <h1 className="text-lg font-bold hidden md:block">吉井電気<span className="text-sm font-bold bg-indigo-900/80 px-2 py-0.5 rounded text-amber-300 font-mono text-xs ml-2">WebVer. 55</span></h1>
+                                <h1 className="text-lg font-bold hidden md:block">吉井電気<span className="text-sm font-bold bg-indigo-900/80 px-2 py-0.5 rounded text-amber-300 font-mono text-xs ml-2">WebVer. 75</span></h1>
                             </div>
                             
                             <div className="flex items-center gap-3">
