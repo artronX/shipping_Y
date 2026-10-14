@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>吉井電気 製品出荷管理システム (WebVer. 81)</title>
+    <title>吉井電気 製品出荷管理システム (WebVer. 83)</title>
     
     <!-- React 18 -->
     <script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js" crossorigin></script>
@@ -252,7 +252,7 @@ const { useState, useEffect, useRef, createContext, useContext } = React;
         const INITIAL_MASTER_DATA = {
             hitachi: { ports: ["東京", "神戸", "博多", "名古屋"], destinations: ["栃木", "五光物流", "高砂倉庫"], models: ["HFK-CV1B", "HFK-CS5000C", "HFK-VS6000T"], modelDetails: {} },
             yoshii: { ports: ["東京", "神戸", "博多", "名古屋"], destinations: ["吉井電気太田物流センター", "NXNP様 西日本", "東日本GLC 浦安Ⅲ"], models: ["ALC-06SK", "ALC-S14", "KS-LC24C"], productNames: ["ｱﾋﾞﾃﾗｯックス LEDｼｰﾘﾝｸﾞ L6畳", "ｱﾋﾞﾃﾗｯックス LEDｼｰﾘﾝｸﾞ L8畳"], modelDetails: {}, modelOrder: {} },
-            common: { statuses: ["未確定", "生産中", "検査待", "出港済", "出荷済み", "納品完了"], containerSizes: ["20FT", "40FT", "40HQ"], orderStatuses: ["計画", "発注確定"], splitTypes: ["全", "分納"] }
+            common: { statuses: ["未確定", "生産中", "検査待", "出港済", "出荷済み", "納品完了"], containerSizes: ["20GP", "40GP", "40HQ"], orderStatuses: ["計画", "発注確定"], splitTypes: ["全", "分納"] }
         };
 
         
@@ -353,7 +353,7 @@ const { useState, useEffect, useRef, createContext, useContext } = React;
                     <div className="bg-white rounded-xl shadow-2xl border border-slate-200 max-w-sm w-full p-6 space-y-5">
                         <div className="text-center space-y-1">
                             <h2 className="text-lg font-bold text-slate-800">吉井電気 製品出荷管理システム</h2>
-                            <p className="text-xs text-indigo-600 font-mono font-bold">権限認証ログイン (WebVer. 81)</p>
+                            <p className="text-xs text-indigo-600 font-mono font-bold">権限認証ログイン (WebVer. 83)</p>
                         </div>
 
                         {errorMsg && (
@@ -813,7 +813,7 @@ const { useState, useEffect, useRef, createContext, useContext } = React;
                         <div className="p-4 bg-indigo-900 text-white flex justify-between items-center">
                             <div className="flex items-center gap-3">
                                 <h3 className="font-bold text-base flex items-center gap-2">⚙ システム管理ログ・接続履歴</h3>
-                                <span className="bg-amber-400 text-slate-900 text-[10px] font-extrabold px-2 py-0.5 rounded font-mono">WebVer. 81</span>
+                                <span className="bg-amber-400 text-slate-900 text-[10px] font-extrabold px-2 py-0.5 rounded font-mono">WebVer. 83</span>
                             </div>
                             <button onClick={onClose} className="text-2xl font-bold hover:text-gray-300 leading-none">×</button>
                         </div>
@@ -3830,7 +3830,7 @@ const modelsSet = new Set();
                     const docRef = await db.collection('user_sessions').add({
                         operator: user.name,
                         roleLabel: user.label,
-                        appVersion: 'WebVer. 81',
+                        appVersion: 'WebVer. 83',
                         loginTimeStr: loginStr,
                         ipAddress: ipAddress,
                         ipLocation: ipLocation,
@@ -3947,7 +3947,7 @@ const modelsSet = new Set();
                         timestamp: timestampStr,
                         createdAt: now.toISOString(),
                         operator: operatorName || '未設定',
-                        appVersion: 'WebVer. 81',
+                        appVersion: 'WebVer. 83',
                         sheetName, action, detail
                     });
                 } catch (e) { console.error("Log Error:", e); }
@@ -3975,14 +3975,29 @@ const modelsSet = new Set();
 
                 auth.signInAnonymously().then(() => {
                     unsubMaster = db.collection('shipping_settings').doc('master_data_v5').onSnapshot(doc => {
-                        if (doc.exists) setMasterData(prev => ({ ...INITIAL_MASTER_DATA, ...doc.data() }));
-                        else db.collection('shipping_settings').doc('master_data_v5').set(INITIAL_MASTER_DATA);
+                        if (doc.exists) {
+                            const data = doc.data() || {};
+                            const merged = { ...INITIAL_MASTER_DATA, ...data };
+                            merged.common = { ...(merged.common || {}), containerSizes: ["20GP", "40GP", "40HQ"] };
+                            setMasterData(merged);
+                        } else {
+                            db.collection('shipping_settings').doc('master_data_v5').set(INITIAL_MASTER_DATA);
+                        }
                     });
                     unsubPlans = db.collection('shipments').orderBy('createdAt').onSnapshot(snapshot => {
                         if (!isDraggingOrSortingRef.current) setPlans(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
                     });
                     unsubContainers = db.collection('containers').orderBy('createdAt').onSnapshot(snapshot => {
-                        if (!isDraggingOrSortingRef.current) setContainers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+                        if (!isDraggingOrSortingRef.current) {
+                            const rawDocs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                            const convertedDocs = rawDocs.map(c => {
+                                let sz = c.containerSize;
+                                if (sz === '40FT') sz = '40GP';
+                                else if (sz === '20FT') sz = '20GP';
+                                return { ...c, containerSize: sz };
+                            });
+                            setContainers(convertedDocs);
+                        }
                         setAppReady(true);
                     });
                     unsubLogs = db.collection('operation_logs').orderBy('createdAt', 'desc').limit(300).onSnapshot(snapshot => {
@@ -4281,7 +4296,7 @@ const contextValue = {
                         <header className="h-[44px] bg-indigo-700 text-white flex items-center justify-between px-4 shadow no-print flex-shrink-0">
                             <div className="flex items-center gap-4">
                                 <a href="shipping.html" className="hover:bg-indigo-600 px-2 py-1 border rounded text-sm transition">ホーム</a>
-                                <h1 className="text-lg font-bold hidden md:block">吉井電気<span className="text-sm font-bold bg-indigo-900/80 px-2 py-0.5 rounded text-amber-300 font-mono text-xs ml-2">WebVer. 81</span></h1>
+                                <h1 className="text-lg font-bold hidden md:block">吉井電気<span className="text-sm font-bold bg-indigo-900/80 px-2 py-0.5 rounded text-amber-300 font-mono text-xs ml-2">WebVer. 83</span></h1>
                             </div>
                             
                             <div className="flex items-center gap-3">
