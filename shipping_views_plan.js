@@ -1,5 +1,5 @@
 // =========================================================
-// shipping_views_plan.js - 計画・割振り画面モジュール (WebVer. 115 マトリクス完全復元版)
+// shipping_views_plan.js - 計画・割振り画面モジュール (WebVer. 115 エラー完全解消版)
 // =========================================================
 
 const formatModelWithBreak = (m) => {
@@ -12,6 +12,113 @@ const formatModelWithBreak = (m) => {
             <br />
             {m.substring(idx + 1)}
         </span>
+    );
+};
+
+// 【型式編集モーダル】
+const ModelEditModal = ({ isOpen, onClose, company }) => {
+    const ctx = React.useContext(AppContext);
+    const [models, setModels] = React.useState([]);
+
+    React.useEffect(() => {
+        if (isOpen && ctx.masterData && ctx.masterData[company]) {
+            const currentModels = ctx.masterData[company].models || [];
+            const currentDetails = ctx.masterData[company].modelDetails || {};
+            
+            const list = currentModels.map(m => {
+                const dt = currentDetails[m] || {};
+                return {
+                    model: m,
+                    productName: dt.productName || '',
+                    janCode: dt.janCode || '',
+                    vendorCode: dt.vendorCode || ''
+                };
+            });
+            setModels(list);
+        }
+    }, [isOpen, ctx.masterData, company]);
+
+    if (!isOpen) return null;
+
+    const handleSave = async () => {
+        const detailsObj = {};
+        const modelsArr = [];
+
+        models.forEach(item => {
+            const m = item.model.trim();
+            if (m) {
+                modelsArr.push(m);
+                detailsObj[m] = {
+                    productName: item.productName,
+                    janCode: item.janCode,
+                    vendorCode: item.vendorCode
+                };
+            }
+        });
+
+        const newMaster = {
+            ...ctx.masterData,
+            [company]: {
+                ...(ctx.masterData[company] || {}),
+                models: modelsArr,
+                modelDetails: detailsObj
+            }
+        };
+
+        await firebase.firestore().collection('shipping_settings').doc('master_data_v5').set(newMaster, { merge: true });
+        onClose();
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-2xl flex flex-col max-h-[85vh] text-xs">
+                <h3 className="font-bold text-sm border-b pb-2 text-gray-800">✏ 型式一覧・基本情報の編集</h3>
+                <div className="overflow-y-auto flex-grow my-4 border rounded p-2">
+                    <table className="w-full text-left border-collapse">
+                        <thead className="bg-gray-100 font-bold sticky top-0">
+                            <tr>
+                                <th className="p-1 border">型式名</th>
+                                <th className="p-1 border w-16 text-center">仕入先</th>
+                                <th className="p-1 border">品名</th>
+                                <th className="p-1 border">JANコード</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {models.map((item, idx) => (
+                                <tr key={idx} className="border-b">
+                                    <td className="p-1 border font-bold">{item.model}</td>
+                                    <td className="p-1 border">
+                                        <input type="text" value={item.vendorCode} onChange={e => {
+                                            const newL = [...models];
+                                            newL[idx].vendorCode = e.target.value;
+                                            setModels(newL);
+                                        }} className="w-full border p-0.5 text-center font-mono"/>
+                                    </td>
+                                    <td className="p-1 border">
+                                        <input type="text" value={item.productName} onChange={e => {
+                                            const newL = [...models];
+                                            newL[idx].productName = e.target.value;
+                                            setModels(newL);
+                                        }} className="w-full border p-0.5"/>
+                                    </td>
+                                    <td className="p-1 border">
+                                        <input type="text" value={item.janCode} onChange={e => {
+                                            const newL = [...models];
+                                            newL[idx].janCode = e.target.value;
+                                            setModels(newL);
+                                        }} className="w-full border p-0.5 font-mono"/>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+                <div className="flex justify-end gap-2 border-t pt-3">
+                    <button onClick={onClose} className="bg-gray-200 text-gray-700 px-3 py-1 rounded font-bold">キャンセル</button>
+                    <button onClick={handleSave} className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded font-bold shadow">保存する</button>
+                </div>
+            </div>
+        </div>
     );
 };
 
