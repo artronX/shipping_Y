@@ -53,21 +53,19 @@
 
     <script type="text/babel">
         // =========================================================
-        // 【最重要】システムバージョン定義（★WebVer. 101へ更新）
+        // 【最重要】システムバージョン定義（★WebVer. 102へ更新）
         // =========================================================
-        const APP_VERSION = 'WebVer. 101';
+        const APP_VERSION = 'WebVer. 102';
 
         // AppContext（全体共有ステート）
         const AppContext = React.createContext(null);
 
-        // 本番用 Firebase 接続設定
-        const firebaseConfig = window.FIREBASE_CONFIG || {
-            apiKey: "AIzaSyD-YOUR-REAL-KEY-HERE", // グローバル設定があれば自動取得
-            authDomain: "shipping-management.firebaseapp.com",
-            projectId: "shipping-management",
-            storageBucket: "shipping-management.appspot.com",
-            messagingSenderId: "1234567890",
-            appId: "1:1234567890:web:abc123def456"
+        // V83原本より抽出した本番用 Firebase 接続設定
+        const firebaseConfig = {
+            apiKey: "AIzaSyDcnf0S5M0OsbCOR9yO7OC4eMKwrXmTbFc",
+            authDomain: "scedulex.firebaseapp.com",
+            projectId: "scedulex",
+            storageBucket: "scedulex.appspot.com"
         };
 
         if (!firebase.apps.length) {
