@@ -1,5 +1,5 @@
 // =========================================================
-// shipping_views_ship.js - 出荷日程・ドレージ画面モジュール (WebVer. 111 完全復元版)
+// shipping_views_ship.js - 出荷日程・ドレージ画面モジュール (WebVer. 112 色・スクロール完全修復版)
 // =========================================================
 
 // 【出荷日程画面ビュー】
@@ -91,7 +91,7 @@ const YoshiiShipView = () => {
         groupedRows.push(c);
     });
 
-    useEffect(() => {
+    React.useEffect(() => {
         if (filterMode === 'all' && ctx.tableContainerRef.current) {
             setTimeout(() => {
                 const targetEl = ctx.tableContainerRef.current.querySelector(`[data-month="${ctx.currentMonthStr}"]`);
@@ -100,7 +100,7 @@ const YoshiiShipView = () => {
                 }
             }, 300);
         }
-    }, [filterMode, ctx.currentMonthStr]);
+    }, [filterMode, ctx.currentMonthStr, displayContainers.length]);
 
     const handleExecuteExport = () => {
         if (exportModal.type === 'print') {
@@ -192,11 +192,11 @@ const YoshiiShipView = () => {
                             <th className="p-1 border min-w-[120px]">備考</th>
                         </tr>
                         <tr className="bg-emerald-50 text-[10px] font-bold border-b">
-                            <td colSpan={4} className="border text-center">補充部品 内訳詳細 →</td>
+                            <td colSpan={4} className="border text-center bg-gray-100">補充部品 内訳詳細 →</td>
                             <td className="border w-[40px] min-w-[40px] max-w-[40px] text-emerald-800">外装箱</td>
                             <td className="border w-[40px] min-w-[40px] max-w-[40px] text-emerald-800">化粧箱</td>
                             <td className="border w-[40px] min-w-[40px] max-w-[40px] text-emerald-800">ラベル</td>
-                            <td colSpan={8} className="border"></td>
+                            <td colSpan={8} className="border bg-gray-100"></td>
                         </tr>
                     </thead>
                     <tbody>
@@ -231,36 +231,36 @@ const YoshiiShipView = () => {
 
                             if (modelKeys.length === 0) {
                                 return (
-                                    <tr key={container.id || idx} className="hover:bg-emerald-50 border-b h-[24px]">
-                                        <td className="border font-bold">{container.managementNo || '-'}</td>
-                                        <td className="border">
+                                    <tr key={container.id || idx} className="hover:bg-gray-50 border-b h-[24px]">
+                                        <td className="border font-bold bg-white">{container.managementNo || '-'}</td>
+                                        <td className="border bg-white">
                                             <DynamicSelect value={container.status || '手配中'} originalValue={(container.originals || {}).status} originalMeta={(container.originalMetas || {}).status} onChange={(val, cat, orig) => ctx.handleSelectChange(container.id, 'status', true, 'yoshii', true, '進行状況')(val, cat, orig)} category="statuses" options={ctx.masterData.common.statuses} isCommon className="w-full text-center border-none bg-transparent"/>
                                         </td>
-                                        <td className="border">
+                                        <td className="border bg-white">
                                             <LocalInput value={container.containerNo || ''} originalValue={(container.originals || {}).containerNo} originalMeta={(container.originalMetas || {}).containerNo} onChange={(v, orig) => ctx.updateContainer(container.id, { containerNo: v }, container.deliveryMonth, 'yoshii', 'コンテナNO')} className="w-full text-center font-mono border-none bg-transparent"/>
                                         </td>
-                                        <td className="border text-gray-400 font-normal">-</td>
-                                        <td className="border text-gray-400">0</td>
-                                        <td className="border text-gray-400">0</td>
-                                        <td className="border text-gray-400">0</td>
-                                        <td className="border font-bold">0</td>
-                                        <td className="border font-extrabold bg-emerald-50 text-emerald-900">0</td>
-                                        <td className="border">
+                                        <td className="border text-gray-400 font-normal bg-white">-</td>
+                                        <td className="border text-gray-400 bg-white">0</td>
+                                        <td className="border text-gray-400 bg-white">0</td>
+                                        <td className="border text-gray-400 bg-white">0</td>
+                                        <td className="border font-bold bg-white">0</td>
+                                        <td className="border font-extrabold bg-emerald-100 text-emerald-900 font-mono">0</td>
+                                        <td className="border bg-white">
                                             <DynamicSelect value={container.port || ''} originalValue={(container.originals || {}).port} originalMeta={(container.originalMetas || {}).port} onChange={(val, cat, orig) => ctx.handleSelectChange(container.id, 'port', true, 'yoshii', false, '到着港')(val, cat, orig)} category="ports" options={ctx.masterData.yoshii.ports} className="w-full text-center border-none bg-transparent"/>
                                         </td>
-                                        <td className="border">
+                                        <td className="border bg-white">
                                             <LocalInput type="date" value={container.etd || ''} originalValue={(container.originals || {}).etd} originalMeta={(container.originalMetas || {}).etd} onChange={(v, orig) => ctx.updateContainer(container.id, { etd: v }, container.deliveryMonth, 'yoshii', 'ETD')} className="w-full text-center border-none bg-transparent"/>
                                         </td>
-                                        <td className="border">
+                                        <td className="border bg-white">
                                             <LocalInput type="date" value={container.eta || ''} originalValue={(container.originals || {}).eta} originalMeta={(container.originalMetas || {}).eta} onChange={(v, orig) => ctx.updateContainer(container.id, { eta: v }, container.deliveryMonth, 'yoshii', 'ETA')} className="w-full text-center border-none bg-transparent"/>
                                         </td>
-                                        <td className="border">
+                                        <td className="border bg-white">
                                             <DynamicSelect value={container.containerSize || container.size || ''} originalValue={(container.originals || {}).containerSize} originalMeta={(container.originalMetas || {}).containerSize} onChange={(val, cat, orig) => ctx.handleSelectChange(container.id, 'containerSize', true, 'yoshii', true, 'サイズ')(val, cat, orig)} category="containerSizes" options={ctx.masterData.common.containerSizes} isCommon className="w-full text-center border-none bg-transparent"/>
                                         </td>
-                                        <td className="border">
+                                        <td className="border bg-white">
                                             <LocalInput value={container.vessel || ''} originalValue={(container.originals || {}).vessel} originalMeta={(container.originalMetas || {}).vessel} onChange={(v, orig) => ctx.updateContainer(container.id, { vessel: v }, container.deliveryMonth, 'yoshii', '本船名')} className="w-full text-center border-none bg-transparent"/>
                                         </td>
-                                        <td className="border">
+                                        <td className="border bg-white">
                                             <LocalTextArea value={container.shipNotes || ''} originalValue={(container.originals || {}).shipNotes} originalMeta={(container.originalMetas || {}).shipNotes} onChange={(v, orig) => ctx.updateContainer(container.id, { shipNotes: v }, container.deliveryMonth, 'yoshii', '備考')}/>
                                         </td>
                                     </tr>
@@ -272,7 +272,7 @@ const YoshiiShipView = () => {
                                 const parts = container.spareParts?.[m] || {};
 
                                 return (
-                                    <tr key={`${container.id || idx}-${m}`} className="hover:bg-emerald-50 border-b h-[24px]">
+                                    <tr key={`${container.id || idx}-${m}`} className="hover:bg-gray-50 border-b h-[24px]">
                                         {mIdx === 0 && (
                                             <>
                                                 <td rowSpan={rowSpan} className="border font-bold bg-white align-middle">{container.managementNo || '-'}</td>
@@ -285,26 +285,26 @@ const YoshiiShipView = () => {
                                             </>
                                         )}
 
-                                        <td className="border font-bold text-left pl-1">{m}</td>
-                                        <td className="border w-[40px] min-w-[40px] max-w-[40px]">
+                                        <td className="border font-bold text-left pl-1 bg-white">{m}</td>
+                                        <td className="border w-[40px] min-w-[40px] max-w-[40px] bg-white">
                                             <LocalInput type="number" value={parts.outerBox !== undefined ? parts.outerBox : ''} onChange={(v) => {
                                                 const newParts = { ...(container.spareParts || {}), [m]: { ...(container.spareParts?.[m] || {}), outerBox: v === '' ? 0 : Number(v) } };
                                                 ctx.updateContainer(container.id, { spareParts: newParts }, container.deliveryMonth, 'yoshii', `型式 [${m}] 外装箱`);
                                             }} className="w-full text-right pr-1 border-none bg-transparent font-normal"/>
                                         </td>
-                                        <td className="border w-[40px] min-w-[40px] max-w-[40px]">
+                                        <td className="border w-[40px] min-w-[40px] max-w-[40px] bg-white">
                                             <LocalInput type="number" value={parts.innerBox !== undefined ? parts.innerBox : ''} onChange={(v) => {
                                                 const newParts = { ...(container.spareParts || {}), [m]: { ...(container.spareParts?.[m] || {}), innerBox: v === '' ? 0 : Number(v) } };
                                                 ctx.updateContainer(container.id, { spareParts: newParts }, container.deliveryMonth, 'yoshii', `型式 [${m}] 化粧箱`);
                                             }} className="w-full text-right pr-1 border-none bg-transparent font-normal"/>
                                         </td>
-                                        <td className="border w-[40px] min-w-[40px] max-w-[40px]">
+                                        <td className="border w-[40px] min-w-[40px] max-w-[40px] bg-white">
                                             <LocalInput type="number" value={parts.label !== undefined ? parts.label : ''} onChange={(v) => {
                                                 const newParts = { ...(container.spareParts || {}), [m]: { ...(container.spareParts?.[m] || {}), label: v === '' ? 0 : Number(v) } };
                                                 ctx.updateContainer(container.id, { spareParts: newParts }, container.deliveryMonth, 'yoshii', `型式 [${m}] ラベル`);
                                             }} className="w-full text-right pr-1 border-none bg-transparent font-normal"/>
                                         </td>
-                                        <td className="border text-right pr-1 font-bold text-emerald-800 font-mono">{qty.toLocaleString()}</td>
+                                        <td className="border text-right pr-1 font-bold text-emerald-800 font-mono bg-white">{qty.toLocaleString()}</td>
 
                                         {mIdx === 0 && (
                                             <>
@@ -342,7 +342,7 @@ const YoshiiShipView = () => {
     );
 };
 
-// 【ドレージ手配画面ビュー - 補充部品3項目・デフォルト当月・原本セル幅完全復元版】
+// 【ドレージ手配画面ビュー - 補充部品3項目・背景色・自動スクロール完全修復版】
 const YoshiiDrayageView = () => {
     const ctx = React.useContext(AppContext);
     const [exportModal, setExportModal] = React.useState({ isOpen: false, type: 'excel' });
@@ -431,7 +431,7 @@ const YoshiiDrayageView = () => {
         groupedRows.push(c);
     });
 
-    useEffect(() => {
+    React.useEffect(() => {
         if (filterMode === 'all' && ctx.tableContainerRef.current) {
             setTimeout(() => {
                 const targetEl = ctx.tableContainerRef.current.querySelector(`[data-month="${ctx.currentMonthStr}"]`);
@@ -440,7 +440,7 @@ const YoshiiDrayageView = () => {
                 }
             }, 300);
         }
-    }, [filterMode, ctx.currentMonthStr]);
+    }, [filterMode, ctx.currentMonthStr, displayContainers.length]);
 
     const handleExecuteExport = () => {
         if (exportModal.type === 'print') {
@@ -539,14 +539,14 @@ const YoshiiDrayageView = () => {
                             <th className="p-1 border w-[120px] min-w-[120px]">本船名</th>
                         </tr>
                         <tr className="bg-emerald-50 text-[10px] font-bold border-b">
-                            <td colSpan={4} className="border text-center">補充部品 内訳詳細 →</td>
+                            <td colSpan={4} className="border text-center bg-gray-100">補充部品 内訳詳細 →</td>
                             <td className="border w-[40px] min-w-[40px] max-w-[40px] text-emerald-800">外装箱</td>
                             <td className="border w-[40px] min-w-[40px] max-w-[40px] text-emerald-800">化粧箱</td>
                             <td className="border w-[40px] min-w-[40px] max-w-[40px] text-emerald-800">ラベル</td>
-                            <td colSpan={5} className="border"></td>
+                            <td colSpan={5} className="border bg-gray-100"></td>
                             <td className="border w-[75px] min-w-[75px] max-w-[75px] text-emerald-900 bg-emerald-100/70">納品日</td>
                             <td className="border w-[65px] min-w-[65px] max-w-[65px] text-emerald-900 bg-emerald-100/70">時間</td>
-                            <td colSpan={4} className="border"></td>
+                            <td colSpan={4} className="border bg-gray-100"></td>
                         </tr>
                     </thead>
                     <tbody>
@@ -581,40 +581,40 @@ const YoshiiDrayageView = () => {
 
                             if (modelKeys.length === 0) {
                                 return (
-                                    <tr key={container.id || idx} className="hover:bg-emerald-50 border-b h-[24px]">
-                                        <td className="border font-bold">{container.managementNo || '-'}</td>
-                                        <td className="border">
+                                    <tr key={container.id || idx} className="hover:bg-gray-50 border-b h-[24px]">
+                                        <td className="border font-bold bg-white">{container.managementNo || '-'}</td>
+                                        <td className="border bg-white">
                                             <DynamicSelect value={container.status || '手配中'} originalValue={(container.originals || {}).status} originalMeta={(container.originalMetas || {}).status} onChange={(val, cat, orig) => ctx.handleSelectChange(container.id, 'status', true, 'yoshii', true, '進行状況')(val, cat, orig)} category="statuses" options={ctx.masterData.common.statuses} isCommon className="w-full text-center border-none bg-transparent"/>
                                         </td>
-                                        <td className="border">
+                                        <td className="border bg-white">
                                             <LocalInput value={container.containerNo || ''} originalValue={(container.originals || {}).containerNo} originalMeta={(container.originalMetas || {}).containerNo} onChange={(v, orig) => ctx.updateContainer(container.id, { containerNo: v }, container.deliveryMonth, 'yoshii', 'コンテナNO')} className="w-full text-center font-mono border-none bg-transparent"/>
                                         </td>
-                                        <td className="border text-gray-400 font-normal">-</td>
-                                        <td className="border text-gray-400">0</td>
-                                        <td className="border text-gray-400">0</td>
-                                        <td className="border text-gray-400">0</td>
-                                        <td className="border font-bold">0</td>
-                                        <td className="border font-extrabold bg-emerald-50 text-emerald-900">0</td>
-                                        <td className="border">{container.port || '-'}</td>
-                                        <td className="border">{container.etd || '-'}</td>
-                                        <td className="border">{container.eta || '-'}</td>
-                                        <td className="border">
+                                        <td className="border text-gray-400 font-normal bg-white">-</td>
+                                        <td className="border text-gray-400 bg-white">0</td>
+                                        <td className="border text-gray-400 bg-white">0</td>
+                                        <td className="border text-gray-400 bg-white">0</td>
+                                        <td className="border font-bold bg-white">0</td>
+                                        <td className="border font-extrabold bg-emerald-100 text-emerald-900 font-mono">0</td>
+                                        <td className="border bg-white">{container.port || '-'}</td>
+                                        <td className="border bg-white">{container.etd || '-'}</td>
+                                        <td className="border bg-white">{container.eta || '-'}</td>
+                                        <td className="border bg-white">
                                             <LocalInput type="date" value={container.freeTime || ''} originalValue={(container.originals || {}).freeTime} originalMeta={(container.originalMetas || {}).freeTime} onChange={(v, orig) => ctx.updateContainer(container.id, { freeTime: v }, container.deliveryMonth, 'yoshii', 'フリータイム')} className="w-full text-center border-none bg-transparent"/>
                                         </td>
-                                        <td className="border">
+                                        <td className="border bg-white">
                                             <LocalInput type="date" value={container.drayageDeliveryDate || ''} originalValue={(container.originals || {}).drayageDeliveryDate} originalMeta={(container.originalMetas || {}).drayageDeliveryDate} onChange={(v, orig) => ctx.updateContainer(container.id, { drayageDeliveryDate: v }, container.deliveryMonth, 'yoshii', '納品日')} className="w-full text-center border-none bg-transparent"/>
                                         </td>
-                                        <td className="border">
+                                        <td className="border bg-white">
                                             <LocalInput type="time" value={container.drayageDeliveryTime || ''} originalValue={(container.originals || {}).drayageDeliveryTime} originalMeta={(container.originalMetas || {}).drayageDeliveryTime} onChange={(v, orig) => ctx.updateContainer(container.id, { drayageDeliveryTime: v }, container.deliveryMonth, 'yoshii', '時間')} className="w-full text-center border-none bg-transparent"/>
                                         </td>
-                                        <td className="border">
+                                        <td className="border bg-white">
                                             <DynamicSelect value={container.drayageDestination || ''} originalValue={(container.originals || {}).drayageDestination} originalMeta={(container.originalMetas || {}).drayageDestination} onChange={(val, cat, orig) => ctx.handleSelectChange(container.id, 'drayageDestination', true, 'yoshii', false, '納品先')(val, cat, orig)} category="destinations" options={ctx.masterData.yoshii.destinations} className="w-full text-center border-none bg-transparent"/>
                                         </td>
-                                        <td className="border">
+                                        <td className="border bg-white">
                                             <LocalTextArea value={container.drayageNotes || ''} originalValue={(container.originals || {}).drayageNotes} originalMeta={(container.originalMetas || {}).drayageNotes} onChange={(v, orig) => ctx.updateContainer(container.id, { drayageNotes: v }, container.deliveryMonth, 'yoshii', '備考')}/>
                                         </td>
-                                        <td className="border">{container.containerSize || container.size || '-'}</td>
-                                        <td className="border">{container.vessel || '-'}</td>
+                                        <td className="border bg-white">{container.containerSize || container.size || '-'}</td>
+                                        <td className="border bg-white">{container.vessel || '-'}</td>
                                     </tr>
                                 );
                             }
@@ -624,7 +624,7 @@ const YoshiiDrayageView = () => {
                                 const parts = container.spareParts?.[m] || {};
 
                                 return (
-                                    <tr key={`${container.id || idx}-${m}`} className="hover:bg-emerald-50 border-b h-[24px]">
+                                    <tr key={`${container.id || idx}-${m}`} className="hover:bg-gray-50 border-b h-[24px]">
                                         {mIdx === 0 && (
                                             <>
                                                 <td rowSpan={rowSpan} className="border font-bold bg-white align-middle">{container.managementNo || '-'}</td>
@@ -637,26 +637,26 @@ const YoshiiDrayageView = () => {
                                             </>
                                         )}
 
-                                        <td className="border font-bold text-left pl-1">{m}</td>
-                                        <td className="border w-[40px] min-w-[40px] max-w-[40px]">
+                                        <td className="border font-bold text-left pl-1 bg-white">{m}</td>
+                                        <td className="border w-[40px] min-w-[40px] max-w-[40px] bg-white">
                                             <LocalInput type="number" value={parts.outerBox !== undefined ? parts.outerBox : ''} onChange={(v) => {
                                                 const newParts = { ...(container.spareParts || {}), [m]: { ...(container.spareParts?.[m] || {}), outerBox: v === '' ? 0 : Number(v) } };
                                                 ctx.updateContainer(container.id, { spareParts: newParts }, container.deliveryMonth, 'yoshii', `型式 [${m}] 外装箱`);
                                             }} className="w-full text-right pr-1 border-none bg-transparent font-normal"/>
                                         </td>
-                                        <td className="border w-[40px] min-w-[40px] max-w-[40px]">
+                                        <td className="border w-[40px] min-w-[40px] max-w-[40px] bg-white">
                                             <LocalInput type="number" value={parts.innerBox !== undefined ? parts.innerBox : ''} onChange={(v) => {
                                                 const newParts = { ...(container.spareParts || {}), [m]: { ...(container.spareParts?.[m] || {}), innerBox: v === '' ? 0 : Number(v) } };
                                                 ctx.updateContainer(container.id, { spareParts: newParts }, container.deliveryMonth, 'yoshii', `型式 [${m}] 化粧箱`);
                                             }} className="w-full text-right pr-1 border-none bg-transparent font-normal"/>
                                         </td>
-                                        <td className="border w-[40px] min-w-[40px] max-w-[40px]">
+                                        <td className="border w-[40px] min-w-[40px] max-w-[40px] bg-white">
                                             <LocalInput type="number" value={parts.label !== undefined ? parts.label : ''} onChange={(v) => {
                                                 const newParts = { ...(container.spareParts || {}), [m]: { ...(container.spareParts?.[m] || {}), label: v === '' ? 0 : Number(v) } };
                                                 ctx.updateContainer(container.id, { spareParts: newParts }, container.deliveryMonth, 'yoshii', `型式 [${m}] ラベル`);
                                             }} className="w-full text-right pr-1 border-none bg-transparent font-normal"/>
                                         </td>
-                                        <td className="border text-right pr-1 font-bold text-emerald-800 font-mono">{qty.toLocaleString()}</td>
+                                        <td className="border text-right pr-1 font-bold text-emerald-800 font-mono bg-white">{qty.toLocaleString()}</td>
 
                                         {mIdx === 0 && (
                                             <>
