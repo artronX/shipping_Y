@@ -53,15 +53,15 @@
 
     <script type="text/babel">
         // =========================================================
-        // 【最重要】システムバージョン定義（★バージョン変更時はここ1箇所のみ修正）
+        // 【最重要】システムバージョン定義（★WebVer. 98へ更新）
         // =========================================================
-        const APP_VERSION = 'WebVer. 97';
+        const APP_VERSION = 'WebVer. 98';
 
         // AppContext（全体共有ステート）
         const AppContext = React.createContext(null);
 
-        // Firebase 初期化設定 (環境に合わせて構成情報を入力)
-        const firebaseConfig = {
+        // Firebase 初期化設定（※本番用接続設定が未読み込みの場合はフォールバック接続を試行）
+        let firebaseConfig = {
             apiKey: "YOUR_API_KEY",
             authDomain: "YOUR_PROJECT.firebaseapp.com",
             projectId: "YOUR_PROJECT_ID",
@@ -69,6 +69,11 @@
             messagingSenderId: "YOUR_SENDER_ID",
             appId: "YOUR_APP_ID"
         };
+
+        // 既存のグローバル設定が存在する場合は優先適用
+        if (window.FIREBASE_CONFIG) {
+            firebaseConfig = window.FIREBASE_CONFIG;
+        }
 
         if (!firebase.apps.length) {
             firebase.initializeApp(firebaseConfig);
@@ -104,9 +109,9 @@
                 passwords: ['JPZ10345'],
                 role: 'VENDOR_JP',
                 label: 'JP専用',
-                allowedViews: ['yoshii_alloc', 'yoshii_ship'], // 割振りと出荷日程のみ表示
-                editableViews: ['yoshii_ship'],                 // 出荷日程表のみ編集可（〇）、割振りは閲覧のみ（×）
-                canViewLogs: false,                            // ログ履歴は非表示
+                allowedViews: ['yoshii_alloc', 'yoshii_ship'],
+                editableViews: ['yoshii_ship'],
+                canViewLogs: false,
                 vendorRestriction: 'JP'
             },
             {
@@ -140,8 +145,8 @@
                 passwords: ['YosiiZ'],
                 role: 'DRAYAGE_YO',
                 label: 'YOドレージ専用',
-                allowedViews: ['yoshii_drayage'],               // ドレージ手配のみ表示
-                editableViews: ['yoshii_drayage'],               // ドレージ手配のみ編集可（〇）
+                allowedViews: ['yoshii_drayage'],
+                editableViews: ['yoshii_drayage'],
                 canViewLogs: false,
                 vendorRestriction: 'YO'
             }
@@ -149,7 +154,6 @@
 
         // メインアプリケーションコンポーネント
         const App = () => {
-            // 状態管理ステート
             const [authUser, setAuthUser] = React.useState(null);
             const [loginPassword, setLoginPassword] = React.useState('');
             const [loginError, setLoginError] = React.useState('');
@@ -177,7 +181,6 @@
             const shipScrollPosRef = React.useRef(null);
             const drayScrollPosRef = React.useRef(null);
 
-            // 日付フォーマット取得
             const getFormattedShortDate = () => {
                 const now = new Date();
                 const yy = String(now.getFullYear()).slice(-2);
@@ -186,7 +189,6 @@
                 return `${yy}/${mm}/${dd}`;
             };
 
-            // ログイン処理
             const handleLogin = async (e) => {
                 e.preventDefault();
                 setLoginError('');
@@ -210,25 +212,22 @@
 
                 setAuthUser(userObj);
                 
-                // 権限で許可されている最初の画面をデフォルト選択
                 if (matchedAuth.allowedViews && matchedAuth.allowedViews.length > 0) {
                     setCurrentView(matchedAuth.allowedViews[0]);
                 }
 
-                // ベンダー限定の場合はフィルターを固定
                 if (matchedAuth.vendorRestriction) {
                     setSelectedVendorFilter(matchedAuth.vendorRestriction);
                 } else {
                     setSelectedVendorFilter('ALL');
                 }
 
-                // セッション接続記録を Firestore へ送信 (APP_VERSION 参照)
                 try {
                     const now = new Date();
                     const docRef = await db.collection('user_sessions').add({
                         operator: operatorName,
                         roleLabel: matchedAuth.label,
-                        appVersion: APP_VERSION, // ★最先頭定数を参照
+                        appVersion: APP_VERSION,
                         loginTimeStr: now.toLocaleString('ja-JP'),
                         createdAt: now.toISOString()
                     });
@@ -238,7 +237,6 @@
                 }
             };
 
-            // ログアウト処理
             const handleLogout = () => {
                 if (currentSessionIdRef.current) {
                     try {
@@ -251,7 +249,6 @@
                 setLoginPassword('');
             };
 
-            // リアルタイムデータ同期 (Firestore)
             React.useEffect(() => {
                 if (!authUser) return;
 
@@ -284,7 +281,6 @@
                 };
             }, [authUser]);
 
-            // 操作ログ送信関数
             const logOperation = async (sheetName, action, detail) => {
                 try {
                     await db.collection('operation_logs').add({
@@ -295,7 +291,6 @@
                 } catch (e) { console.error("Log error:", e); }
             };
 
-            // データ更新用関数ヘルパー群
             const updatePlan = async (docId, updateData, descStr) => {
                 if (docId) {
                     await db.collection('shipments').doc(docId).update(updateData);
@@ -368,7 +363,6 @@
                 }
             };
 
-            // 変更比較・記録モード制御
             const handleStartTracking = () => {
                 setIsChangeTrackingMode(true);
                 alert("【変更記録モード開始】\nこれ以降に変更されたセルが黄色で強調表示されます。");
@@ -380,7 +374,6 @@
                 }
             };
 
-            // 矢印キー・Gridナビゲーション制御
             const createGridNav = (prefix, maxRow, maxCol) => (e) => {
                 if (!e.target || !e.target.dataset || !e.target.dataset.gridId) return;
                 const parts = e.target.dataset.gridId.split('-');
@@ -403,14 +396,12 @@
                 }
             };
 
-            // 画面ごとの編集権限判定ヘルパー (動的判定)
             const canEditCurrentView = authUser && authUser.editableViews && authUser.editableViews.includes(currentView);
 
-            // Context 値の集約
             const contextValue = {
                 authUser: {
                     ...authUser,
-                    canEdit: canEditCurrentView // ★画面（タブ）に応じた動的編集権限を注入
+                    canEdit: canEditCurrentView
                 },
                 operatorName, setOperatorName,
                 currentView, setCurrentView,
@@ -425,7 +416,6 @@
                 getFormattedShortDate, createGridNav
             };
 
-            // 未ログイン時：ログイン画面表示
             if (!authUser) {
                 return (
                     <div className="h-screen flex items-center justify-center bg-slate-900 p-4">
@@ -482,7 +472,6 @@
             return (
                 <AppContext.Provider value={contextValue}>
                     <div className="h-full flex flex-col">
-                        {/* メインヘッダーナビゲーション */}
                         <header className="bg-indigo-900 text-white p-3 flex justify-between items-center shadow-md flex-shrink-0 no-print">
                             <div className="flex items-center gap-4">
                                 <div className="flex items-center gap-2">
@@ -497,7 +486,6 @@
                                     </h1>
                                 </div>
 
-                                {/* 権限に応じた表示可能画面（タブ）のみをレンダリング */}
                                 <nav className="flex items-center gap-1 bg-indigo-950 p-1 rounded-lg border border-indigo-800 text-xs font-bold">
                                     {authUser.allowedViews.includes('yoshii_plan') && (
                                         <button 
@@ -558,7 +546,6 @@
                             </div>
                         </header>
 
-                        {/* メインビュー描画エリア */}
                         <main className="flex-grow flex flex-col overflow-hidden relative">
                             {currentView === 'yoshii_plan' && <YoshiiPlanView />}
                             {currentView === 'yoshii_alloc' && <YoshiiAllocationView />}
@@ -566,7 +553,6 @@
                             {currentView === 'yoshii_drayage' && <YoshiiDrayageView />}
                         </main>
 
-                        {/* 管理ログ表示モーダル */}
                         <LogViewModal 
                             isOpen={isLogModalOpen} 
                             onClose={() => setIsLogModalOpen(false)} 
@@ -581,7 +567,7 @@
         ReactDOM.createRoot(document.getElementById('root')).render(<App />);
     </script>
 
-    <!-- モジュールJavaScriptファイルの読み込み (WebVer. 97) -->
+    <!-- モジュールJavaScriptファイルの順次読み込み -->
     <script type="text/babel" src="shipping_logs.js"></script>
     <script type="text/babel" src="shipping_exports.js"></script>
     <script type="text/babel" src="shipping_views.js"></script>
