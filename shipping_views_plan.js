@@ -1,5 +1,5 @@
 // =========================================================
-// shipping_views_plan.js - 計画・割振り画面モジュール
+// shipping_views_plan.js - 計画・割振り画面モジュール (WebVer. 107 修復版)
 // =========================================================
 
 const formatModelWithBreak = (m) => {
@@ -600,7 +600,7 @@ const YoshiiPlanView = () => {
     );
 };
 
-// 【コンテナ割振り画面ビュー - 固定幅 62px レイアウト】
+// 【コンテナ割振り画面ビュー - V95原本通り一律固定幅 (w-[62px] min-w-[62px])】
 const YoshiiAllocationView = () => {
     const ctx = React.useContext(AppContext);
     const [exportModal, setExportModal] = React.useState({ isOpen: false, type: 'excel' });
@@ -654,7 +654,7 @@ const YoshiiAllocationView = () => {
         const mgmt = String(c.managementNo || '').trim();
         if (!mgmt || mgmt === '-') return 999999;
 
-        const match = mgmt.match(/^([A-Za-z]+)(\d+)(?:-(\d+))?$/);
+        const match = mgmt.match(/^([A-Za-z]+)(\d+)(?:-(\d+))?\$/);
         if (match) {
             const prefix = match[1].toUpperCase();
             const num1 = parseInt(match[2], 10);
@@ -848,7 +848,7 @@ const YoshiiAllocationView = () => {
                                 <th className="p-1 border w-[90px] min-w-[90px] sticky left-[104px] top-0 bg-gray-200 z-40 text-xs">管理番号</th>
                                 <th className="p-1 border w-[76px] min-w-[70px] sticky left-[194px] top-0 bg-gray-200 z-40 text-xs">到着港</th>
                                 {models.map(m => (
-                                    <th key={m} className="p-1 border bg-emerald-100 text-xs leading-tight align-bottom model-hdr w-[62px] min-w-[62px] max-w-[62px]" title={m}>
+                                    <th key={m} className="p-1 border bg-emerald-100 text-xs leading-tight align-bottom model-hdr w-[62px] min-w-[62px]" title={m}>
                                         {formatModelWithBreak(m)}
                                     </th>
                                 ))}
@@ -861,7 +861,7 @@ const YoshiiAllocationView = () => {
                                 <td className="p-1 border sticky left-[194px] bg-gray-50 z-40 text-right pr-1.5 font-extrabold text-emerald-900 bg-emerald-100/60">
                                     {models.reduce((sum, m) => sum + (Number(modelTotals[m]) || 0), 0).toLocaleString()}
                                 </td>
-                                {models.map(m => <td key={m} className="p-1 border font-bold text-right pr-1.5 text-xs w-[62px] min-w-[62px] max-w-[62px]">{Number(modelTotals[m]).toLocaleString()}</td>)}
+                                {models.map(m => <td key={m} className="p-1 border font-bold text-right pr-1.5 text-xs w-[62px] min-w-[62px]">{Number(modelTotals[m]).toLocaleString()}</td>)}
                                 <td className="p-1 border bg-gray-50 no-print"></td>
                             </tr>
                             <tr className="bg-gray-100 font-bold text-xs text-gray-800 border-b-2 border-gray-300">
@@ -877,7 +877,7 @@ const YoshiiAllocationView = () => {
                                 {models.map(m => {
                                     const allocated = monthContainers.reduce((sum, c) => sum + (Number(getContainerAllocationQty(c.allocations, m)) || 0), 0);
                                     const remain = modelTotals[m] - allocated;
-                                    return <td key={m} className={`p-1 border font-bold text-right pr-1.5 text-xs w-[62px] min-w-[62px] max-w-[62px] ${remain < 0 ? 'text-red-600' : remain > 0 ? 'text-blue-600' : 'text-green-600'}`}>{remain.toLocaleString()}</td>;
+                                    return <td key={m} className={`p-1 border font-bold text-right pr-1.5 text-xs w-[62px] min-w-[62px] ${remain < 0 ? 'text-red-600' : remain > 0 ? 'text-blue-600' : 'text-green-600'}`}>{remain.toLocaleString()}</td>;
                                 })}
                                 <td className="p-1 border bg-gray-100 no-print"></td>
                             </tr>
@@ -927,7 +927,7 @@ const YoshiiAllocationView = () => {
                                         {models.map((m, mIdx) => {
                                             const cellValue = getContainerAllocationQty(container.allocations, m);
                                             return (
-                                                <td key={m} className="matrix-td px-0.5 w-[62px] min-w-[62px] max-w-[62px]">
+                                                <td key={m} className="matrix-td px-0.5 w-[62px] min-w-[62px]">
                                                     <LocalInput 
                                                         type="number" 
                                                         value={cellValue} 
