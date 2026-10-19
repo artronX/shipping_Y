@@ -1,6 +1,197 @@
 // =========================================================
-// shipping_components.js - 共通入力UIコンポーネント
+// shipping_components.js - 共通入力UIコンポーネント & モーダル
 // =========================================================
+
+// 【型式編集・削除モーダルコンポーネント】
+const ModelEditModal = ({ isOpen, onClose, company='yoshii' }) => {
+    const ctx = React.useContext(AppContext);
+    const [models, setModels] = React.useState([]);
+    const [editingModel, setEditingModel] = React.useState(null);
+    const [newModelName, setNewModelName] = React.useState('');
+    const [deleteTarget, setDeleteTarget] = React.useState(null);
+
+    React.useEffect(() => {
+        if (isOpen) {
+            const masterModels = ctx.masterData[company]?.models || [];
+            const planModels = ctx.plans.filter(p => p.company === company && p.model).map(p => p.model);
+            const mergedSet = new Set([...masterModels, ...planModels]);
+            const modelOrders = ctx.masterData[company]?.modelOrder || {};
+            const compiledModels = Array.from(mergedSet).sort((a, b) => {
+                const orderA = modelOrders[a] !== undefined ? modelOrders[a] : 9999;
+                const orderB = modelOrders[b] !== undefined ? modelOrders[b] : 9999;
+                if (orderA !== orderB) return orderA - orderB;
+                return a.localeCompare(b, 'ja');
+            });
+            setModels(compiledModels);
+        }
+    }, [isOpen, ctx.masterData, ctx.plans, company]);
+
+    if (!isOpen) return null;
+
+    const handleStartEdit = (m) => {
+        setEditingModel(m);
+        setNewModelName(m);
+    };
+
+    const handleSaveEdit = async () => {
+        if (!newModelName.trim()) return alert("型式名を入力してください。");
+        const targetOld = editingModel;
+        const targetNew = newModelName.trim();
+
+        if (targetOld === targetNew) {
+            setEditingModel(null);
+            return;
+        }
+
+        const currentMaster = ctx.masterData[company] || {};
+        const updatedModels = Array.from(new Set([...(currentMaster.models || []).map(m => m === targetOld ? targetNew : m), targetNew]));
+        const currentDetails = { ...(currentMaster.modelDetails || {}) };
+        if (currentDetails[targetOld]) {
+            currentDetails[targetNew] = currentDetails[targetOld];
+            delete currentDetails[targetOld];
+        }
+
+        const newMaster = {
+            ...ctx.masterData,
+            [company]: { ...currentMaster, models: updatedModels, modelDetails: currentDetails }
+        };
+
+        await firebase.firestore().collection('shipping_settings').doc('master_data_v5').set(newMaster, { merge: true });
+
+        const normOld = normalizeModelCode(targetOld);
+        const matchingPlans = ctx.plans.filter(p => p.company === company && normalizeModelCode(p.model) === normOld);
+        if (matchingPlans.length > 0) {
+            const batch = firebase.firestore().batch();
+            matchingPlans.forEach(p => {
+                batch.update(firebase.firestore().collection('shipments').doc(p.id), { model: targetNew });
+            });
+            await batch.commit();
+        }
+
+        ctx.logOperation('型式マスタ', '修正', `型式名を [${targetOld}] から [${targetNew}] へ更新`);
+        setEditingModel(null);
+    };
+
+    const promptDeleteConfirm = (modelToDelete) => {
+        const normTarget = normalizeModelCode(modelToDelete);
+        const matchingPlans = ctx.plans.filter(p => p.company === company && normalizeModelCode(p.model) === normTarget);
+        const totalQty = matchingPlans.reduce((sum, p) => sum + Number(p.quantity || 0), 0);
+        setDeleteTarget({ model: modelToDelete, totalQty });
+    };
+
+    const handleExecuteDeleteModel = async () => {
+        if (!deleteTarget) return;
+        const modelToDelete = deleteTarget.model;
+
+        const currentMaster = ctx.masterData[company] || {};
+        const updatedModels = (currentMaster.models || []).filter(m => m !== modelToDelete);
+        const currentDetails = { ...(currentMaster.modelDetails || {}) };
+        delete currentDetails[modelToDelete];
+
+        const newMaster = {
+            ...ctx.masterData,
+            [company]: { ...currentMaster, models: updatedModels, modelDetails: currentDetails }
+        };
+
+        await firebase.firestore().collection('shipping_settings').doc('master_data_v5').set(newMaster, { merge: true });
+
+        const normTarget = normalizeModelCode(modelToDelete);
+        const matchingPlans = ctx.plans.filter(p => p.company === company && normalizeModelCode(p.model) === normTarget);
+        if (matchingPlans.length > 0) {
+            const batch = firebase.firestore().batch();
+            matchingPlans.forEach(p => {
+                batch.delete(firebase.firestore().collection('shipments').doc(p.id));
+            });
+            await batch.commit();
+        }
+
+        ctx.logOperation('型式マスタ', '削除', `型式 [${modelToDelete}] (計画数: ${deleteTarget.totalQty}) を削除`);
+        setDeleteTarget(null);
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-xl h-[75vh] flex flex-col relative">
+                <div className="p-4 bg-emerald-700 text-white flex justify-between items-center rounded-t-lg">
+                    <h3 className="font-bold text-base flex items-center gap-2">✏ 型式マスタの編集・削除</h3>
+                    <button onClick={onClose} className="text-xl font-bold hover:text-gray-300">×</button>
+                </div>
+                <div className="p-4 overflow-y-auto flex-grow">
+                    <table className="w-full text-xs border-collapse">
+                        <thead className="bg-gray-100 sticky top-0">
+                            <tr className="border-b text-left">
+                                <th className="p-2 border">登録型式名</th>
+                                <th className="p-2 border w-24 text-center">編集</th>
+                                <th className="p-2 border w-20 text-center">削除</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {models.length === 0 ? (
+                                <tr><td colSpan="3" className="p-4 text-center text-gray-500">登録型式はありません。</td></tr>
+                            ) : (
+                                models.map(m => (
+                                    <tr key={m} className="border-b hover:bg-gray-50">
+                                        <td className="p-2 border font-bold">
+                                            {editingModel === m ? (
+                                                <input 
+                                                    type="text" 
+                                                    value={newModelName} 
+                                                    onChange={e => setNewModelName(e.target.value)} 
+                                                    className="w-full border p-1 rounded font-bold text-sm bg-yellow-50"
+                                                    autoFocus
+                                                />
+                                            ) : (
+                                                m
+                                            )}
+                                        </td>
+                                        <td className="p-2 border text-center">
+                                            {editingModel === m ? (
+                                                <button onClick={handleSaveEdit} className="bg-blue-600 text-white px-2 py-1 rounded font-bold hover:bg-blue-700">保存</button>
+                                            ) : (
+                                                <button onClick={() => handleStartEdit(m)} className="bg-gray-200 text-gray-800 px-2 py-1 rounded font-bold hover:bg-gray-300">✏ 修正</button>
+                                            )}
+                                        </td>
+                                        <td className="p-2 border text-center">
+                                            <button onClick={() => promptDeleteConfirm(m)} className="bg-red-500 text-white px-2 py-1 rounded font-bold hover:bg-red-600">削除</button>
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+                <div className="p-3 bg-gray-100 border-t flex justify-end">
+                    <button onClick={onClose} className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-1 rounded text-xs font-bold">閉じる</button>
+                </div>
+
+                {deleteTarget && (
+                    <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                        <div className="bg-white rounded-xl shadow-2xl border-2 border-red-500 max-w-md w-full p-6 space-y-4 text-center">
+                            <div className="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto text-2xl font-bold">⚠️</div>
+                            <h3 className="text-base font-bold text-slate-800 border-b pb-2">型式データの完全削除確認</h3>
+                            <div className="bg-red-50 p-4 rounded-lg border border-red-200 text-left space-y-2 text-xs">
+                                <p className="font-bold text-slate-700">以下の型式および関連計画データを削除します。</p>
+                                <div className="flex justify-between items-center bg-white p-2.5 rounded border border-red-300">
+                                    <span className="text-gray-600 font-bold">対象型式名:</span>
+                                    <span className="text-red-600 font-extrabold text-sm font-mono">{deleteTarget.model}</span>
+                                </div>
+                                <div className="flex justify-between items-center bg-white p-2.5 rounded border border-red-300">
+                                    <span className="text-gray-600 font-bold">年間合計計画台数:</span>
+                                    <span className="text-emerald-700 font-extrabold text-sm">{deleteTarget.totalQty.toLocaleString()} 台</span>
+                                </div>
+                            </div>
+                            <p className="text-xs text-red-600 font-bold">※削除するとデータベースから計画数が消去されます。本当に実行しますか？</p>
+                            <div className="flex justify-end gap-3 pt-2">
+                                <button onClick={() => setDeleteTarget(null)} className="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300 font-bold text-xs text-gray-700">キャンセル</button>
+                                <button onClick={handleExecuteDeleteModel} className="px-5 py-2 rounded bg-red-600 hover:bg-red-700 font-bold text-xs text-white shadow">本当に削除する</button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
 
 const ScheduleFilterSortControl = ({ 
     filterMode, setFilterMode, 
