@@ -1,313 +1,189 @@
 // =========================================================
-// shipping_views_ship.js - 出荷日程・ドレージ手配画面モジュール
+// shipping_views_ship.js - 出荷日程画面モジュール
 // =========================================================
-
-const getSortIndicator = (key, sortConfig) => {
-    if (!sortConfig) return '';
-    const idx = sortConfig.findIndex(s => s.key === key);
-    if (idx === -1) return '';
-    const dir = sortConfig[idx].direction === 'asc' ? '▲' : '▼';
-    const numStr = sortConfig.length > 1 ? String(idx + 1) : '';
-    return ' ' + dir + numStr;
-};
 
 // 【出荷日程画面ビュー】
 const YoshiiShipView = () => {
     const ctx = React.useContext(AppContext);
     const [exportModal, setExportModal] = React.useState({ isOpen: false, type: 'excel' });
 
-    const handleExecuteExport = ({ mode, selectedYear: selYr, singleMonth: sgMo, startMonth: sMo, endMonth: eMo }) => {
-        const targetVendor = ctx.selectedVendorFilter || 'ALL';
-        
-        let targetContainers = yoshiiContainers.filter(item => {
-            const mo = item.deliveryMonth || '';
-            if (mode === 'current') return mo === ctx.currentMonthStr;
-            if (mode === 'year') {
-                if (!mo) return false;
-                const y = Number(mo.split('-')[0]);
-                const m = Number(mo.split('-')[1]);
-                if (m >= 4) return y === selYr;
-                return y === selYr + 1;
-            }
-            if (mode === 'single') return mo === sgMo;
-            return mo >= sMo && mo <= eMo;
-        });
+    const [rangeMode, setRangeMode] = React.useState('year');
+    const [selectedYear, setSelectedYear] = React.useState(2026);
+    const [customStartMonth, setCustomStartMonth] = React.useState('2026-04');
+    const [customEndMonth, setCustomEndMonth] = React.useState('2027-03');
 
+    const [sortConfig, setSortConfig] = React.useState([]);
+
+    const generateMonths = () => {
+        const months = [];
+        if (rangeMode === 'year') {
+            for (let i = 0; i < 12; i++) {
+                const mo = (i + 3) % 12 + 1;
+                const yr = (i + 3) >= 12 ? Number(selectedYear) + 1 : Number(selectedYear);
+                months.push(`${yr}-${String(mo).padStart(2, '0')}`);
+            }
+        } else {
+            let curr = new Date(`${customStartMonth}-01`);
+            const end = new Date(`${customEndMonth}-01`);
+            while (curr <= end && months.length < 36) {
+                const yr = curr.getFullYear();
+                const mo = String(curr.getMonth() + 1).padStart(2, '0');
+                months.push(`${yr}-${mo}`);
+                curr.setMonth(curr.getMonth() + 1);
+            }
+        }
+        return months;
+    };
+
+    const displayMonths = generateMonths();
+
+    // 1. 吉井電気の対象月コンテナを取得
+    let targetContainers = ctx.containers.filter(c => 
+        c.company === 'yoshii' && displayMonths.includes(c.deliveryMonth)
+    );
+
+    // ベンダー制限フィルター
+    if (ctx.selectedVendorFilter && ctx.selectedVendorFilter !== 'ALL') {
+        targetContainers = targetContainers.filter(c => {
+            return Object.keys(c.allocations || {}).some(m => {
+                const q = c.allocations[m];
+                if (q <= 0) return false;
+                const matchModelDetails = ctx.masterData.yoshii?.modelDetails?.[m] || {};
+                const normTarget = normalizeModelCode(m);
+                const matchPlanInfo = ctx.plans.find(p => normalizeModelCode(p.model) === normTarget && p.vendorCode);
+                const vCode = matchModelDetails.vendorCode !== undefined ? matchModelDetails.vendorCode : (matchPlanInfo?.vendorCode || '');
+                return vCode === ctx.selectedVendorFilter;
+            });
+        });
+    }
+
+    // 重複防止（IDの一意化）
+    const uniqueContainersMap = new Map();
+    targetContainers.forEach(c => {
+        if (c.id && !uniqueContainersMap.has(c.id)) {
+            uniqueContainersMap.set(c.id, c);
+        }
+    });
+    const uniqueContainers = Array.from(uniqueContainersMap.values());
+
+    const handleExecuteExport = () => {
         if (exportModal.type === 'print') {
-            setFilterMode(mode === 'current' ? 'current' : mode === 'single' ? 'month' : 'range');
-            if (mode === 'single') setSingleMonth(sgMo);
-            if (mode === 'range') { setStartMonth(sMo); setEndMonth(eMo); }
             setTimeout(() => window.print(), 300);
             return;
         }
 
         const headers = ['管理番号', '進行状況', 'コンテナNO.', '積載型式', '外装箱', '化粧箱', 'ラベル', '割振数', '総数量', '到着港', 'ETD', 'ETA', 'サイズ', '本船名', '備考'];
-        const containerGroups = [];
+        const rows = [];
 
-        targetContainers.forEach(item => {
-            let cModels = Object.keys(item.allocations || {})
-                .filter(m => item.allocations[m] > 0)
-                .sort((a, b) => (modelOrders[a] || 9999) - (modelOrders[b] || 9999));
+        uniqueContainers.forEach(c => {
+            const allocs = c.allocations || {};
+            const allocModels = Object.keys(allocs).filter(m => allocs[m] > 0);
 
-            if (targetVendor !== 'ALL') {
-                cModels = cModels.filter(m => {
-                    const matchModelDetails = ctx.masterData.yoshii?.modelDetails?.[m] || {};
-                    const normTarget = normalizeModelCode(m);
-                    const matchPlanInfo = ctx.plans.find(p => normalizeModelCode(p.model) === normTarget && p.vendorCode);
-                    const vCode = matchModelDetails.vendorCode !== undefined ? matchModelDetails.vendorCode : (matchPlanInfo?.vendorCode || '');
-                    return vCode === targetVendor;
+            if (allocModels.length === 0) {
+                rows.push([c.managementNo || '-', c.status || '手配中', c.containerNo || '-', '-', '-', '-', '-', 0, 0, c.port || '-', c.etd || '-', c.eta || '-', c.size || '-', c.vessel || '-', c.shipNotes || '']);
+            } else {
+                allocModels.forEach((m, idx) => {
+                    const q = allocs[m];
+                    const parts = c.parts?.[m] || {};
+                    rows.push([
+                        idx === 0 ? (c.managementNo || '-') : '',
+                        idx === 0 ? (c.status || '手配中') : '',
+                        idx === 0 ? (c.containerNo || '-') : '',
+                        m,
+                        parts.box || 0,
+                        parts.case || 0,
+                        parts.label || 0,
+                        q,
+                        idx === 0 ? Object.values(allocs).reduce((a,b)=>a+Number(b||0),0) : '',
+                        idx === 0 ? (c.port || '-') : '',
+                        idx === 0 ? (c.etd || '-') : '',
+                        idx === 0 ? (c.eta || '-') : '',
+                        idx === 0 ? (c.size || '-') : '',
+                        idx === 0 ? (c.vessel || '-') : '',
+                        idx === 0 ? (c.shipNotes || '') : ''
+                    ]);
                 });
             }
-
-            if (cModels.length === 0) return;
-            const totalQty = cModels.reduce((sum, m) => sum + item.allocations[m], 0);
-
-            const groupRows = cModels.map((m, mIdx) => {
-                const parts = (item.spareParts || {})[m] || {};
-                return [
-                    item.managementNo || '-',
-                    item.status || '-',
-                    item.containerNo || '-',
-                    m,
-                    parts.outerBox || 0,
-                    parts.innerBox || 0,
-                    parts.label || 0,
-                    item.allocations[m] || 0,
-                    totalQty,
-                    item.port || '-',
-                    item.etd || '-',
-                    item.eta || '-',
-                    item.containerSize || '-',
-                    item.vessel || '-',
-                    item.shipNotes || '-'
-                ];
-            });
-
-            const mergeColIndices = [1, 2, 3, 9, 10, 11, 12, 13, 14, 15];
-
-            containerGroups.push({ rows: groupRows, mergeColIndices });
         });
 
-        const dateTag = mode === 'current' ? formatYYMM(ctx.currentMonthStr) : mode === 'year' ? `${selYr}年度` : mode === 'single' ? formatYYMM(sgMo) : `${formatYYMM(sMo)}_${formatYYMM(eMo)}`;
-        const filename = `${targetVendor}_出荷日程_${dateTag}.xlsx`;
-
-        exportToExcelAdvanced({ title: `吉井電気 出荷日程表 [仕入先: ${targetVendor}] [期間: ${dateTag}]`, headers, containerGroups, filename });
-    };
-
-    const [filterMode, setFilterMode] = React.useState('year');
-    const [selectedYear, setSelectedYear] = React.useState(2026);
-    const [singleMonth, setSingleMonth] = React.useState(ctx.currentMonthStr);
-    const [startMonth, setStartMonth] = React.useState('2026-04');
-    const [endMonth, setEndMonth] = React.useState('2027-03');
-    const [sortConfig, setSortConfig] = React.useState([]);
-
-    const yoshiiContainers = ctx.containers.filter(c => c.company === 'yoshii');
-    const modelOrders = ctx.masterData.yoshii?.modelOrder || {};
-
-    let displayContainers = yoshiiContainers.filter(item => {
-        const mo = item.deliveryMonth || '';
-        if (filterMode === 'current') return mo === ctx.currentMonthStr;
-        if (filterMode === 'year') {
-            if (!mo) return false;
-            const y = Number(mo.split('-')[0]);
-            const m = Number(mo.split('-')[1]);
-            if (m >= 4) return y === selectedYear;
-            return y === selectedYear + 1;
-        }
-        if (filterMode === 'month') return mo === singleMonth;
-        if (filterMode === 'range') return mo >= startMonth && mo <= endMonth;
-        return true;
-    });
-
-    if (sortConfig.length > 0) {
-        displayContainers.sort((a, b) => {
-            for (const s of sortConfig) {
-                let valA = a[s.key] || '';
-                let valB = b[s.key] || '';
-                if (s.key === 'drayageDeliveryDateCombo') {
-                    valA = (a.drayageDeliveryDate || '') + (a.drayageDeliveryTime || '');
-                    valB = (b.drayageDeliveryDate || '') + (b.drayageDeliveryTime || '');
-                }
-                if (valA !== valB) {
-                    const cmp = String(valA).localeCompare(String(valB), 'ja', { numeric: true });
-                    return s.direction === 'asc' ? cmp : -cmp;
-                }
-            }
-            const orderA = a.allocNo !== undefined ? a.allocNo : (a.sortOrder !== undefined ? a.sortOrder : 999999);
-            const orderB = b.allocNo !== undefined ? b.allocNo : (b.sortOrder !== undefined ? b.sortOrder : 999999);
-            return orderA - orderB;
+        const filename = `吉井電気_出荷日程表_${ctx.getFormattedShortDate().replace(/\//g,'')}.xlsx`;
+        exportToExcelSimple({
+            title: `吉井電気 出荷日程表 [仕入先: ${ctx.selectedVendorFilter || 'ALL'}]`,
+            headers, rows, filename
         });
-    } else {
-        displayContainers.sort((a, b) => {
-            const mA = a.deliveryMonth || '9999-99';
-            const mB = b.deliveryMonth || '9999-99';
-            if (mA !== mB) return mA.localeCompare(mB);
-
-            const orderA = a.allocNo !== undefined ? a.allocNo : (a.sortOrder !== undefined ? a.sortOrder : 999999);
-            const orderB = b.allocNo !== undefined ? b.allocNo : (b.sortOrder !== undefined ? b.sortOrder : 999999);
-            return orderA - orderB;
-        });
-    }
-
-    React.useEffect(() => {
-        const container = ctx.tableContainerRef.current;
-        if (!container) return;
-
-        if (ctx.shipScrollPosRef.current !== null) {
-            container.scrollTop = ctx.shipScrollPosRef.current;
-        } else if (filterMode === 'year' || filterMode === 'all') {
-            setTimeout(() => {
-                const currentMonthRow = container.querySelector(`tr[data-month="${ctx.currentMonthStr}"]`);
-                const thead = container.querySelector('thead');
-                if (currentMonthRow && container) {
-                    const headerHeight = thead ? thead.offsetHeight : 0;
-                    container.scrollTop = Math.max(0, currentMonthRow.offsetTop - headerHeight);
-                }
-            }, 300);
-        }
-
-        const handleScroll = () => { if (container) ctx.shipScrollPosRef.current = container.scrollTop; };
-        container.addEventListener('scroll', handleScroll);
-        return () => container.removeEventListener('scroll', handleScroll);
-    }, [filterMode, ctx.currentMonthStr]);
-
-    const handleSortClick = (key, label, e) => {
-        const isShift = e.shiftKey;
-        let newConfig = [...sortConfig];
-        const existingIdx = newConfig.findIndex(s => s.key === key);
-
-        if (!isShift) {
-            if (existingIdx >= 0) {
-                const currDir = newConfig[existingIdx].direction;
-                newConfig = currDir === 'asc' ? [{ key, label, direction: 'desc' }] : [];
-            } else {
-                newConfig = [{ key, label, direction: 'asc' }];
-            }
-        } else {
-            if (existingIdx >= 0) {
-                const currDir = newConfig[existingIdx].direction;
-                if (currDir === 'asc') { newConfig[existingIdx].direction = 'desc'; } else { newConfig.splice(existingIdx, 1); }
-            } else {
-                newConfig.push({ key, label, direction: 'asc' });
-            }
-        }
-        setSortConfig(newConfig);
     };
-
-    const handlePartsChange = (containerId, model, partKey, value, originalVal) => {
-        const targetContainer = yoshiiContainers.find(c => c.id === containerId);
-        if (!targetContainer) return;
-        
-        const currentParts = targetContainer.spareParts || {};
-        const modelParts = currentParts[model] || {};
-        
-        const updatedParts = {
-            ...currentParts,
-            [model]: { ...modelParts, [partKey]: value }
-        };
-
-        const currentOrigParts = targetContainer.originals?.spareParts || {};
-        const modelOrigParts = currentOrigParts[model] || {};
-        const updatedOrigParts = {
-            ...currentOrigParts,
-            [model]: {
-                ...modelOrigParts,
-                [partKey]: modelOrigParts[partKey] !== undefined ? modelOrigParts[partKey] : (originalVal || '')
-            }
-        };
-
-        const currentMetaParts = targetContainer.originalMetas?.spareParts || {};
-        const modelMetaParts = currentMetaParts[model] || {};
-        const updatedMetaParts = {
-            ...currentMetaParts,
-            [model]: {
-                ...modelMetaParts,
-                [partKey]: modelMetaParts[partKey] !== undefined ? modelMetaParts[partKey] : `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}`
-            }
-        };
-        
-        ctx.updateContainer(containerId, { spareParts: updatedParts, originals: { ...(targetContainer.originals || {}), spareParts: updatedOrigParts }, originalMetas: { ...(targetContainer.originalMetas || {}), spareParts: updatedMetaParts } }, targetContainer.deliveryMonth, 'yoshii', `補充部品 [${model}-${partKey}]`);
-    };
-
-    const groupedRows = [];
-    let currentMonth = null;
-    displayContainers.forEach(c => {
-        const m = c.deliveryMonth || '未設定';
-        if (m !== currentMonth) { groupedRows.push({ isDivider: true, monthLabel: m }); currentMonth = m; }
-        groupedRows.push(c);
-    });
 
     return (
-        <div className="p-4 bg-white flex-grow flex flex-col h-full">
-            <div className="hidden print:block font-bold text-sm text-black mb-1.5 border-b pb-1 text-left w-full">
-                吉井電気 出荷日程表 [仕入先: {ctx.selectedVendorFilter || 'ALL'}] [対象期間: {filterMode === 'current' ? `${ctx.currentMonthStr.replace('-', '/')}分` : filterMode === 'month' ? `${singleMonth.replace('-', '/')}分` : filterMode === 'year' ? `${selectedYear}年度` : `${startMonth.replace('-', '/')}〜${endMonth.replace('-', '/')}`}]
-            </div>
+        <div className="p-3 bg-white flex-grow flex flex-col h-full overflow-hidden text-xs">
             <div className="flex justify-between items-center mb-2 no-print flex-shrink-0">
-                <h2 className="text-lg font-bold">吉井電気 出荷日程表 {ctx.selectedVendorFilter && ctx.selectedVendorFilter !== 'ALL' ? ` [仕入先: ${ctx.selectedVendorFilter}]` : ''}</h2>
+                <div className="flex items-center gap-3">
+                    <h2 className="text-base font-extrabold text-emerald-900 border-b-2 border-emerald-600 pb-0.5">
+                        吉井電気 出荷日程表 [仕入先: {ctx.selectedVendorFilter || 'ALL'}]
+                    </h2>
 
-                <div className="flex items-center gap-1.5 no-print">
-                    <button onClick={() => setExportModal({ isOpen: true, type: 'excel' })} className="px-2.5 py-1 text-xs font-bold rounded bg-emerald-700 hover:bg-emerald-800 text-white shadow transition flex items-center gap-1">📊 Excel出力</button>
-                    <button onClick={() => setExportModal({ isOpen: true, type: 'print' })} className="px-2.5 py-1 text-xs font-bold rounded bg-slate-700 hover:bg-slate-800 text-white shadow transition flex items-center gap-1">🖨 印刷</button>
-                    <button onClick={ctx.handleStartTracking} className={`px-2.5 py-1 text-xs font-bold rounded shadow transition ${ctx.isChangeTrackingMode ? 'bg-red-600 text-white animate-pulse' : 'bg-gray-200 hover:bg-gray-300 text-gray-800'}`}>{ctx.isChangeTrackingMode ? '● 変更記録中' : '変更開始'}</button>
-                    <button onClick={ctx.handleClearTracking} className="px-2.5 py-1 text-xs font-bold rounded bg-gray-600 hover:bg-gray-700 text-white shadow transition">変更クリア</button>
+                    <div className="flex items-center gap-1 bg-gray-50 p-0.5 rounded border text-xs">
+                        <select value={rangeMode} onChange={e => setRangeMode(e.target.value)} className="font-bold border rounded px-1 py-0.5 bg-white">
+                            <option value="year">年度指定</option>
+                            <option value="custom">カスタム指定</option>
+                        </select>
+
+                        {rangeMode === 'year' ? (
+                            <select value={selectedYear} onChange={e => setSelectedYear(Number(e.target.value))} className="font-bold border rounded px-1 py-0.5 bg-white text-emerald-800">
+                                <option value={2025}>2025年度</option>
+                                <option value={2026}>2026年度</option>
+                                <option value={2027}>2027年度</option>
+                            </select>
+                        ) : (
+                            <div className="flex items-center gap-1 font-bold">
+                                <input type="month" value={customStartMonth} onChange={e => setCustomStartMonth(e.target.value)} className="border rounded px-1 bg-white"/>
+                                <span>〜</span>
+                                <input type="month" value={customEndMonth} onChange={e => setCustomEndMonth(e.target.value)} className="border rounded px-1 bg-white"/>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                <div className="flex items-center gap-2 font-bold">
+                    <button onClick={() => setExportModal({ isOpen: true, type: 'excel' })} className="px-2 py-1 text-xs font-bold rounded bg-emerald-700 hover:bg-emerald-800 text-white shadow transition flex items-center gap-1">📊 Excel出力</button>
+                    <button onClick={() => setExportModal({ isOpen: true, type: 'print' })} className="px-2 py-1 text-xs font-bold rounded bg-slate-700 hover:bg-slate-800 text-white shadow transition flex items-center gap-1">🖨 印刷</button>
+                    <button onClick={ctx.handleStartTracking} className={`px-2 py-1 text-xs font-bold rounded shadow transition ${ctx.isChangeTrackingMode ? 'bg-red-600 text-white animate-pulse' : 'bg-gray-200 hover:bg-gray-300 text-gray-800'}`}>{ctx.isChangeTrackingMode ? '● 変更記録中' : '変更開始'}</button>
+                    <button onClick={ctx.handleClearTracking} className="px-2 py-1 text-xs font-bold rounded bg-gray-600 hover:bg-gray-700 text-white shadow transition">変更クリア</button>
                 </div>
             </div>
 
-            <ScheduleFilterSortControl filterMode={filterMode} setFilterMode={setFilterMode} selectedYear={selectedYear} setSelectedYear={setSelectedYear} singleMonth={singleMonth} setSingleMonth={setSingleMonth} startMonth={startMonth} setStartMonth={setStartMonth} endMonth={endMonth} setEndMonth={setEndMonth} sortConfig={sortConfig} setSortConfig={setSortConfig}/>
-
-            <div className="table-container flex-grow" ref={ctx.tableContainerRef}>
-                <table className="w-full text-xs text-left border-collapse">
-                    <thead className="bg-gray-100 border-b-2 sticky top-0 z-20">
-                        <tr className="bg-gray-100 border-b">
-                            <th rowSpan="2" className="p-1 w-[80px] border-r">管理番号</th>
-                            <th rowSpan="2" className="p-1 w-[80px] border-r">進行状況</th>
-                            <th rowSpan="2" onClick={e => handleSortClick('containerNo', 'コンテナNO.', e)} className="p-1 w-[110px] cursor-pointer hover:bg-emerald-100 text-emerald-900 border-r">
-                                コンテナNO.{getSortIndicator('containerNo', sortConfig)}
-                            </th>
-                            <th rowSpan="2" className="p-1 w-[125px] min-w-[120px] border-r">積載型式</th>
-                            <th colSpan="3" className="p-1 bg-emerald-50 text-emerald-900 border-r text-center font-bold">補充部品 (PCS)</th>
-                            <th rowSpan="2" className="p-1 w-[48px] min-w-[45px] border-r">割振数</th>
-                            <th rowSpan="2" className="p-1 w-[48px] min-w-[45px] border-r">総数量</th>
-                            <th rowSpan="2" onClick={e => handleSortClick('port', '到着港', e)} className="p-1 w-[70px] min-w-[65px] cursor-pointer hover:bg-emerald-100 text-emerald-900 border-r">
-                                到着港{getSortIndicator('port', sortConfig)}
-                            </th>
-                            <th rowSpan="2" onClick={e => handleSortClick('etd', 'ETD', e)} className="p-1 w-[58px] min-w-[54px] cursor-pointer hover:bg-emerald-100 text-emerald-900 border-r">
-                                ETD{getSortIndicator('etd', sortConfig)}
-                            </th>
-                            <th rowSpan="2" onClick={e => handleSortClick('eta', 'ETA', e)} className="p-1 w-[58px] min-w-[54px] cursor-pointer hover:bg-emerald-100 text-emerald-900 border-r">
-                                ETA{getSortIndicator('eta', sortConfig)}
-                            </th>
-                            <th rowSpan="2" className="p-1 w-[62px] min-w-[58px] border-r">サイズ</th>
-                            <th rowSpan="2" onClick={e => handleSortClick('vessel', '本船名', e)} className="p-1 w-[170px] min-w-[160px] cursor-pointer hover:bg-emerald-100 text-emerald-900 border-r">
-                                本船名{getSortIndicator('vessel', sortConfig)}
-                            </th>
-                            <th rowSpan="2" className="p-1 min-w-[160px] notes-col">備考</th>
+            <div className="table-container flex-grow border rounded shadow-inner overflow-x-auto overflow-y-auto">
+                <table className="w-full text-center border-collapse text-[11px]">
+                    <thead className="sticky top-0 z-30 bg-gray-200 font-bold">
+                        <tr className="bg-gray-200 border-b">
+                            <th className="p-1 border min-w-[70px]">管理番号</th>
+                            <th className="p-1 border min-w-[80px]">進行状況</th>
+                            <th className="p-1 border min-w-[100px]">コンテナNO.</th>
+                            <th className="p-1 border min-w-[110px]">積載型式</th>
+                            <th className="p-1 border bg-emerald-50 text-emerald-900" colSpan={3}>補充部品 (PCS)</th>
+                            <th className="p-1 border min-w-[60px]">割振数</th>
+                            <th className="p-1 border min-w-[65px] bg-emerald-100 font-extrabold text-emerald-900">総数量</th>
+                            <th className="p-1 border min-w-[65px]">到着港</th>
+                            <th className="p-1 border min-w-[75px]">ETD</th>
+                            <th className="p-1 border min-w-[75px]">ETA</th>
+                            <th className="p-1 border min-w-[65px]">サイズ</th>
+                            <th className="p-1 border min-w-[140px]">本船名</th>
+                            <th className="p-1 border min-w-[120px]">備考</th>
                         </tr>
-                        <tr className="bg-emerald-50/70 text-emerald-800 text-[10px] font-bold border-b">
-                            <th className="p-1 border-r text-center w-10">外装箱</th>
-                            <th className="p-1 border-r text-center w-10">化粧箱</th>
-                            <th className="p-1 border-r text-center w-10">ラベル</th>
+                        <tr className="bg-emerald-50 text-[10px] font-bold border-b">
+                            <td colSpan={4} className="border text-center">補充部品 内訳詳細 →</td>
+                            <td className="border w-[50px] text-emerald-800">外装箱</td>
+                            <td className="border w-[50px] text-emerald-800">化粧箱</td>
+                            <td className="border w-[50px] text-emerald-800">ラベル</td>
+                            <td colSpan={8} className="border"></td>
                         </tr>
                     </thead>
                     <tbody>
-                        {groupedRows.map((row, idx) => {
-                            if (row.isDivider) {
-                                const label = row.monthLabel === '未設定' ? '納品月 未設定' : `■ ${row.monthLabel.split('-')[0]}年${row.monthLabel.split('-')[1]}月 納品分`;
-                                return <tr key={`div-${idx}`} className="month-divider" data-month={row.monthLabel}><td colSpan={100}>{label}</td></tr>;
-                            }
-
-                            const item = row;
-                            let cModels = Object.keys(item.allocations || {})
-                                .filter(m => item.allocations[m] > 0)
-                                .sort((a, b) => {
-                                    const orderA = modelOrders[a] !== undefined ? modelOrders[a] : 9999;
-                                    const orderB = modelOrders[b] !== undefined ? modelOrders[b] : 9999;
-                                    if (orderA !== orderB) return orderA - orderB;
-                                    return a.localeCompare(b, 'ja');
-                                });
+                        {uniqueContainers.map((container, cIdx) => {
+                            const allocs = container.allocations || {};
+                            let modelKeys = Object.keys(allocs).filter(m => Number(allocs[m]) > 0);
 
                             if (ctx.selectedVendorFilter && ctx.selectedVendorFilter !== 'ALL') {
-                                cModels = cModels.filter(m => {
+                                modelKeys = modelKeys.filter(m => {
                                     const matchModelDetails = ctx.masterData.yoshii?.modelDetails?.[m] || {};
                                     const normTarget = normalizeModelCode(m);
                                     const matchPlanInfo = ctx.plans.find(p => normalizeModelCode(p.model) === normTarget && p.vendorCode);
@@ -316,518 +192,118 @@ const YoshiiShipView = () => {
                                 });
                             }
 
-                            if (cModels.length === 0) return null;
-                            const totalQty = cModels.reduce((sum, m) => sum + item.allocations[m], 0);
+                            const totalQty = modelKeys.reduce((sum, m) => sum + Number(allocs[m] || 0), 0);
+                            const rowSpan = Math.max(modelKeys.length, 1);
 
-                            return (
-                                <tr key={item.id} className="border-b hover:bg-emerald-50" data-month={item.deliveryMonth || '未設定'}>
-                                    <td className="p-0.5"><LocalInput value={item.managementNo} originalValue={(item.originals || {}).managementNo} originalMeta={(item.originalMetas || {}).managementNo} onChange={(v, orig) => ctx.updateContainer(item.id, { managementNo: v, originals: { ...(item.originals || {}), managementNo: item.originals?.managementNo !== undefined ? item.originals.managementNo : orig }, originalMetas: { ...(item.originalMetas || {}), managementNo: item.originalMetas?.managementNo !== undefined ? item.originalMetas.managementNo : `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}` } }, item.deliveryMonth, 'yoshii', '管理番号')} className="text-center font-bold" /></td>
-                                    <td className={`p-0.5 ${['出港済', '出荷済み', '納品完了'].includes(item.status) ? 'bg-green-200 print-bg-green' : ''}`}><DynamicSelect value={item.status} originalValue={(item.originals || {}).status} originalMeta={(item.originalMetas || {}).status} onChange={(val, cat, orig) => ctx.handleSelectChange(item.id, 'status', true, 'yoshii', true, '進行状況')(val, cat, orig)} category="statuses" options={ctx.masterData.common.statuses} /></td>
-                                    <td className="p-0.5"><LocalInput value={item.containerNo} originalValue={(item.originals || {}).containerNo} originalMeta={(item.originalMetas || {}).containerNo} onChange={(v, orig) => ctx.updateContainer(item.id, { containerNo: v, originals: { ...(item.originals || {}), containerNo: item.originals?.containerNo !== undefined ? item.originals.containerNo : orig }, originalMetas: { ...(item.originalMetas || {}), containerNo: item.originalMetas?.containerNo !== undefined ? item.originalMetas.containerNo : `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}` } }, item.deliveryMonth, 'yoshii', 'コンテナNO.')} className="text-center font-bold" /></td>
-                                    
-                                    <td className="p-0.5 readonly-cell text-center align-middle font-bold">
-                                        {cModels.map(m => (
-                                            <div key={m} className="h-5 flex items-center justify-center border-b last:border-b-0 border-gray-200 py-0 text-xs">{m}</div>
-                                        ))}
-                                    </td>
-
-                                    <td className="p-0.5 bg-emerald-50/20 text-center align-middle">
-                                        {cModels.map(m => {
-                                            const parts = (item.spareParts || {})[m] || {};
-                                            const origParts = (item.originals?.spareParts || {})[m] || {};
-                                            const metaParts = (item.originalMetas?.spareParts || {})[m] || {};
-                                            const origVal = origParts.outerBox;
-                                            const metaStr = metaParts.outerBox || `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}`;
-
-                                            return (
-                                                <div key={m} className="h-5 flex items-center justify-center border-b last:border-b-0 border-gray-200 py-0">
-                                                    <div className={`relative ${origVal !== undefined ? 'has-original-tooltip' : ''}`} data-original-val={origVal} data-original-meta={metaStr}>
-                                                        <input type="text" maxLength={2} value={parts.outerBox || ''} onChange={e => handlePartsChange(item.id, m, 'outerBox', e.target.value, parts.outerBox || '')} disabled={ctx.authUser && !ctx.authUser.canEdit} className={`spare-part-input ${ctx.isChangeTrackingMode && origVal !== undefined && String(origVal) !== String(parts.outerBox || '') ? 'is-changed-cell' : ''}`} placeholder="0"/>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                    </td>
-                                    <td className="p-0.5 bg-emerald-50/20 text-center align-middle">
-                                        {cModels.map(m => {
-                                            const parts = (item.spareParts || {})[m] || {};
-                                            const origParts = (item.originals?.spareParts || {})[m] || {};
-                                            const metaParts = (item.originalMetas?.spareParts || {})[m] || {};
-                                            const origVal = origParts.innerBox;
-                                            const metaStr = metaParts.innerBox || `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}`;
-
-                                            return (
-                                                <div key={m} className="h-5 flex items-center justify-center border-b last:border-b-0 border-gray-200 py-0">
-                                                    <div className={`relative ${origVal !== undefined ? 'has-original-tooltip' : ''}`} data-original-val={origVal} data-original-meta={metaStr}>
-                                                        <input type="text" maxLength={2} value={parts.innerBox || ''} onChange={e => handlePartsChange(item.id, m, 'innerBox', e.target.value, parts.innerBox || '')} disabled={ctx.authUser && !ctx.authUser.canEdit} className={`spare-part-input ${ctx.isChangeTrackingMode && origVal !== undefined && String(origVal) !== String(parts.innerBox || '') ? 'is-changed-cell' : ''}`} placeholder="0"/>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                    </td>
-                                    <td className="p-0.5 bg-emerald-50/20 text-center align-middle">
-                                        {cModels.map(m => {
-                                            const parts = (item.spareParts || {})[m] || {};
-                                            const origParts = (item.originals?.spareParts || {})[m] || {};
-                                            const metaParts = (item.originalMetas?.spareParts || {})[m] || {};
-                                            const origVal = origParts.label;
-                                            const metaStr = metaParts.label || `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}`;
-
-                                            return (
-                                                <div key={m} className="h-5 flex items-center justify-center border-b last:border-b-0 border-gray-200 py-0">
-                                                    <div className={`relative ${origVal !== undefined ? 'has-original-tooltip' : ''}`} data-original-val={origVal} data-original-meta={metaStr}>
-                                                        <input type="text" maxLength={2} value={parts.label || ''} onChange={e => handlePartsChange(item.id, m, 'label', e.target.value, parts.label || '')} disabled={ctx.authUser && !ctx.authUser.canEdit} className={`spare-part-input ${ctx.isChangeTrackingMode && origVal !== undefined && String(origVal) !== String(parts.label || '') ? 'is-changed-cell' : ''}`} placeholder="0"/>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                    </td>
-
-                                    <td className="p-0.5 bg-white text-right align-middle">
-                                        {cModels.map(m => {
-                                            const allocVal = item.allocations[m];
-                                            const origAlloc = (item.originals?.allocations || {})[m];
-                                            const metaAlloc = (item.originalMetas?.allocations || {})[m];
-                                            return (
-                                                <div key={m} className="h-5 flex items-center justify-end border-b last:border-b-0 border-gray-200 px-0 py-0">
-                                                    <LocalInput type="number" value={allocVal !== undefined && allocVal !== null ? allocVal : ''} originalValue={origAlloc} originalMeta={metaAlloc} onChange={(v, orig) => {
-                                                        const newQty = v === '' ? 0 : Number(v);
-                                                        const currentAllocs = item.allocations || {};
-                                                        const updatedAllocs = { ...currentAllocs, [m]: newQty };
-
-                                                        const updatedOrigs = {
-                                                            ...(item.originals || {}),
-                                                            allocations: {
-                                                                ...(item.originals?.allocations || {}),
-                                                                [m]: (item.originals?.allocations || {})[m] !== undefined ? (item.originals.allocations)[m] : (orig || '')
-                                                            }
-                                                        };
-
-                                                        const updatedMetas = {
-                                                            ...(item.originalMetas || {}),
-                                                            allocations: {
-                                                                ...(item.originalMetas?.allocations || {}),
-                                                                [m]: (item.originalMetas?.allocations || {})[m] !== undefined ? (item.originalMetas.allocations)[m] : `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}`
-                                                            }
-                                                        };
-
-                                                        ctx.updateContainer(item.id, { allocations: updatedAllocs, originals: updatedOrigs, originalMetas: updatedMetas }, item.deliveryMonth, 'yoshii', `型式 [${m}] 割振数`);
-                                                    }} className="text-right font-bold font-mono text-xs h-[20px] pr-1 border-none bg-transparent"/>
-                                                </div>
-                                            );
-                                        })}
-                                    </td>
-
-                                    <td className="p-1 readonly-cell text-right font-bold">{totalQty.toLocaleString()}</td>
-                                    <td className="p-0.5"><DynamicSelect value={item.port} originalValue={(item.originals || {}).port} originalMeta={(item.originalMetas || {}).port} onChange={(val, cat, orig) => ctx.handleSelectChange(item.id, 'port', true, 'yoshii', false, '到着港')(val, cat, orig)} category="ports" options={ctx.masterData.yoshii.ports} /></td>
-                                    <td className="p-0.5"><LocalInput type="date" value={item.etd} originalValue={(item.originals || {}).etd} originalMeta={(item.originalMetas || {}).etd} onChange={(v, orig) => ctx.updateContainer(item.id, { etd: v, originals: { ...(item.originals || {}), etd: item.originals?.etd !== undefined ? item.originals.etd : orig }, originalMetas: { ...(item.originalMetas || {}), etd: item.originalMetas?.etd !== undefined ? item.originalMetas.etd : `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}` } }, item.deliveryMonth, 'yoshii', 'ETD')} /></td>
-                                    <td className="p-0.5"><LocalInput type="date" value={item.eta} originalValue={(item.originals || {}).eta} originalMeta={(item.originalMetas || {}).eta} refDate={item.etd} onChange={(v, orig) => ctx.updateContainer(item.id, { eta: v, originals: { ...(item.originals || {}), eta: item.originals?.eta !== undefined ? item.originals.eta : orig }, originalMetas: { ...(item.originalMetas || {}), eta: item.originalMetas?.eta !== undefined ? item.originalMetas.eta : `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}` } }, item.deliveryMonth, 'yoshii', 'ETA')} /></td>
-                                    <td className="p-0.5"><DynamicSelect value={item.containerSize} originalValue={(item.originals || {}).containerSize} originalMeta={(item.originalMetas || {}).containerSize} onChange={(val, cat, orig) => ctx.handleSelectChange(item.id, 'containerSize', true, 'yoshii', true, 'コンテナサイズ')(val, cat, orig)} category="containerSizes" options={ctx.masterData.common.containerSizes} autoDefaultValue="40HQ" /></td>
-                                    
-                                    <td className="p-0.5">
-                                        <LocalInput value={item.vessel} originalValue={(item.originals || {}).vessel} originalMeta={(item.originalMetas || {}).vessel} onChange={(v, orig) => ctx.updateContainer(item.id, { vessel: v, originals: { ...(item.originals || {}), vessel: item.originals?.vessel !== undefined ? item.originals.vessel : orig }, originalMetas: { ...(item.originalMetas || {}), vessel: item.originalMetas?.vessel !== undefined ? item.originalMetas.vessel : `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}` } }, item.deliveryMonth, 'yoshii', '本船名')} className="text-center font-medium text-xs"/>
-                                    </td>
-                                    
-                                    <td className="p-0.5 notes-cell">
-                                        <LocalTextArea value={item.shipNotes} originalValue={(item.originals || {}).shipNotes} originalMeta={(item.originalMetas || {}).shipNotes} onChange={(v, orig) => ctx.updateContainer(item.id, { shipNotes: v, originals: { ...(item.originals || {}), shipNotes: item.originals?.shipNotes !== undefined ? item.originals.shipNotes : orig }, originalMetas: { ...(item.originalMetas || {}), shipNotes: item.originals?.shipNotes !== undefined ? item.originals.shipNotes : `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}` } }, item.deliveryMonth, 'yoshii', '出荷日程 備考')} isCompact={true} className="text-left text-xs whitespace-normal break-all"/>
-                                    </td>
-                                </tr>
-                            )
-                        })}
-                    </tbody>
-                </table>
-            </div>
-
-            <ExportPrintModal isOpen={exportModal.isOpen} onClose={() => setExportModal({ isOpen: false, type: 'excel' })} screenName="出荷日程表" currentMonthStr={ctx.currentMonthStr} defaultMode="current" onStartExport={handleExecuteExport} />
-        </div>
-    );
-};
-
-// 【ドレージ手配画面ビュー】
-const YoshiiDrayageView = () => {
-    const ctx = React.useContext(AppContext);
-    const [exportModal, setExportModal] = React.useState({ isOpen: false, type: 'excel' });
-
-    const handleExecuteExport = ({ mode, selectedYear: selYr, singleMonth: sgMo, startMonth: sMo, endMonth: eMo }) => {
-        const targetVendor = ctx.selectedVendorFilter || 'YO';
-        
-        let targetContainers = yoshiiContainers.filter(item => {
-            const mo = item.deliveryMonth || '';
-            if (mode === 'current') return mo === ctx.currentMonthStr;
-            if (mode === 'year') {
-                if (!mo) return false;
-                const y = Number(mo.split('-')[0]);
-                const m = Number(mo.split('-')[1]);
-                if (m >= 4) return y === selYr;
-                return y === selYr + 1;
-            }
-            if (mode === 'single') return mo === sgMo;
-            return mo >= sMo && mo <= eMo;
-        });
-
-        if (exportModal.type === 'print') {
-            setFilterMode(mode === 'current' ? 'current' : mode === 'single' ? 'month' : 'range');
-            if (mode === 'single') setSingleMonth(sgMo);
-            if (mode === 'range') { setStartMonth(sMo); setEndMonth(eMo); }
-            setTimeout(() => window.print(), 300);
-            return;
-        }
-
-        const headers = ['管理番号', '進行状況', 'コンテナNO.', '積載型式', '外装箱', '化粧箱', 'ラベル', '割振数', '総数量', '到着港', 'ETD', 'ETA', 'フリータイム', '納品日', '納品時間', '納品先', '備考', 'コンテナサイズ', '本船名'];
-        const containerGroups = [];
-
-        targetContainers.forEach(item => {
-            let cModels = Object.keys(item.allocations || {})
-                .filter(m => item.allocations[m] > 0)
-                .sort((a, b) => (modelOrders[a] || 9999) - (modelOrders[b] || 9999));
-
-            if (cModels.length === 0) return;
-            const totalQty = cModels.reduce((sum, m) => sum + item.allocations[m], 0);
-
-            const groupRows = cModels.map((m, mIdx) => {
-                const parts = (item.spareParts || {})[m] || {};
-                return [
-                    item.managementNo || '-',
-                    item.status || '-',
-                    item.containerNo || '-',
-                    m,
-                    parts.outerBox || 0,
-                    parts.innerBox || 0,
-                    parts.label || 0,
-                    item.allocations[m] || 0,
-                    totalQty,
-                    item.port || '-',
-                    item.etd || '-',
-                    item.eta || '-',
-                    item.freeTime || '-',
-                    item.drayageDeliveryDate || '-',
-                    item.drayageDeliveryTime || '-',
-                    item.drayageDestination || '-',
-                    item.drayageNotes || '-',
-                    item.containerSize || '-',
-                    item.vessel || '-'
-                ];
-            });
-
-            const mergeColIndices = [1, 2, 3, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19];
-
-            containerGroups.push({ rows: groupRows, mergeColIndices });
-        });
-
-        const dateTag = mode === 'current' ? formatYYMM(ctx.currentMonthStr) : mode === 'year' ? `${selYr}年度` : mode === 'single' ? formatYYMM(sgMo) : `${formatYYMM(sMo)}_${formatYYMM(eMo)}`;
-        const filename = `${targetVendor}_ドレージ_${dateTag}.xlsx`;
-
-        exportToExcelAdvanced({ title: `吉井電気 ドレージ手配 [仕入先: ${targetVendor}] [期間: ${dateTag}]`, headers, containerGroups, filename, isDrayage: true });
-    };
-
-    const [filterMode, setFilterMode] = React.useState('year');
-    const [selectedYear, setSelectedYear] = React.useState(2026);
-    const [singleMonth, setSingleMonth] = React.useState(ctx.currentMonthStr);
-    const [startMonth, setStartMonth] = React.useState('2026-04');
-    const [endMonth, setEndMonth] = React.useState('2027-03');
-    const [sortConfig, setSortConfig] = React.useState([]);
-
-    const yoshiiContainers = ctx.containers.filter(c => c.company === 'yoshii');
-    const modelOrders = ctx.masterData.yoshii?.modelOrder || {};
-
-    let displayContainers = yoshiiContainers.filter(item => {
-        const mo = item.deliveryMonth || '';
-        if (filterMode === 'current') return mo === ctx.currentMonthStr;
-        if (filterMode === 'year') {
-            if (!mo) return false;
-            const y = Number(mo.split('-')[0]);
-            const m = Number(mo.split('-')[1]);
-            if (m >= 4) return y === selectedYear;
-            return y === selectedYear + 1;
-        }
-        if (filterMode === 'month') return mo === singleMonth;
-        if (filterMode === 'range') return mo >= startMonth && mo <= endMonth;
-        return true;
-    });
-
-    if (sortConfig.length > 0) {
-        displayContainers.sort((a, b) => {
-            for (const s of sortConfig) {
-                let valA = a[s.key] || '';
-                let valB = b[s.key] || '';
-                if (s.key === 'drayageDeliveryDateCombo') {
-                    valA = (a.drayageDeliveryDate || '') + (a.drayageDeliveryTime || '');
-                    valB = (b.drayageDeliveryDate || '') + (b.drayageDeliveryTime || '');
-                }
-                if (valA !== valB) {
-                    const cmp = String(valA).localeCompare(String(valB), 'ja', { numeric: true });
-                    return s.direction === 'asc' ? cmp : -cmp;
-                }
-            }
-            const orderA = a.allocNo !== undefined ? a.allocNo : (a.sortOrder !== undefined ? a.sortOrder : 999999);
-            const orderB = b.allocNo !== undefined ? b.allocNo : (b.sortOrder !== undefined ? b.sortOrder : 999999);
-            return orderA - orderB;
-        });
-    } else {
-        displayContainers.sort((a, b) => {
-            const mA = a.deliveryMonth || '9999-99';
-            const mB = b.deliveryMonth || '9999-99';
-            if (mA !== mB) return mA.localeCompare(mB);
-
-            const orderA = a.allocNo !== undefined ? a.allocNo : (a.sortOrder !== undefined ? a.sortOrder : 999999);
-            const orderB = b.allocNo !== undefined ? b.allocNo : (b.sortOrder !== undefined ? b.sortOrder : 999999);
-            return orderA - orderB;
-        });
-    }
-
-    React.useEffect(() => {
-        const container = ctx.tableContainerRef.current;
-        if (!container) return;
-
-        if (ctx.drayScrollPosRef.current !== null) {
-            container.scrollTop = ctx.drayScrollPosRef.current;
-        } else if (filterMode === 'year' || filterMode === 'all') {
-            setTimeout(() => {
-                const currentMonthRow = container.querySelector(`tr[data-month="${ctx.currentMonthStr}"]`);
-                const thead = container.querySelector('thead');
-                if (currentMonthRow && container) {
-                    const headerHeight = thead ? thead.offsetHeight : 0;
-                    container.scrollTop = Math.max(0, currentMonthRow.offsetTop - headerHeight);
-                }
-            }, 300);
-        }
-
-        const handleScroll = () => { if (container) ctx.drayScrollPosRef.current = container.scrollTop; };
-        container.addEventListener('scroll', handleScroll);
-        return () => container.removeEventListener('scroll', handleScroll);
-    }, [filterMode, ctx.currentMonthStr]);
-
-    const handleSortClick = (key, label, e) => {
-        const isShift = e.shiftKey;
-        let newConfig = [...sortConfig];
-        const existingIdx = newConfig.findIndex(s => s.key === key);
-
-        if (!isShift) {
-            if (existingIdx >= 0) {
-                const currDir = newConfig[existingIdx].direction;
-                newConfig = currDir === 'asc' ? [{ key, label, direction: 'desc' }] : [];
-            } else {
-                newConfig = [{ key, label, direction: 'asc' }];
-            }
-        } else {
-            if (existingIdx >= 0) {
-                const currDir = newConfig[existingIdx].direction;
-                if (currDir === 'asc') { newConfig[existingIdx].direction = 'desc'; } else { newConfig.splice(existingIdx, 1); }
-            } else {
-                newConfig.push({ key, label, direction: 'asc' });
-            }
-        }
-        setSortConfig(newConfig);
-    };
-
-    const handlePartsChange = (containerId, model, partKey, value, originalVal) => {
-        const targetContainer = yoshiiContainers.find(c => c.id === containerId);
-        if (!targetContainer) return;
-        
-        const currentParts = targetContainer.spareParts || {};
-        const modelParts = currentParts[model] || {};
-        const updatedParts = { ...currentParts, [model]: { ...modelParts, [partKey]: value } };
-
-        const currentOrigParts = targetContainer.originals?.spareParts || {};
-        const modelOrigParts = currentOrigParts[model] || {};
-        const updatedOrigParts = {
-            ...currentOrigParts,
-            [model]: {
-                ...modelOrigParts,
-                [partKey]: modelOrigParts[partKey] !== undefined ? modelOrigParts[partKey] : (originalVal || '')
-            }
-        };
-
-        const currentMetaParts = targetContainer.originalMetas?.spareParts || {};
-        const modelMetaParts = currentMetaParts[model] || {};
-        const updatedMetaParts = {
-            ...currentMetaParts,
-            [model]: {
-                ...modelMetaParts,
-                [partKey]: modelMetaParts[partKey] !== undefined ? modelMetaParts[partKey] : `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}`
-            }
-        };
-        
-        ctx.updateContainer(containerId, { spareParts: updatedParts, originals: { ...(targetContainer.originals || {}), spareParts: updatedOrigParts }, originalMetas: { ...(targetContainer.originalMetas || {}), spareParts: updatedMetaParts } }, targetContainer.deliveryMonth, 'yoshii', `補充部品 [${model}-${partKey}]`);
-    };
-
-    const groupedRows = [];
-    let currentMonth = null;
-    displayContainers.forEach(c => {
-        const m = c.deliveryMonth || '未設定';
-        if (m !== currentMonth) { groupedRows.push({ isDivider: true, monthLabel: m }); currentMonth = m; }
-        groupedRows.push(c);
-    });
-
-    return (
-        <div className="p-4 bg-white flex-grow flex flex-col h-full">
-            <div className="hidden print:block font-bold text-sm text-black mb-1.5 border-b pb-1 text-left w-full">
-                吉井電気 ドレージ手配 [仕入先: {ctx.selectedVendorFilter || 'ALL'}] [対象期間: {filterMode === 'current' ? `${ctx.currentMonthStr.replace('-', '/')}分` : filterMode === 'month' ? `${singleMonth.replace('-', '/')}分` : filterMode === 'year' ? `${selectedYear}年度` : `${startMonth.replace('-', '/')}〜${endMonth.replace('-', '/')}`}]
-            </div>
-            <div className="flex justify-between items-center mb-2 no-print flex-shrink-0">
-                <h2 className="text-lg font-bold">吉井電気 ドレージ手配 {ctx.selectedVendorFilter && ctx.selectedVendorFilter !== 'ALL' ? ` [仕入先: ${ctx.selectedVendorFilter}]` : ''}</h2>
-
-                <div className="flex items-center gap-1.5 no-print">
-                    <button onClick={() => setExportModal({ isOpen: true, type: 'excel' })} className="px-2.5 py-1 text-xs font-bold rounded bg-emerald-700 hover:bg-emerald-800 text-white shadow transition flex items-center gap-1">📊 Excel出力</button>
-                    <button onClick={() => setExportModal({ isOpen: true, type: 'print' })} className="px-2.5 py-1 text-xs font-bold rounded bg-slate-700 hover:bg-slate-800 text-white shadow transition flex items-center gap-1">🖨 印刷</button>
-                    <button onClick={ctx.handleStartTracking} className={`px-2.5 py-1 text-xs font-bold rounded shadow transition ${ctx.isChangeTrackingMode ? 'bg-red-600 text-white animate-pulse' : 'bg-gray-200 hover:bg-gray-300 text-gray-800'}`}>{ctx.isChangeTrackingMode ? '● 変更記録中' : '変更開始'}</button>
-                    <button onClick={ctx.handleClearTracking} className="px-2.5 py-1 text-xs font-bold rounded bg-gray-600 hover:bg-gray-700 text-white shadow transition">変更クリア</button>
-                </div>
-            </div>
-
-            <ScheduleFilterSortControl filterMode={filterMode} setFilterMode={setFilterMode} selectedYear={selectedYear} setSelectedYear={setSelectedYear} singleMonth={singleMonth} setSingleMonth={setSingleMonth} startMonth={startMonth} setStartMonth={setStartMonth} endMonth={endMonth} setEndMonth={setEndMonth} sortConfig={sortConfig} setSortConfig={setSortConfig}/>
-
-            <div className="table-container flex-grow" ref={ctx.tableContainerRef}>
-                <table className="w-full text-xs text-left border-collapse">
-                    <thead className="bg-gray-100 border-b-2 sticky top-0 z-20">
-                        <tr className="bg-gray-100 border-b">
-                            <th rowSpan="2" className="p-1 w-[60px] border-r">管理番号</th>
-                            <th rowSpan="2" className="p-1 w-[58px] border-r">進行状況</th>
-                            <th rowSpan="2" onClick={e => handleSortClick('containerNo', 'コンテナNO.', e)} className="p-1 w-[98px] cursor-pointer hover:bg-emerald-100 text-emerald-900 border-r">
-                                コンテナNO.{getSortIndicator('containerNo', sortConfig)}
-                            </th>
-                            <th rowSpan="2" className="p-1 w-[125px] min-w-[120px] border-r">積載型式</th>
-                            <th colSpan="3" className="p-1 bg-emerald-50 text-emerald-900 border-r text-center font-bold">補充部品 (PCS)</th>
-                            <th rowSpan="2" className="p-1 w-[48px] min-w-[45px] border-r">割振数</th>
-                            <th rowSpan="2" className="p-1 w-[48px] min-w-[45px] border-r">総数量</th>
-                            <th rowSpan="2" onClick={e => handleSortClick('port', '到着港', e)} className="p-1 w-[54px] min-w-[50px] cursor-pointer hover:bg-emerald-100 text-emerald-900 border-r">
-                                到着港{getSortIndicator('port', sortConfig)}
-                            </th>
-                            <th rowSpan="2" onClick={e => handleSortClick('etd', 'ETD', e)} className="p-1 w-[54px] min-w-[50px] cursor-pointer hover:bg-emerald-100 text-emerald-900 border-r">
-                                ETD{getSortIndicator('etd', sortConfig)}
-                            </th>
-                            <th rowSpan="2" onClick={e => handleSortClick('eta', 'ETA', e)} className="p-1 w-[54px] min-w-[50px] cursor-pointer hover:bg-emerald-100 text-emerald-900 border-r">
-                                ETA{getSortIndicator('eta', sortConfig)}
-                            </th>
-                            <th rowSpan="2" className="p-1 w-[54px] min-w-[50px] border-r">フリータイム</th>
-                            <th rowSpan="2" onClick={e => handleSortClick('drayageDeliveryDateCombo', '納品日時', e)} className="p-1 w-[82px] min-w-[78px] cursor-pointer hover:bg-emerald-100 text-emerald-900 border-r" colSpan="2">
-                                納品日時{getSortIndicator('drayageDeliveryDateCombo', sortConfig)}
-                            </th>
-                            <th rowSpan="2" onClick={e => handleSortClick('drayageDestination', '納品先', e)} className="p-1 w-[190px] min-w-[180px] cursor-pointer hover:bg-emerald-100 text-emerald-900 border-r">
-                                納品先{getSortIndicator('drayageDestination', sortConfig)}
-                            </th>
-                            <th rowSpan="2" className="p-1 w-[110px] min-w-[100px] notes-col border-r">備考</th>
-                            <th rowSpan="2" className="p-1 w-[42px] min-w-[40px] border-r">サイズ</th>
-                            <th rowSpan="2" className="p-1 w-[170px] min-w-[160px]">本船名</th>
-                        </tr>
-                        <tr className="bg-emerald-50/70 text-emerald-800 text-[10px] font-bold border-b">
-                            <th className="p-1 border-r text-center w-10">外装箱</th>
-                            <th className="p-1 border-r text-center w-10">化粧箱</th>
-                            <th className="p-1 border-r text-center w-10">ラベル</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {groupedRows.map((row, idx) => {
-                            if (row.isDivider) {
-                                const label = row.monthLabel === '未設定' ? '納品月 未設定' : `■ ${row.monthLabel.split('-')[0]}年${row.monthLabel.split('-')[1]}月 納品分`;
-                                return <tr key={`div-${idx}`} className="month-divider" data-month={row.monthLabel}><td colSpan={100}>{label}</td></tr>;
+                            if (modelKeys.length === 0) {
+                                return (
+                                    <tr key={container.id || cIdx} className="hover:bg-emerald-50 border-b h-[24px]">
+                                        <td className="border font-bold">{container.managementNo || '-'}</td>
+                                        <td className="border">
+                                            <DynamicSelect value={container.status || '手配中'} onChange={(val, cat, orig) => ctx.handleSelectChange(container.id, 'status', true, 'yoshii', true, '進行状況')(val, cat, orig)} category="statuses" options={ctx.masterData.common.statuses} isCommon className="w-full text-center border-none bg-transparent"/>
+                                        </td>
+                                        <td className="border">
+                                            <LocalInput value={container.containerNo || ''} onChange={(v, orig) => ctx.updateContainer(container.id, { containerNo: v }, ctx.yoshiiAllocMonth, 'yoshii', 'コンテナNO')} className="w-full text-center font-mono border-none bg-transparent"/>
+                                        </td>
+                                        <td className="border text-gray-400 font-normal">-</td>
+                                        <td className="border text-gray-400">0</td>
+                                        <td className="border text-gray-400">0</td>
+                                        <td className="border text-gray-400">0</td>
+                                        <td className="border font-bold">0</td>
+                                        <td className="border font-extrabold bg-emerald-50 text-emerald-900">0</td>
+                                        <td className="border">
+                                            <DynamicSelect value={container.port || ''} onChange={(val, cat, orig) => ctx.handleSelectChange(container.id, 'port', true, 'yoshii', false, '到着港')(val, cat, orig)} category="ports" options={ctx.masterData.yoshii.ports} className="w-full text-center border-none bg-transparent"/>
+                                        </td>
+                                        <td className="border">
+                                            <LocalInput type="date" value={container.etd || ''} onChange={(v, orig) => ctx.updateContainer(container.id, { etd: v }, ctx.yoshiiAllocMonth, 'yoshii', 'ETD')} className="w-full text-center border-none bg-transparent"/>
+                                        </td>
+                                        <td className="border">
+                                            <LocalInput type="date" value={container.eta || ''} onChange={(v, orig) => ctx.updateContainer(container.id, { eta: v }, ctx.yoshiiAllocMonth, 'yoshii', 'ETA')} className="w-full text-center border-none bg-transparent"/>
+                                        </td>
+                                        <td className="border">
+                                            <DynamicSelect value={container.size || ''} onChange={(val, cat, orig) => ctx.handleSelectChange(container.id, 'size', true, 'yoshii', true, 'サイズ')(val, cat, orig)} category="containerSizes" options={ctx.masterData.common.containerSizes} isCommon className="w-full text-center border-none bg-transparent"/>
+                                        </td>
+                                        <td className="border">
+                                            <LocalInput value={container.vessel || ''} onChange={(v, orig) => ctx.updateContainer(container.id, { vessel: v }, ctx.yoshiiAllocMonth, 'yoshii', '本船名')} className="w-full text-center border-none bg-transparent"/>
+                                        </td>
+                                        <td className="border">
+                                            <LocalTextArea value={container.shipNotes || ''} onChange={(v, orig) => ctx.updateContainer(container.id, { shipNotes: v }, ctx.yoshiiAllocMonth, 'yoshii', '備考')}/>
+                                        </td>
+                                    </tr>
+                                );
                             }
 
-                            const item = row;
-                            let cModels = Object.keys(item.allocations || {})
-                                .filter(m => item.allocations[m] > 0)
-                                .sort((a, b) => {
-                                    const orderA = modelOrders[a] !== undefined ? modelOrders[a] : 9999;
-                                    const orderB = modelOrders[b] !== undefined ? modelOrders[b] : 9999;
-                                    if (orderA !== orderB) return orderA - orderB;
-                                    return a.localeCompare(b, 'ja');
-                                });
+                            return modelKeys.map((m, mIdx) => {
+                                const qty = allocs[m] || 0;
+                                const parts = container.parts?.[m] || {};
 
-                            if (cModels.length === 0) return null;
-                            const totalQty = cModels.reduce((sum, m) => sum + item.allocations[m], 0);
+                                return (
+                                    <tr key={`${container.id || cIdx}-${m}`} className="hover:bg-emerald-50 border-b h-[24px]">
+                                        {mIdx === 0 && (
+                                            <>
+                                                <td rowSpan={rowSpan} className="border font-bold bg-white align-middle">{container.managementNo || '-'}</td>
+                                                <td rowSpan={rowSpan} className="border bg-white align-middle">
+                                                    <DynamicSelect value={container.status || '手配中'} onChange={(val, cat, orig) => ctx.handleSelectChange(container.id, 'status', true, 'yoshii', true, '進行状況')(val, cat, orig)} category="statuses" options={ctx.masterData.common.statuses} isCommon className="w-full text-center border-none bg-transparent"/>
+                                                </td>
+                                                <td rowSpan={rowSpan} className="border bg-white align-middle">
+                                                    <LocalInput value={container.containerNo || ''} onChange={(v, orig) => ctx.updateContainer(container.id, { containerNo: v }, ctx.yoshiiAllocMonth, 'yoshii', 'コンテナNO')} className="w-full text-center font-mono border-none bg-transparent"/>
+                                                </td>
+                                            </>
+                                        )}
 
-                            return (
-                                <tr key={item.id} className={`border-b hover:bg-emerald-50 ${['出港済', '出荷済み', '納品完了'].includes(item.status) ? 'bg-green-50' : ''}`} data-month={item.deliveryMonth || '未設定'}>
-                                    <td className="p-1 readonly-cell text-center font-bold">{item.managementNo || '-'}</td>
-                                    <td className="p-1 readonly-cell text-center">{item.status || '-'}</td>
-                                    <td className="p-1 bg-gray-50 font-bold text-center">{item.containerNo || '-'}</td>
-                                    
-                                    <td className="p-0.5 readonly-cell text-center align-middle font-bold">
-                                        {cModels.map(m => (
-                                            <div key={m} className="h-5 flex items-center justify-center border-b last:border-b-0 border-gray-200 py-0 text-xs">{m}</div>
-                                        ))}
-                                    </td>
+                                        <td className="border font-bold text-left pl-1">{m}</td>
+                                        <td className="border">
+                                            <LocalInput type="number" value={parts.box !== undefined ? parts.box : ''} onChange={(v) => {
+                                                const newParts = { ...(container.parts || {}), [m]: { ...(container.parts?.[m] || {}), box: v === '' ? 0 : Number(v) } };
+                                                ctx.updateContainer(container.id, { parts: newParts }, ctx.yoshiiAllocMonth, 'yoshii', `型式 [${m}] 外装箱`);
+                                            }} className="w-full text-right pr-1 border-none bg-transparent font-normal"/>
+                                        </td>
+                                        <td className="border">
+                                            <LocalInput type="number" value={parts.case !== undefined ? parts.case : ''} onChange={(v) => {
+                                                const newParts = { ...(container.parts || {}), [m]: { ...(container.parts?.[m] || {}), case: v === '' ? 0 : Number(v) } };
+                                                ctx.updateContainer(container.id, { parts: newParts }, ctx.yoshiiAllocMonth, 'yoshii', `型式 [${m}] 化粧箱`);
+                                            }} className="w-full text-right pr-1 border-none bg-transparent font-normal"/>
+                                        </td>
+                                        <td className="border">
+                                            <LocalInput type="number" value={parts.label !== undefined ? parts.label : ''} onChange={(v) => {
+                                                const newParts = { ...(container.parts || {}), [m]: { ...(container.parts?.[m] || {}), label: v === '' ? 0 : Number(v) } };
+                                                ctx.updateContainer(container.id, { parts: newParts }, ctx.yoshiiAllocMonth, 'yoshii', `型式 [${m}] ラベル`);
+                                            }} className="w-full text-right pr-1 border-none bg-transparent font-normal"/>
+                                        </td>
+                                        <td className="border text-right pr-1 font-bold text-emerald-800">{qty.toLocaleString()}</td>
 
-                                    <td className="p-0.5 bg-emerald-50/20 text-center align-middle">
-                                        {cModels.map(m => {
-                                            const parts = (item.spareParts || {})[m] || {};
-                                            const origParts = (item.originals?.spareParts || {})[m] || {};
-                                            const metaParts = (item.originalMetas || {}).spareParts || {};
-                                            const origVal = origParts.outerBox;
-                                            const metaStr = (metaParts[m] || {}).outerBox || `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}`;
-
-                                            return (
-                                                <div key={m} className="h-5 flex items-center justify-center border-b last:border-b-0 border-gray-200 py-0">
-                                                    <div className={`relative ${origVal !== undefined ? 'has-original-tooltip' : ''}`} data-original-val={origVal} data-original-meta={metaStr}>
-                                                        <input type="text" maxLength={2} value={parts.outerBox || ''} onChange={e => handlePartsChange(item.id, m, 'outerBox', e.target.value, parts.outerBox || '')} disabled={ctx.authUser && !ctx.authUser.canEdit} className={`spare-part-input ${ctx.isChangeTrackingMode && origVal !== undefined && String(origVal) !== String(parts.outerBox || '') ? 'is-changed-cell' : ''}`} placeholder="0"/>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                    </td>
-                                    <td className="p-0.5 bg-emerald-50/20 text-center align-middle">
-                                        {cModels.map(m => {
-                                            const parts = (item.spareParts || {})[m] || {};
-                                            const origParts = (item.originals?.spareParts || {})[m] || {};
-                                            const metaParts = (item.originalMetas || {}).spareParts || {};
-                                            const origVal = origParts.innerBox;
-                                            const metaStr = (metaParts[m] || {}).innerBox || `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}`;
-
-                                            return (
-                                                <div key={m} className="h-5 flex items-center justify-center border-b last:border-b-0 border-gray-200 py-0">
-                                                    <div className={`relative ${origVal !== undefined ? 'has-original-tooltip' : ''}`} data-original-val={origVal} data-original-meta={metaStr}>
-                                                        <input type="text" maxLength={2} value={parts.innerBox || ''} onChange={e => handlePartsChange(item.id, m, 'innerBox', e.target.value, parts.innerBox || '')} disabled={ctx.authUser && !ctx.authUser.canEdit} className={`spare-part-input ${ctx.isChangeTrackingMode && origVal !== undefined && String(origVal) !== String(parts.innerBox || '') ? 'is-changed-cell' : ''}`} placeholder="0"/>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                    </td>
-                                    <td className="p-0.5 bg-emerald-50/20 text-center align-middle">
-                                        {cModels.map(m => {
-                                            const parts = (item.spareParts || {})[m] || {};
-                                            const origParts = (item.originals?.spareParts || {})[m] || {};
-                                            const metaParts = (item.originalMetas || {}).spareParts || {};
-                                            const origVal = origParts.label;
-                                            const metaStr = (metaParts[m] || {}).label || `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}`;
-
-                                            return (
-                                                <div key={m} className="h-5 flex items-center justify-center border-b last:border-b-0 border-gray-200 py-0">
-                                                    <div className={`relative ${origVal !== undefined ? 'has-original-tooltip' : ''}`} data-original-val={origVal} data-original-meta={metaStr}>
-                                                        <input type="text" maxLength={2} value={parts.label || ''} onChange={e => handlePartsChange(item.id, m, 'label', e.target.value, parts.label || '')} disabled={ctx.authUser && !ctx.authUser.canEdit} className={`spare-part-input ${ctx.isChangeTrackingMode && origVal !== undefined && String(origVal) !== String(parts.label || '') ? 'is-changed-cell' : ''}`} placeholder="0"/>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                    </td>
-
-                                    <td className="p-0.5 readonly-cell text-right align-middle font-mono">
-                                        {cModels.map(m => (
-                                            <div key={m} className="h-5 flex items-center justify-end border-b last:border-b-0 border-gray-200 px-1 py-0 text-xs font-bold text-gray-700">
-                                                {Number(item.allocations[m] || 0).toLocaleString()}
-                                            </div>
-                                        ))}
-                                    </td>
-                                    <td className="p-1 readonly-cell text-right font-bold">{totalQty.toLocaleString()}</td>
-                                    <td className="p-1 readonly-cell text-center">{item.port || '-'}</td>
-                                    <td className="p-0.5"><LocalInput type="date" value={item.etd} originalValue={(item.originals || {}).etd} originalMeta={(item.originalMetas || {}).etd} onChange={(v, orig) => ctx.updateContainer(item.id, { etd: v, originals: { ...(item.originals || {}), etd: item.originals?.etd !== undefined ? item.originals.etd : orig }, originalMetas: { ...(item.originalMetas || {}), etd: item.originalMetas?.etd !== undefined ? item.originalMetas.etd : `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}` } }, item.deliveryMonth, 'yoshii', 'ETD')} /></td>
-                                    <td className="p-0.5"><LocalInput type="date" value={item.eta} originalValue={(item.originals || {}).eta} originalMeta={(item.originalMetas || {}).eta} refDate={item.etd} onChange={(v, orig) => ctx.updateContainer(item.id, { eta: v, originals: { ...(item.originals || {}), eta: item.originals?.eta !== undefined ? item.originals.eta : orig }, originalMetas: { ...(item.originalMetas || {}), eta: item.originalMetas?.eta !== undefined ? item.originalMetas.eta : `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}` } }, item.deliveryMonth, 'yoshii', 'ETA')} /></td>
-                                    <td className="p-0.5"><LocalInput type="date" value={item.freeTime} originalValue={(item.originals || {}).freeTime} originalMeta={(item.originalMetas || {}).freeTime} onChange={(v, orig) => ctx.updateContainer(item.id, { freeTime: v, originals: { ...(item.originals || {}), freeTime: item.originals?.freeTime !== undefined ? item.originals.freeTime : orig }, originalMetas: { ...(item.originalMetas || {}), freeTime: item.originalMetas?.freeTime !== undefined ? item.originalMetas.freeTime : `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}` } }, item.deliveryMonth, 'yoshii', 'フリータイム')} /></td>
-                                    <td className="p-0.5"><LocalInput type="date" value={item.drayageDeliveryDate} originalValue={(item.originals || {}).drayageDeliveryDate} originalMeta={(item.originalMetas || {}).drayageDeliveryDate} refDate={item.freeTime || item.eta} onChange={(v, orig) => ctx.updateContainer(item.id, { drayageDeliveryDate: v, originals: { ...(item.originals || {}), drayageDeliveryDate: item.originals?.drayageDeliveryDate !== undefined ? item.originals.drayageDeliveryDate : orig }, originalMetas: { ...(item.originalMetas || {}), drayageDeliveryDate: item.originalMetas?.drayageDeliveryDate !== undefined ? item.originalMetas.drayageDeliveryDate : `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}` } }, item.deliveryMonth, 'yoshii', '納品日')} /></td>
-                                    <td className="p-0.5"><LocalInput type="time" value={item.drayageDeliveryTime} originalValue={(item.originals || {}).drayageDeliveryTime} originalMeta={(item.originalMetas || {}).drayageDeliveryTime} onChange={(v, orig) => ctx.updateContainer(item.id, { drayageDeliveryTime: v, originals: { ...(item.originals || {}), drayageDeliveryTime: item.originals?.drayageDeliveryTime !== undefined ? item.originals.drayageDeliveryTime : orig }, originalMetas: { ...(item.originalMetas || {}), drayageDeliveryTime: item.originals?.drayageDeliveryTime !== undefined ? item.originals.drayageDeliveryTime : `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}` } }, item.deliveryMonth, 'yoshii', '納品時間')} className="text-center" /></td>
-                                    <td className="p-0.5 w-[190px] min-w-[180px]"><DynamicSelect value={item.drayageDestination} originalValue={(item.originals || {}).drayageDestination} originalMeta={(item.originalMetas || {}).drayageDestination} onChange={(val, cat, orig) => ctx.handleSelectChange(item.id, 'drayageDestination', true, 'yoshii', false, '納品先')(val, cat, orig)} category="destinations" options={ctx.masterData.yoshii.destinations} className="text-xs font-bold w-full text-center" /></td>
-                                    <td className="p-0.5 notes-cell">
-                                        <LocalTextArea value={item.drayageNotes} originalValue={(item.originals || {}).drayageNotes} originalMeta={(item.originalMetas || {}).drayageNotes} onChange={(v, orig) => ctx.updateContainer(item.id, { drayageNotes: v, originals: { ...(item.originals || {}), drayageNotes: item.originals?.drayageNotes !== undefined ? item.originals.drayageNotes : orig }, originalMetas: { ...(item.originalMetas || {}), drayageNotes: item.originals?.drayageNotes !== undefined ? item.originals.drayageNotes : `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}` } }, item.deliveryMonth, 'yoshii', '備考')} isCompact={true} className="text-left text-xs whitespace-normal break-all"/>
-                                    </td>
-                                    <td className="p-1 readonly-cell text-center">{item.containerSize || '-'}</td>
-                                    <td className="p-0.5 readonly-cell text-center font-bold text-xs">{item.vessel || '-'}</td>
-                                </tr>
-                            )
+                                        {mIdx === 0 && (
+                                            <>
+                                                <td rowSpan={rowSpan} className="border font-extrabold bg-emerald-100 text-emerald-900 text-right pr-1 align-middle">{totalQty.toLocaleString()}</td>
+                                                <td rowSpan={rowSpan} className="border bg-white align-middle">
+                                                    <DynamicSelect value={container.port || ''} onChange={(val, cat, orig) => ctx.handleSelectChange(container.id, 'port', true, 'yoshii', false, '到着港')(val, cat, orig)} category="ports" options={ctx.masterData.yoshii.ports} className="w-full text-center border-none bg-transparent"/>
+                                                </td>
+                                                <td rowSpan={rowSpan} className="border bg-white align-middle">
+                                                    <LocalInput type="date" value={container.etd || ''} onChange={(v, orig) => ctx.updateContainer(container.id, { etd: v }, ctx.yoshiiAllocMonth, 'yoshii', 'ETD')} className="w-full text-center border-none bg-transparent"/>
+                                                </td>
+                                                <td rowSpan={rowSpan} className="border bg-white align-middle">
+                                                    <LocalInput type="date" value={container.eta || ''} onChange={(v, orig) => ctx.updateContainer(container.id, { eta: v }, ctx.yoshiiAllocMonth, 'yoshii', 'ETA')} className="w-full text-center border-none bg-transparent"/>
+                                                </td>
+                                                <td rowSpan={rowSpan} className="border bg-white align-middle">
+                                                    <DynamicSelect value={container.size || ''} onChange={(val, cat, orig) => ctx.handleSelectChange(container.id, 'size', true, 'yoshii', true, 'サイズ')(val, cat, orig)} category="containerSizes" options={ctx.masterData.common.containerSizes} isCommon className="w-full text-center border-none bg-transparent"/>
+                                                </td>
+                                                <td rowSpan={rowSpan} className="border bg-white align-middle">
+                                                    <LocalInput value={container.vessel || ''} onChange={(v, orig) => ctx.updateContainer(container.id, { vessel: v }, ctx.yoshiiAllocMonth, 'yoshii', '本船名')} className="w-full text-center border-none bg-transparent"/>
+                                                </td>
+                                                <td rowSpan={rowSpan} className="border bg-white align-middle">
+                                                    <LocalTextArea value={container.shipNotes || ''} onChange={(v, orig) => ctx.updateContainer(container.id, { shipNotes: v }, ctx.yoshiiAllocMonth, 'yoshii', '備考')}/>
+                                                </td>
+                                            </>
+                                        )}
+                                    </tr>
+                                );
+                            });
                         })}
                     </tbody>
                 </table>
             </div>
 
-            <ExportPrintModal isOpen={exportModal.isOpen} onClose={() => setExportModal({ isOpen: false, type: 'excel' })} screenName="ドレージ手配" currentMonthStr={ctx.currentMonthStr} defaultMode="current" onStartExport={handleExecuteExport} />
+            <ExportPrintModal isOpen={exportModal.isOpen} onClose={() => setExportModal({ isOpen: false, type: 'excel' })} screenName="出荷日程表" currentMonthStr={ctx.currentMonthStr} defaultMode="year" onStartExport={handleExecuteExport} />
         </div>
     );
 };

@@ -127,8 +127,10 @@ const YoshiiPlanView = () => {
         });
     }
 
+    // 全型式リスト（ドロップダウン用）を確保
     const selectableModelsList = [...allModels];
 
+    // ドロップダウンによる型式絞り込み
     if (selectedModelFilter !== 'ALL') {
         allModels = allModels.filter(m => m === selectedModelFilter);
     }
@@ -350,7 +352,7 @@ const YoshiiPlanView = () => {
                 </div>
             </div>
 
-            {/* 2行目サブツールバー：変更履歴チェックボックス */}
+            {/* 2行目サブツールバー */}
             <div className="flex justify-between items-center mb-2 no-print gap-2 flex-shrink-0 text-xs">
                 <div className="flex items-center gap-2 font-bold">
                     <div className="flex bg-gray-100 p-0.5 rounded border gap-1">
@@ -413,7 +415,7 @@ const YoshiiPlanView = () => {
                                 </div>
                             </th>
 
-                            {/* 型式ドロップダウンリスト付きヘッダー */}
+                            {/* 型式ドロップダウンリスト付きヘッダー（復元・絞り込み連動） */}
                             <th className="p-0.5 border min-w-[85px] sticky left-[66px] bg-gray-200 z-40 text-[11px] font-bold">
                                 <div className="flex items-center justify-center gap-1 px-1">
                                     <select 
@@ -491,8 +493,8 @@ const YoshiiPlanView = () => {
                                         <LocalInput value={currentJanCode} originalValue={(matchModelDetails.originals || {}).janCode} originalMeta={(matchModelDetails.originalMetas || {}).janCode} onChange={(v, orig) => handleModelDetailChange(model, 'janCode', v)} className="w-full text-[11px] text-center font-mono border-none bg-transparent h-[20px] font-normal"/>
                                     </td>
                                     
-                                    {/* データ行合計：太字（font-bold）を完全に解除（font-normal）し右側数値と桁位置を揃える */}
-                                    <td className={`border text-[11px] text-right pr-0.5 bg-emerald-50 text-emerald-900 font-normal w-[60px] min-w-[60px] max-w-[60px] ${rowPaddingClass}`}>
+                                    {/* データ行合計：太字（font-bold）をインラインスタイルで確実に解除（fontWeight: 'normal'）し桁を揃える */}
+                                    <td style={{ fontWeight: 'normal' }} className={`border text-[11px] text-right pr-0.5 bg-emerald-50 text-emerald-900 w-[60px] min-w-[60px] max-w-[60px] ${rowPaddingClass}`}>
                                         {rowTot > 0 ? rowTot.toLocaleString() : '0'}
                                     </td>
                                     
