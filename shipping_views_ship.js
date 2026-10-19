@@ -1,5 +1,5 @@
 // =========================================================
-// shipping_views_ship.js - 出荷日程・ドレージ画面モジュール (WebVer. 112 色・スクロール完全修復版)
+// shipping_views_ship.js - 出荷日程・ドレージ画面モジュール (WebVer. 113 完全復元版)
 // =========================================================
 
 // 【出荷日程画面ビュー】
@@ -91,16 +91,29 @@ const YoshiiShipView = () => {
         groupedRows.push(c);
     });
 
+    // 他画面から戻った時のスクロール位置復元 & 画面を離れる時の位置保持
     React.useEffect(() => {
-        if (filterMode === 'all' && ctx.tableContainerRef.current) {
-            setTimeout(() => {
-                const targetEl = ctx.tableContainerRef.current.querySelector(`[data-month="${ctx.currentMonthStr}"]`);
-                if (targetEl) {
-                    targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }
-            }, 300);
+        const container = ctx.tableContainerRef.current;
+        if (!container) return;
+
+        if (ctx.shipScrollPosRef.current > 0) {
+            container.scrollTop = ctx.shipScrollPosRef.current;
         }
-    }, [filterMode, ctx.currentMonthStr, displayContainers.length]);
+
+        const handleScroll = () => {
+            if (container) {
+                ctx.shipScrollPosRef.current = container.scrollTop;
+            }
+        };
+
+        container.addEventListener('scroll', handleScroll);
+        return () => {
+            if (container) {
+                ctx.shipScrollPosRef.current = container.scrollTop;
+                container.removeEventListener('scroll', handleScroll);
+            }
+        };
+    }, []);
 
     const handleExecuteExport = () => {
         if (exportModal.type === 'print') {
@@ -175,7 +188,7 @@ const YoshiiShipView = () => {
 
             <div className="table-container flex-grow border rounded shadow-inner overflow-x-auto overflow-y-auto" ref={ctx.tableContainerRef}>
                 <table className="w-full text-center border-collapse text-[11px]">
-                    <thead className="sticky top-0 z-30 bg-gray-200 font-bold">
+                    <thead className="sticky top-0 z-30 bg-gray-200 font-bold shadow-sm">
                         <tr className="bg-gray-200 border-b">
                             <th className="p-1 border w-[70px] min-w-[70px] max-w-[70px]">管理番号</th>
                             <th className="p-1 border w-[80px] min-w-[80px] max-w-[80px]">進行状況</th>
@@ -205,7 +218,7 @@ const YoshiiShipView = () => {
                                 const label = row.monthLabel === '未設定' ? '納品月 未設定' : `■ ${row.monthLabel.split('-')[0]}年${row.monthLabel.split('-')[1]}月 納品分`;
                                 return (
                                     <tr key={`div-${idx}`} className="month-divider" data-month={row.monthLabel}>
-                                        <td colSpan={100} className="bg-gray-200 font-bold text-left px-2 py-1 text-slate-800 border-y border-gray-300">
+                                        <td colSpan={15} className="bg-gray-200 font-bold text-left px-3 py-1.5 text-gray-800 border-y-2 border-gray-400 text-xs">
                                             {label}
                                         </td>
                                     </tr>
@@ -342,7 +355,7 @@ const YoshiiShipView = () => {
     );
 };
 
-// 【ドレージ手配画面ビュー - 補充部品3項目・背景色・自動スクロール完全修復版】
+// 【ドレージ手配画面ビュー - 月区分バー復元 & スクロール位置保持復元版】
 const YoshiiDrayageView = () => {
     const ctx = React.useContext(AppContext);
     const [exportModal, setExportModal] = React.useState({ isOpen: false, type: 'excel' });
@@ -431,16 +444,29 @@ const YoshiiDrayageView = () => {
         groupedRows.push(c);
     });
 
+    // 他画面から戻った時のスクロール位置復元 & 画面を離れる時の位置保持
     React.useEffect(() => {
-        if (filterMode === 'all' && ctx.tableContainerRef.current) {
-            setTimeout(() => {
-                const targetEl = ctx.tableContainerRef.current.querySelector(`[data-month="${ctx.currentMonthStr}"]`);
-                if (targetEl) {
-                    targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }
-            }, 300);
+        const container = ctx.tableContainerRef.current;
+        if (!container) return;
+
+        if (ctx.drayScrollPosRef.current > 0) {
+            container.scrollTop = ctx.drayScrollPosRef.current;
         }
-    }, [filterMode, ctx.currentMonthStr, displayContainers.length]);
+
+        const handleScroll = () => {
+            if (container) {
+                ctx.drayScrollPosRef.current = container.scrollTop;
+            }
+        };
+
+        container.addEventListener('scroll', handleScroll);
+        return () => {
+            if (container) {
+                ctx.drayScrollPosRef.current = container.scrollTop;
+                container.removeEventListener('scroll', handleScroll);
+            }
+        };
+    }, []);
 
     const handleExecuteExport = () => {
         if (exportModal.type === 'print') {
@@ -519,7 +545,7 @@ const YoshiiDrayageView = () => {
 
             <div className="table-container flex-grow border rounded shadow-inner overflow-x-auto overflow-y-auto" ref={ctx.tableContainerRef}>
                 <table className="w-full text-center border-collapse text-[11px]">
-                    <thead className="sticky top-0 z-30 bg-gray-200 font-bold">
+                    <thead className="sticky top-0 z-30 bg-gray-200 font-bold shadow-sm">
                         <tr className="bg-gray-200 border-b">
                             <th className="p-1 border w-[65px] min-w-[65px] max-w-[65px]">管理番号</th>
                             <th className="p-1 border w-[70px] min-w-[70px] max-w-[70px]">進行状況</th>
@@ -555,7 +581,7 @@ const YoshiiDrayageView = () => {
                                 const label = row.monthLabel === '未設定' ? '納品月 未設定' : `■ ${row.monthLabel.split('-')[0]}年${row.monthLabel.split('-')[1]}月 納品分`;
                                 return (
                                     <tr key={`div-${idx}`} className="month-divider" data-month={row.monthLabel}>
-                                        <td colSpan={100} className="bg-gray-200 font-bold text-left px-2 py-1 text-slate-800 border-y border-gray-300">
+                                        <td colSpan={19} className="bg-gray-200 font-bold text-left px-3 py-1.5 text-gray-800 border-y-2 border-gray-400 text-xs">
                                             {label}
                                         </td>
                                     </tr>
