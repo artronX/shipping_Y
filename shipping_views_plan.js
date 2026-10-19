@@ -1,5 +1,5 @@
 // =========================================================
-// shipping_views_plan.js - 計画・割振り画面モジュール (WebVer. 110 完全版)
+// shipping_views_plan.js - 計画・割振り画面モジュール (WebVer. 110 完全修復版)
 // =========================================================
 
 const formatModelWithBreak = (m) => {
@@ -575,7 +575,7 @@ const YoshiiPlanView = () => {
     );
 };
 
-// 【コンテナ割振り画面ビュー - ツールチップ完全表示修復版】
+// 【コンテナ割振り画面ビュー - ドラッグ移動動作・セル幅完全修復版】
 const YoshiiAllocationView = () => {
     const ctx = React.useContext(AppContext);
     const [exportModal, setExportModal] = React.useState({ isOpen: false, type: 'excel' });
@@ -629,7 +629,7 @@ const YoshiiAllocationView = () => {
         const mgmt = String(c.managementNo || '').trim();
         if (!mgmt || mgmt === '-') return 999999;
 
-        const match = mgmt.match(/^([A-Za-z]+)(\d+)(?:-(\d+))?$/);
+        const match = mgmt.match(/^([A-Za-z]+)(\d+)(?:-(\d+))?\$/);
         if (match) {
             const prefix = match[1].toUpperCase();
             const num1 = parseInt(match[2], 10);
@@ -861,9 +861,11 @@ const YoshiiAllocationView = () => {
                                 return (
                                     <tr 
                                         key={container.id || `new-${idx}`}
-                                        className="hover:bg-emerald-50 h-[22px]"
+                                        onDragOver={(e) => ctx.handleDragOver(e, container.id)}
+                                        onDrop={(e) => ctx.handleDrop(e, container.id, monthContainers)}
+                                        className={`hover:bg-emerald-50 h-[22px] ${ctx.dragOverRowId === container.id ? 'border-t-2 border-t-blue-500 bg-blue-50' : ''}`}
                                     >
-                                        <td draggable={!!container.id && (ctx.authUser ? ctx.authUser.canEdit : true)} onDragStart={(e) => ctx.handleDragStart(e, container.id, 'containers')} className="p-0.5 border bg-white sticky left-0 z-20 text-center drag-handle text-gray-400 hover:text-emerald-600 text-sm cursor-grab active:cursor-grabbing no-print font-normal">≡</td>
+                                        <td draggable={!!container.id && (ctx.authUser ? ctx.authUser.canEdit : true)} onDragStart={(e) => ctx.handleDragStart(e, container.id)} onDragEnd={ctx.handleDragEnd} className="p-0.5 border bg-white sticky left-0 z-20 text-center drag-handle text-gray-400 hover:text-emerald-600 text-sm cursor-grab active:cursor-grabbing no-print font-normal">≡</td>
                                         <td className="p-0.5 border bg-white sticky left-[32px] z-20 text-[10px] font-normal whitespace-nowrap">コンテナ {idx + 1}</td>
                                         
                                         <td className="matrix-td px-0 sticky left-[88px] bg-white z-20">

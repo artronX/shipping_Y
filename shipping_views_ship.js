@@ -1,5 +1,5 @@
 // =========================================================
-// shipping_views_ship.js - 出荷日程・ドレージ画面モジュール (WebVer. 110 完全版)
+// shipping_views_ship.js - 出荷日程・ドレージ画面モジュール (WebVer. 110 完全復元版)
 // =========================================================
 
 // 【出荷日程画面ビュー】
@@ -7,7 +7,7 @@ const YoshiiShipView = () => {
     const ctx = React.useContext(AppContext);
     const [exportModal, setExportModal] = React.useState({ isOpen: false, type: 'excel' });
 
-    const [filterMode, setFilterMode] = React.useState('year');
+    const [filterMode, setFilterMode] = React.useState('all');
     const [selectedYear, setSelectedYear] = React.useState(2026);
     const [singleMonth, setSingleMonth] = React.useState(ctx.currentMonthStr);
     const [startMonth, setStartMonth] = React.useState('2026-04');
@@ -91,6 +91,17 @@ const YoshiiShipView = () => {
         groupedRows.push(c);
     });
 
+    useEffect(() => {
+        if (filterMode === 'all' && ctx.tableContainerRef.current) {
+            setTimeout(() => {
+                const targetEl = ctx.tableContainerRef.current.querySelector(`[data-month="${ctx.currentMonthStr}"]`);
+                if (targetEl) {
+                    targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            }, 300);
+        }
+    }, [filterMode, ctx.currentMonthStr]);
+
     const handleExecuteExport = () => {
         if (exportModal.type === 'print') {
             setTimeout(() => window.print(), 300);
@@ -166,25 +177,25 @@ const YoshiiShipView = () => {
                 <table className="w-full text-center border-collapse text-[11px]">
                     <thead className="sticky top-0 z-30 bg-gray-200 font-bold">
                         <tr className="bg-gray-200 border-b">
-                            <th className="p-1 border min-w-[70px]">管理番号</th>
-                            <th className="p-1 border min-w-[80px]">進行状況</th>
-                            <th className="p-1 border min-w-[100px]">コンテナNO.</th>
-                            <th className="p-1 border min-w-[110px]">積載型式</th>
+                            <th className="p-1 border w-[70px] min-w-[70px] max-w-[70px]">管理番号</th>
+                            <th className="p-1 border w-[80px] min-w-[80px] max-w-[80px]">進行状況</th>
+                            <th className="p-1 border w-[100px] min-w-[100px] max-w-[100px]">コンテナNO.</th>
+                            <th className="p-1 border w-[110px] min-w-[110px]">積載型式</th>
                             <th className="p-1 border bg-emerald-50 text-emerald-900" colSpan={3}>補充部品 (PCS)</th>
-                            <th className="p-1 border min-w-[60px]">割振数</th>
-                            <th className="p-1 border min-w-[65px] bg-emerald-100 font-extrabold text-emerald-900">総数量</th>
-                            <th className="p-1 border min-w-[65px]">到着港</th>
-                            <th className="p-1 border min-w-[75px]">ETD</th>
-                            <th className="p-1 border min-w-[75px]">ETA</th>
-                            <th className="p-1 border min-w-[65px]">サイズ</th>
-                            <th className="p-1 border min-w-[140px]">本船名</th>
+                            <th className="p-1 border w-[60px] min-w-[60px] max-w-[60px]">割振数</th>
+                            <th className="p-1 border w-[65px] min-w-[65px] max-w-[65px] bg-emerald-100 font-extrabold text-emerald-900">総数量</th>
+                            <th className="p-1 border w-[65px] min-w-[65px] max-w-[65px]">到着港</th>
+                            <th className="p-1 border w-[75px] min-w-[75px] max-w-[75px]">ETD</th>
+                            <th className="p-1 border w-[75px] min-w-[75px] max-w-[75px]">ETA</th>
+                            <th className="p-1 border w-[65px] min-w-[65px] max-w-[65px]">サイズ</th>
+                            <th className="p-1 border w-[140px] min-w-[140px]">本船名</th>
                             <th className="p-1 border min-w-[120px]">備考</th>
                         </tr>
                         <tr className="bg-emerald-50 text-[10px] font-bold border-b">
                             <td colSpan={4} className="border text-center">補充部品 内訳詳細 →</td>
-                            <td className="border w-[50px] text-emerald-800">外装箱</td>
-                            <td className="border w-[50px] text-emerald-800">化粧箱</td>
-                            <td className="border w-[50px] text-emerald-800">ラベル</td>
+                            <td className="border w-[40px] min-w-[40px] max-w-[40px] text-emerald-800">外装箱</td>
+                            <td className="border w-[40px] min-w-[40px] max-w-[40px] text-emerald-800">化粧箱</td>
+                            <td className="border w-[40px] min-w-[40px] max-w-[40px] text-emerald-800">ラベル</td>
                             <td colSpan={8} className="border"></td>
                         </tr>
                     </thead>
@@ -275,29 +286,29 @@ const YoshiiShipView = () => {
                                         )}
 
                                         <td className="border font-bold text-left pl-1">{m}</td>
-                                        <td className="border">
+                                        <td className="border w-[40px] min-w-[40px] max-w-[40px]">
                                             <LocalInput type="number" value={parts.outerBox !== undefined ? parts.outerBox : ''} onChange={(v) => {
                                                 const newParts = { ...(container.spareParts || {}), [m]: { ...(container.spareParts?.[m] || {}), outerBox: v === '' ? 0 : Number(v) } };
                                                 ctx.updateContainer(container.id, { spareParts: newParts }, container.deliveryMonth, 'yoshii', `型式 [${m}] 外装箱`);
                                             }} className="w-full text-right pr-1 border-none bg-transparent font-normal"/>
                                         </td>
-                                        <td className="border">
+                                        <td className="border w-[40px] min-w-[40px] max-w-[40px]">
                                             <LocalInput type="number" value={parts.innerBox !== undefined ? parts.innerBox : ''} onChange={(v) => {
                                                 const newParts = { ...(container.spareParts || {}), [m]: { ...(container.spareParts?.[m] || {}), innerBox: v === '' ? 0 : Number(v) } };
                                                 ctx.updateContainer(container.id, { spareParts: newParts }, container.deliveryMonth, 'yoshii', `型式 [${m}] 化粧箱`);
                                             }} className="w-full text-right pr-1 border-none bg-transparent font-normal"/>
                                         </td>
-                                        <td className="border">
+                                        <td className="border w-[40px] min-w-[40px] max-w-[40px]">
                                             <LocalInput type="number" value={parts.label !== undefined ? parts.label : ''} onChange={(v) => {
                                                 const newParts = { ...(container.spareParts || {}), [m]: { ...(container.spareParts?.[m] || {}), label: v === '' ? 0 : Number(v) } };
                                                 ctx.updateContainer(container.id, { spareParts: newParts }, container.deliveryMonth, 'yoshii', `型式 [${m}] ラベル`);
                                             }} className="w-full text-right pr-1 border-none bg-transparent font-normal"/>
                                         </td>
-                                        <td className="border text-right pr-1 font-bold text-emerald-800">{qty.toLocaleString()}</td>
+                                        <td className="border text-right pr-1 font-bold text-emerald-800 font-mono">{qty.toLocaleString()}</td>
 
                                         {mIdx === 0 && (
                                             <>
-                                                <td rowSpan={rowSpan} className="border font-extrabold bg-emerald-100 text-emerald-900 text-right pr-1 align-middle">{totalQty.toLocaleString()}</td>
+                                                <td rowSpan={rowSpan} className="border font-extrabold bg-emerald-100 text-emerald-900 text-right pr-1 align-middle font-mono">{totalQty.toLocaleString()}</td>
                                                 <td rowSpan={rowSpan} className="border bg-white align-middle">
                                                     <DynamicSelect value={container.port || ''} originalValue={(container.originals || {}).port} originalMeta={(container.originalMetas || {}).port} onChange={(val, cat, orig) => ctx.handleSelectChange(container.id, 'port', true, 'yoshii', false, '到着港')(val, cat, orig)} category="ports" options={ctx.masterData.yoshii.ports} className="w-full text-center border-none bg-transparent"/>
                                                 </td>
@@ -331,12 +342,12 @@ const YoshiiShipView = () => {
     );
 };
 
-// 【ドレージ手配画面ビュー】
+// 【ドレージ手配画面ビュー - 補充部品3項目・デフォルト当月・原本セル幅完全復元版】
 const YoshiiDrayageView = () => {
     const ctx = React.useContext(AppContext);
     const [exportModal, setExportModal] = React.useState({ isOpen: false, type: 'excel' });
 
-    const [filterMode, setFilterMode] = React.useState('year');
+    const [filterMode, setFilterMode] = React.useState('all');
     const [selectedYear, setSelectedYear] = React.useState(2026);
     const [singleMonth, setSingleMonth] = React.useState(ctx.currentMonthStr);
     const [startMonth, setStartMonth] = React.useState('2026-04');
@@ -420,13 +431,24 @@ const YoshiiDrayageView = () => {
         groupedRows.push(c);
     });
 
+    useEffect(() => {
+        if (filterMode === 'all' && ctx.tableContainerRef.current) {
+            setTimeout(() => {
+                const targetEl = ctx.tableContainerRef.current.querySelector(`[data-month="${ctx.currentMonthStr}"]`);
+                if (targetEl) {
+                    targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            }, 300);
+        }
+    }, [filterMode, ctx.currentMonthStr]);
+
     const handleExecuteExport = () => {
         if (exportModal.type === 'print') {
             setTimeout(() => window.print(), 300);
             return;
         }
 
-        const headers = ['管理番号', '進行状況', 'コンテナNO.', '積載型式', '割振数', '総数量', '到着港', 'ETD', 'ETA', 'フリータイム', '納品日', '納品時間', '納品先', '備考', 'コンテナサイズ', '本船名'];
+        const headers = ['管理番号', '進行状況', 'コンテナNO.', '積載型式', '外装箱', '化粧箱', 'ラベル', '割振数', '総数量', '到着港', 'ETD', 'ETA', 'フリータイム', '納品日', '納品時間', '納品先', '備考', 'コンテナサイズ', '本船名'];
         const rows = [];
 
         displayContainers.forEach(c => {
@@ -434,15 +456,19 @@ const YoshiiDrayageView = () => {
             const allocModels = Object.keys(allocs).filter(m => allocs[m] > 0);
 
             if (allocModels.length === 0) {
-                rows.push([c.managementNo || '-', c.status || '手配中', c.containerNo || '-', '-', 0, 0, c.port || '-', c.etd || '-', c.eta || '-', c.freeTime || '-', c.drayageDeliveryDate || '-', c.drayageDeliveryTime || '-', c.drayageDestination || '-', c.drayageNotes || '', c.containerSize || c.size || '-', c.vessel || '-']);
+                rows.push([c.managementNo || '-', c.status || '手配中', c.containerNo || '-', '-', 0, 0, 0, 0, 0, c.port || '-', c.etd || '-', c.eta || '-', c.freeTime || '-', c.drayageDeliveryDate || '-', c.drayageDeliveryTime || '-', c.drayageDestination || '-', c.drayageNotes || '', c.containerSize || c.size || '-', c.vessel || '-']);
             } else {
                 allocModels.forEach((m, idx) => {
                     const q = allocs[m];
+                    const parts = c.spareParts?.[m] || {};
                     rows.push([
                         idx === 0 ? (c.managementNo || '-') : '',
                         idx === 0 ? (c.status || '手配中') : '',
                         idx === 0 ? (c.containerNo || '-') : '',
                         m,
+                        parts.outerBox || 0,
+                        parts.innerBox || 0,
+                        parts.label || 0,
                         q,
                         idx === 0 ? Object.values(allocs).reduce((a,b)=>a+Number(b||0),0) : '',
                         idx === 0 ? (c.port || '-') : '',
@@ -495,22 +521,32 @@ const YoshiiDrayageView = () => {
                 <table className="w-full text-center border-collapse text-[11px]">
                     <thead className="sticky top-0 z-30 bg-gray-200 font-bold">
                         <tr className="bg-gray-200 border-b">
-                            <th className="p-1 border min-w-[65px]">管理番号</th>
-                            <th className="p-1 border min-w-[70px]">進行状況</th>
-                            <th className="p-1 border min-w-[90px]">コンテナNO.</th>
-                            <th className="p-1 border min-w-[110px]">積載型式</th>
-                            <th className="p-1 border min-w-[55px]">割振数</th>
-                            <th className="p-1 border min-w-[65px] bg-emerald-100 font-extrabold text-emerald-900">総数量</th>
-                            <th className="p-1 border min-w-[60px]">到着港</th>
-                            <th className="p-1 border min-w-[70px]">ETD</th>
-                            <th className="p-1 border min-w-[70px]">ETA</th>
-                            <th className="p-1 border min-w-[75px]">フリータイム</th>
-                            <th className="p-1 border min-w-[75px]">納品日</th>
-                            <th className="p-1 border min-w-[65px]">時間</th>
-                            <th className="p-1 border min-w-[140px]">納品先</th>
+                            <th className="p-1 border w-[65px] min-w-[65px] max-w-[65px]">管理番号</th>
+                            <th className="p-1 border w-[70px] min-w-[70px] max-w-[70px]">進行状況</th>
+                            <th className="p-1 border w-[90px] min-w-[90px] max-w-[90px]">コンテナNO.</th>
+                            <th className="p-1 border w-[110px] min-w-[110px]">積載型式</th>
+                            <th className="p-1 border bg-emerald-50 text-emerald-900" colSpan={3}>補充部品 (PCS)</th>
+                            <th className="p-1 border w-[55px] min-w-[55px] max-w-[55px]">割振数</th>
+                            <th className="p-1 border w-[65px] min-w-[65px] max-w-[65px] bg-emerald-100 font-extrabold text-emerald-900">総数量</th>
+                            <th className="p-1 border w-[60px] min-w-[60px] max-w-[60px]">到着港</th>
+                            <th className="p-1 border w-[70px] min-w-[70px] max-w-[70px]">ETD</th>
+                            <th className="p-1 border w-[70px] min-w-[70px] max-w-[70px]">ETA</th>
+                            <th className="p-1 border w-[75px] min-w-[75px] max-w-[75px]">フリータイム</th>
+                            <th className="p-1 border bg-emerald-100/70 text-emerald-900" colSpan={2}>納品日時</th>
+                            <th className="p-1 border w-[140px] min-w-[140px]">納品先</th>
                             <th className="p-1 border min-w-[120px]">備考</th>
-                            <th className="p-1 border min-w-[55px]">サイズ</th>
-                            <th className="p-1 border min-w-[120px]">本船名</th>
+                            <th className="p-1 border w-[55px] min-w-[55px] max-w-[55px]">サイズ</th>
+                            <th className="p-1 border w-[120px] min-w-[120px]">本船名</th>
+                        </tr>
+                        <tr className="bg-emerald-50 text-[10px] font-bold border-b">
+                            <td colSpan={4} className="border text-center">補充部品 内訳詳細 →</td>
+                            <td className="border w-[40px] min-w-[40px] max-w-[40px] text-emerald-800">外装箱</td>
+                            <td className="border w-[40px] min-w-[40px] max-w-[40px] text-emerald-800">化粧箱</td>
+                            <td className="border w-[40px] min-w-[40px] max-w-[40px] text-emerald-800">ラベル</td>
+                            <td colSpan={5} className="border"></td>
+                            <td className="border w-[75px] min-w-[75px] max-w-[75px] text-emerald-900 bg-emerald-100/70">納品日</td>
+                            <td className="border w-[65px] min-w-[65px] max-w-[65px] text-emerald-900 bg-emerald-100/70">時間</td>
+                            <td colSpan={4} className="border"></td>
                         </tr>
                     </thead>
                     <tbody>
@@ -554,6 +590,9 @@ const YoshiiDrayageView = () => {
                                             <LocalInput value={container.containerNo || ''} originalValue={(container.originals || {}).containerNo} originalMeta={(container.originalMetas || {}).containerNo} onChange={(v, orig) => ctx.updateContainer(container.id, { containerNo: v }, container.deliveryMonth, 'yoshii', 'コンテナNO')} className="w-full text-center font-mono border-none bg-transparent"/>
                                         </td>
                                         <td className="border text-gray-400 font-normal">-</td>
+                                        <td className="border text-gray-400">0</td>
+                                        <td className="border text-gray-400">0</td>
+                                        <td className="border text-gray-400">0</td>
                                         <td className="border font-bold">0</td>
                                         <td className="border font-extrabold bg-emerald-50 text-emerald-900">0</td>
                                         <td className="border">{container.port || '-'}</td>
@@ -582,6 +621,7 @@ const YoshiiDrayageView = () => {
 
                             return modelKeys.map((m, mIdx) => {
                                 const qty = allocs[m] || 0;
+                                const parts = container.spareParts?.[m] || {};
 
                                 return (
                                     <tr key={`${container.id || idx}-${m}`} className="hover:bg-emerald-50 border-b h-[24px]">
@@ -598,11 +638,29 @@ const YoshiiDrayageView = () => {
                                         )}
 
                                         <td className="border font-bold text-left pl-1">{m}</td>
-                                        <td className="border text-right pr-1 font-bold text-emerald-800">{qty.toLocaleString()}</td>
+                                        <td className="border w-[40px] min-w-[40px] max-w-[40px]">
+                                            <LocalInput type="number" value={parts.outerBox !== undefined ? parts.outerBox : ''} onChange={(v) => {
+                                                const newParts = { ...(container.spareParts || {}), [m]: { ...(container.spareParts?.[m] || {}), outerBox: v === '' ? 0 : Number(v) } };
+                                                ctx.updateContainer(container.id, { spareParts: newParts }, container.deliveryMonth, 'yoshii', `型式 [${m}] 外装箱`);
+                                            }} className="w-full text-right pr-1 border-none bg-transparent font-normal"/>
+                                        </td>
+                                        <td className="border w-[40px] min-w-[40px] max-w-[40px]">
+                                            <LocalInput type="number" value={parts.innerBox !== undefined ? parts.innerBox : ''} onChange={(v) => {
+                                                const newParts = { ...(container.spareParts || {}), [m]: { ...(container.spareParts?.[m] || {}), innerBox: v === '' ? 0 : Number(v) } };
+                                                ctx.updateContainer(container.id, { spareParts: newParts }, container.deliveryMonth, 'yoshii', `型式 [${m}] 化粧箱`);
+                                            }} className="w-full text-right pr-1 border-none bg-transparent font-normal"/>
+                                        </td>
+                                        <td className="border w-[40px] min-w-[40px] max-w-[40px]">
+                                            <LocalInput type="number" value={parts.label !== undefined ? parts.label : ''} onChange={(v) => {
+                                                const newParts = { ...(container.spareParts || {}), [m]: { ...(container.spareParts?.[m] || {}), label: v === '' ? 0 : Number(v) } };
+                                                ctx.updateContainer(container.id, { spareParts: newParts }, container.deliveryMonth, 'yoshii', `型式 [${m}] ラベル`);
+                                            }} className="w-full text-right pr-1 border-none bg-transparent font-normal"/>
+                                        </td>
+                                        <td className="border text-right pr-1 font-bold text-emerald-800 font-mono">{qty.toLocaleString()}</td>
 
                                         {mIdx === 0 && (
                                             <>
-                                                <td rowSpan={rowSpan} className="border font-extrabold bg-emerald-100 text-emerald-900 text-right pr-1 align-middle">{totalQty.toLocaleString()}</td>
+                                                <td rowSpan={rowSpan} className="border font-extrabold bg-emerald-100 text-emerald-900 text-right pr-1 align-middle font-mono">{totalQty.toLocaleString()}</td>
                                                 <td rowSpan={rowSpan} className="border bg-white align-middle">{container.port || '-'}</td>
                                                 <td rowSpan={rowSpan} className="border bg-white align-middle">{container.etd || '-'}</td>
                                                 <td rowSpan={rowSpan} className="border bg-white align-middle">{container.eta || '-'}</td>
