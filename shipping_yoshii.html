@@ -54,9 +54,9 @@
 
     <script type="text/babel">
         // =========================================================
-        // 【最重要】システムバージョン定義（★WebVer. 103へ更新）
+        // 【最重要】システムバージョン定義（★WebVer. 105へ更新）
         // =========================================================
-        const APP_VERSION = 'WebVer. 103';
+        const APP_VERSION = 'WebVer. 105';
 
         // AppContext（全体共有ステート）
         const AppContext = React.createContext(null);
@@ -244,7 +244,7 @@
                 setLoginPassword('');
             };
 
-            // Firebase 匿名認証を行った後に Firestore リスナーを開始
+            // Firebase 匿名認証（signInAnonymously）を実行した後に Firestore リアルタイム取得（onSnapshot）を開始
             React.useEffect(() => {
                 if (!authUser) return;
 
