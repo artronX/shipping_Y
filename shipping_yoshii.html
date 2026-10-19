@@ -159,7 +159,7 @@
 
     <script type="text/babel">
         // =========================================================
-        // バージョン一元化宣言 (システム全体で参照)
+        // SYSTEM_VERSION = 'WebVer. 115'; // バージョン単一真実源
         // =========================================================
         const SYSTEM_VERSION = 'WebVer. 115';
 
@@ -200,13 +200,6 @@
             common: { statuses: ["未確定", "生産中", "検査待", "出港済", "出荷済み", "納品完了"], containerSizes: ["20GP", "40GP", "40HQ"], orderStatuses: ["計画", "発注確定"], splitTypes: ["全", "分納"] }
         };
 
-        const formatYYMM = (ymStr) => {
-            if (!ymStr || !ymStr.includes('-')) return '';
-            const parts = ymStr.split('-');
-            return `${parts[0].slice(-2)}${parts[1].padStart(2, '0')}`;
-        };
-
-        // UIコンポーネント: LocalInput
         const LocalInput = ({ value, onChange, onEnter, onTabOut, onFocusTrigger, type="text", className="", listId, dataGridId, onGridKeyDown, autoFocus, onAutoFocused, refDate, placeholder="", originalValue, originalMeta, disabled=false }) => {
             const ctx = useContext(AppContext);
             const [val, setVal] = useState(value !== undefined && value !== null ? String(value) : '');
@@ -281,7 +274,6 @@
             );
         };
 
-        // UIコンポーネント: LocalTextArea
         const LocalTextArea = ({ value, onChange, isCompact=false, className="", originalValue, originalMeta, disabled=false }) => {
             const ctx = useContext(AppContext);
             const [val, setVal] = useState(value !== undefined && value !== null ? String(value) : '');
@@ -306,7 +298,6 @@
             );
         };
 
-        // UIコンポーネント: DynamicSelect
         const DynamicSelect = ({ value, onChange, category, options, className="", dataGridId, onGridKeyDown, onFocusTrigger, autoDefaultValue, autoFocus, onAutoFocused, originalValue, originalMeta, disabled=false }) => {
             const ctx = useContext(AppContext);
             const [val, setVal] = useState(value || '');
@@ -341,7 +332,6 @@
             );
         };
 
-        // UIコンポーネント: ScheduleFilterSortControl
         const ScheduleFilterSortControl = ({ filterMode, setFilterMode, selectedYear, setSelectedYear, singleMonth, setSingleMonth, startMonth, setStartMonth, endMonth, setEndMonth, sortConfig, setSortConfig }) => (
             <div className="flex flex-wrap items-center justify-between gap-3 bg-gray-50 p-2 rounded border text-xs no-print mb-2 flex-shrink-0">
                 <div className="flex items-center gap-3 flex-wrap">
@@ -383,7 +373,6 @@
             </div>
         );
 
-        // UIコンポーネント: LogViewModal
         const LogViewModal = ({ isOpen, onClose, logs, sessions }) => {
             const [activeTab, setActiveTab] = useState('data_logs');
             if (!isOpen) return null;
@@ -452,44 +441,6 @@
             );
         };
 
-        // UIコンポーネント: ModelEditModal
-        const ModelEditModal = ({ isOpen, onClose, company='yoshii' }) => {
-            const ctx = useContext(AppContext);
-            const [models, setModels] = useState([]);
-
-            useEffect(() => {
-                if (isOpen) {
-                    const masterModels = ctx.masterData[company]?.models || [];
-                    const planModels = ctx.plans.filter(p => p.company === company && p.model).map(p => p.model);
-                    const mergedSet = new Set([...masterModels, ...planModels]);
-                    setModels(Array.from(mergedSet).sort());
-                }
-            }, [isOpen, ctx.masterData, ctx.plans, company]);
-
-            if (!isOpen) return null;
-
-            return (
-                <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-lg shadow-xl w-full max-w-xl h-[75vh] flex flex-col relative">
-                        <div className="p-4 bg-emerald-700 text-white flex justify-between items-center rounded-t-lg">
-                            <h3 className="font-bold text-base">✏ 型式マスタの編集</h3>
-                            <button onClick={onClose} className="text-xl font-bold">×</button>
-                        </div>
-                        <div className="p-4 overflow-y-auto flex-grow">
-                            <table className="w-full text-xs border-collapse">
-                                <thead><tr className="border-b bg-gray-100"><th className="p-2 border text-left">型式名</th></tr></thead>
-                                <tbody>
-                                    {models.map(m => <tr key={m} className="border-b"><td className="p-2 border font-bold">{m}</td></tr>)}
-                                </tbody>
-                            </table>
-                        </div>
-                        <div className="p-3 bg-gray-100 border-t flex justify-end"><button onClick={onClose} className="bg-gray-600 text-white px-4 py-1 rounded text-xs font-bold">閉じる</button></div>
-                    </div>
-                </div>
-            );
-        };
-
-        // UIコンポーネント: ExportPrintModal
         const ExportPrintModal = ({ isOpen, onClose, screenName, currentMonthStr, onStartExport, defaultMode = 'year' }) => {
             const [mode, setMode] = useState(defaultMode);
             const [selectedYear, setSelectedYear] = useState(2026);
@@ -525,7 +476,7 @@
             });
         };
 
-        // ログインモーダル定義
+        // ログインモーダル定義（SYSTEM_VERSION 定数完全一元化）
         const LoginModal = ({ onLogin }) => {
             const [workerId, setWorkerId] = useState(() => localStorage.getItem(LAST_OPERATOR_STORAGE_KEY) || '');
             const [password, setPassword] = useState('');
@@ -560,6 +511,7 @@
                     <div className="bg-white rounded-xl shadow-2xl border border-slate-200 max-w-sm w-full p-6 space-y-5">
                         <div className="text-center space-y-1">
                             <h2 className="text-lg font-bold text-slate-800">吉井電気 製品出荷管理システム</h2>
+                            {/* 手書き文字列を廃止し、定数 SYSTEM_VERSION のみと参照連動 */}
                             <p className="text-xs text-indigo-600 font-mono font-bold">権限認証ログイン ({SYSTEM_VERSION})</p>
                         </div>
                         {errorMsg && <div className="bg-red-50 border border-red-200 text-red-600 text-xs p-2.5 rounded text-center font-bold">{errorMsg}</div>}
@@ -755,7 +707,6 @@
                 if (isContainer) await updateContainer(id, { [field]: newVal }, yoshiiAllocMonth, company, fieldLabel || field);
             };
 
-            // 割振り画面 D&D 行順序入れ替え修復ロジック
             const handleDragStart = (e, containerId) => { setDraggedRowId(containerId); isDraggingOrSortingRef.current = true; };
             const handleDragOver = (e, targetId) => { e.preventDefault(); if (draggedRowId && draggedRowId !== targetId) setDragOverRowId(targetId); };
             const handleDragEnd = () => { setDraggedRowId(null); setDragOverRowId(null); isDraggingOrSortingRef.current = false; };
@@ -884,7 +835,7 @@
         root.render(<App />);
     </script>
 
-    <!-- 分割コンポーネントおよびビューモジュールの読み込み (WebVer. 115 キャッシュ破棄タグ) -->
+    <!-- キャッシュ破棄タグ付与 -->
     <script type="text/babel" src="shipping_views_plan.js?v=115"></script>
     <script type="text/babel" src="shipping_views_ship.js?v=115"></script>
 </body>
