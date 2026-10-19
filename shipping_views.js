@@ -1,5 +1,5 @@
 // =========================================================
-// shipping_views.js - View Components (WebVer. 106 完全修復版)
+// shipping_views.js - View Components (WebVer. 107 完全修復版)
 // =========================================================
 
 const formatModelWithBreak = (m) => {
@@ -856,7 +856,6 @@ const YoshiiAllocationView = () => {
                                 <th className="p-1 border w-16 sticky left-10 top-0 bg-gray-200 z-40 text-xs">項目</th>
                                 <th className="p-1 border w-[90px] min-w-[90px] sticky left-[104px] top-0 bg-gray-200 z-40 text-xs">管理番号</th>
                                 <th className="p-1 border w-[76px] min-w-[70px] sticky left-[194px] top-0 bg-gray-200 z-40 text-xs">到着港</th>
-                                <!-- ★V95原本通り一律固定幅（w-[62px] min-w-[62px]）で横崩れ防止 -->
                                 {models.map(m => (
                                     <th key={m} className="p-1 border bg-emerald-100 text-xs leading-tight align-bottom model-hdr w-[62px] min-w-[62px] max-w-[62px]" title={m}>
                                         {formatModelWithBreak(m)}
@@ -942,7 +941,7 @@ const YoshiiAllocationView = () => {
                                                         type="number" 
                                                         value={cellValue} 
                                                         originalValue={(container.originals?.allocations || {})[m]}
-                                                        originalMeta={(container.originalMetas?.allocations || {})[m]}
+                                                        originalMeta={(container.originalMetas || {})[m]}
                                                         onChange={(v, orig) => handleAllocationValueChange(container, m, v, orig)} 
                                                         className="matrix-input text-emerald-800 font-bold pr-1 text-right" 
                                                         dataGridId={`y-alloc-${idx}-${mIdx + 2}`} 
@@ -1392,7 +1391,7 @@ const YoshiiShipView = () => {
                                     </td>
                                     
                                     <td className="p-0.5 notes-cell">
-                                        <LocalTextArea value={item.shipNotes} originalValue={(item.originals || {}).shipNotes} originalMeta={(item.originalMetas || {}).shipNotes} onChange={(v, orig) => ctx.updateContainer(item.id, { shipNotes: v, originals: { ...(item.originals || {}), shipNotes: item.originals?.shipNotes !== undefined ? item.originals.shipNotes : orig }, originalMetas: { ...(item.originalMetas || {}), shipNotes: item.originalMetas?.shipNotes !== undefined ? item.originalMetas.shipNotes : `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}` } }, item.deliveryMonth, 'yoshii', '出荷日程 備考')} isCompact={true} className="text-left text-xs whitespace-normal break-all"/>
+                                        <LocalTextArea value={item.shipNotes} originalValue={(item.originals || {}).shipNotes} originalMeta={(item.originalMetas || {}).shipNotes} onChange={(v, orig) => ctx.updateContainer(item.id, { shipNotes: v, originals: { ...(item.originals || {}), shipNotes: item.originals?.shipNotes !== undefined ? item.originals.shipNotes : orig }, originalMetas: { ...(item.originalMetas || {}), shipNotes: item.originals?.shipNotes !== undefined ? item.originals.shipNotes : `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}` } }, item.deliveryMonth, 'yoshii', '出荷日程 備考')} isCompact={true} className="text-left text-xs whitespace-normal break-all"/>
                                     </td>
                                 </tr>
                             )
@@ -1772,4 +1771,25 @@ const YoshiiDrayageView = () => {
                                     </td>
                                     <td className="p-1 readonly-cell text-right font-bold">{totalQty.toLocaleString()}</td>
                                     <td className="p-1 readonly-cell text-center">{item.port || '-'}</td>
-                                    <td className="p-0.5"><LocalInput type="date" value={item.etd} originalValue={(item.originals || {}).etd} originalMeta={(item.originalMetas || {}).etd} onChange={(v, orig) => ctx.updateContainer(item.id, { etd: v, originals: { ...(item.originals || {}), etd: item.originals?.etd !== undefined ? item.originals.etd : orig },
+                                    <td className="p-0.5"><LocalInput type="date" value={item.etd} originalValue={(item.originals || {}).etd} originalMeta={(item.originalMetas || {}).etd} onChange={(v, orig) => ctx.updateContainer(item.id, { etd: v, originals: { ...(item.originals || {}), etd: item.originals?.etd !== undefined ? item.originals.etd : orig }, originalMetas: { ...(item.originalMetas || {}), etd: item.originalMetas?.etd !== undefined ? item.originalMetas.etd : `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}` } }, item.deliveryMonth, 'yoshii', 'ETD')} /></td>
+                                    <td className="p-0.5"><LocalInput type="date" value={item.eta} originalValue={(item.originals || {}).eta} originalMeta={(item.originalMetas || {}).eta} refDate={item.etd} onChange={(v, orig) => ctx.updateContainer(item.id, { eta: v, originals: { ...(item.originals || {}), eta: item.originals?.eta !== undefined ? item.originals.eta : orig }, originalMetas: { ...(item.originalMetas || {}), eta: item.originalMetas?.eta !== undefined ? item.originalMetas.eta : `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}` } }, item.deliveryMonth, 'yoshii', 'ETA')} /></td>
+                                    <td className="p-0.5"><LocalInput type="date" value={item.freeTime} originalValue={(item.originals || {}).freeTime} originalMeta={(item.originalMetas || {}).freeTime} onChange={(v, orig) => ctx.updateContainer(item.id, { freeTime: v, originals: { ...(item.originals || {}), freeTime: item.originals?.freeTime !== undefined ? item.originals.freeTime : orig }, originalMetas: { ...(item.originalMetas || {}), freeTime: item.originalMetas?.freeTime !== undefined ? item.originalMetas.freeTime : `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}` } }, item.deliveryMonth, 'yoshii', 'フリータイム')} /></td>
+                                    <td className="p-0.5"><LocalInput type="date" value={item.drayageDeliveryDate} originalValue={(item.originals || {}).drayageDeliveryDate} originalMeta={(item.originalMetas || {}).drayageDeliveryDate} refDate={item.freeTime || item.eta} onChange={(v, orig) => ctx.updateContainer(item.id, { drayageDeliveryDate: v, originals: { ...(item.originals || {}), drayageDeliveryDate: item.originals?.drayageDeliveryDate !== undefined ? item.originals.drayageDeliveryDate : orig }, originalMetas: { ...(item.originalMetas || {}), drayageDeliveryDate: item.originalMetas?.drayageDeliveryDate !== undefined ? item.originalMetas.drayageDeliveryDate : `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}` } }, item.deliveryMonth, 'yoshii', '納品日')} /></td>
+                                    <td className="p-0.5"><LocalInput type="time" value={item.drayageDeliveryTime} originalValue={(item.originals || {}).drayageDeliveryTime} originalMeta={(item.originalMetas || {}).drayageDeliveryTime} onChange={(v, orig) => ctx.updateContainer(item.id, { drayageDeliveryTime: v, originals: { ...(item.originals || {}), drayageDeliveryTime: item.originals?.drayageDeliveryTime !== undefined ? item.originals.drayageDeliveryTime : orig }, originalMetas: { ...(item.originalMetas || {}), drayageDeliveryTime: item.originals?.drayageDeliveryTime !== undefined ? item.originals.drayageDeliveryTime : `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}` } }, item.deliveryMonth, 'yoshii', '納品時間')} className="text-center" /></td>
+                                    <td className="p-0.5 w-[190px] min-w-[180px]"><DynamicSelect value={item.drayageDestination} originalValue={(item.originals || {}).drayageDestination} originalMeta={(item.originalMetas || {}).drayageDestination} onChange={(val, cat, orig) => ctx.handleSelectChange(item.id, 'drayageDestination', true, 'yoshii', false, '納品先')(val, cat, orig)} category="destinations" options={ctx.masterData.yoshii.destinations} className="text-xs font-bold w-full text-center" /></td>
+                                    <td className="p-0.5 notes-cell">
+                                        <LocalTextArea value={item.drayageNotes} originalValue={(item.originals || {}).drayageNotes} originalMeta={(item.originalMetas || {}).drayageNotes} onChange={(v, orig) => ctx.updateContainer(item.id, { drayageNotes: v, originals: { ...(item.originals || {}), drayageNotes: item.originals?.drayageNotes !== undefined ? item.originals.drayageNotes : orig }, originalMetas: { ...(item.originalMetas || {}), drayageNotes: item.originals?.drayageNotes !== undefined ? item.originals.drayageNotes : `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}` } }, item.deliveryMonth, 'yoshii', '備考')} isCompact={true} className="text-left text-xs whitespace-normal break-all"/>
+                                    </td>
+                                    <td className="p-1 readonly-cell text-center">{item.containerSize || '-'}</td>
+                                    <td className="p-0.5 readonly-cell text-center font-bold text-xs">{item.vessel || '-'}</td>
+                                </tr>
+                            )
+                        })}
+                    </tbody>
+                </table>
+            </div>
+
+            <ExportPrintModal isOpen={exportModal.isOpen} onClose={() => setExportModal({ isOpen: false, type: 'excel' })} screenName="ドレージ手配" currentMonthStr={ctx.currentMonthStr} defaultMode="current" onStartExport={handleExecuteExport} />
+        </div>
+    );
+};
