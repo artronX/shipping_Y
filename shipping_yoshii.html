@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>吉井電気 製品出荷管理システム (WebVer. 114)</title>
+    <title>吉井電気 製品出荷管理システム (WebVer. 115)</title>
     
     <!-- React 18 -->
     <script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js" crossorigin></script>
@@ -46,7 +46,6 @@
 
             th.notes-col, td.notes-col, .notes-cell { white-space: normal !important; word-break: break-all !important; }
             input, select, textarea { border: none !important; appearance: none; background: transparent; padding: 0; margin: 0; font-size: inherit; width: 100%; color: black; }
-            .print-bg-green { background-color: #bbf7d0 !important; }
             .table-container { overflow: visible !important; max-height: none !important; height: auto !important; width: 100% !important; }
             .sticky { position: static !important; }
             
@@ -159,6 +158,11 @@
     <div id="root"></div>
 
     <script type="text/babel">
+        // =========================================================
+        // バージョン一元化宣言 (システム全体で参照)
+        // =========================================================
+        const SYSTEM_VERSION = 'WebVer. 115';
+
         const AUTO_LOGOUT_MINUTES = 15;
         const LAST_OPERATOR_STORAGE_KEY = 'shipping_last_operator_name';
         const LAST_ACTIVE_TIME_KEY = 'shipping_last_active_time';
@@ -389,7 +393,7 @@
                         <div className="p-4 bg-indigo-900 text-white flex justify-between items-center">
                             <div className="flex items-center gap-3">
                                 <h3 className="font-bold text-base flex items-center gap-2">⚙ システム管理ログ・接続履歴</h3>
-                                <span className="bg-amber-400 text-slate-900 text-[10px] font-extrabold px-2 py-0.5 rounded font-mono">WebVer. 114</span>
+                                <span className="bg-amber-400 text-slate-900 text-[10px] font-extrabold px-2 py-0.5 rounded font-mono">{SYSTEM_VERSION}</span>
                             </div>
                             <button onClick={onClose} className="text-2xl font-bold hover:text-gray-300 leading-none">×</button>
                         </div>
@@ -556,7 +560,7 @@
                     <div className="bg-white rounded-xl shadow-2xl border border-slate-200 max-w-sm w-full p-6 space-y-5">
                         <div className="text-center space-y-1">
                             <h2 className="text-lg font-bold text-slate-800">吉井電気 製品出荷管理システム</h2>
-                            <p className="text-xs text-indigo-600 font-mono font-bold">権限認証ログイン (WebVer. 114)</p>
+                            <p className="text-xs text-indigo-600 font-mono font-bold">権限認証ログイン ({SYSTEM_VERSION})</p>
                         </div>
                         {errorMsg && <div className="bg-red-50 border border-red-200 text-red-600 text-xs p-2.5 rounded text-center font-bold">{errorMsg}</div>}
                         <form onSubmit={handleSubmit} className="space-y-4">
@@ -576,7 +580,6 @@
         };
 
         const App = () => {
-            // スクロール状態の永続保持Ref (コンポーネント再マウント時にもクリアされない上位State)
             const shipScrollPosRef = useRef(null);
             const drayScrollPosRef = useRef(null);
 
@@ -641,7 +644,7 @@
                 const now = new Date();
                 const timestampStr = `${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
                 try {
-                    await db.collection('operation_logs').add({ timestamp: timestampStr, createdAt: now.toISOString(), operator: operatorName || '未設定', appVersion: 'WebVer. 114', sheetName, action, detail });
+                    await db.collection('operation_logs').add({ timestamp: timestampStr, createdAt: now.toISOString(), operator: operatorName || '未設定', appVersion: SYSTEM_VERSION, sheetName, action, detail });
                 } catch (e) { console.error("Log Error:", e); }
             };
 
@@ -752,10 +755,47 @@
                 if (isContainer) await updateContainer(id, { [field]: newVal }, yoshiiAllocMonth, company, fieldLabel || field);
             };
 
+            // 割振り画面 D&D 行順序入れ替え修復ロジック
             const handleDragStart = (e, containerId) => { setDraggedRowId(containerId); isDraggingOrSortingRef.current = true; };
             const handleDragOver = (e, targetId) => { e.preventDefault(); if (draggedRowId && draggedRowId !== targetId) setDragOverRowId(targetId); };
             const handleDragEnd = () => { setDraggedRowId(null); setDragOverRowId(null); isDraggingOrSortingRef.current = false; };
-            const handleDrop = async (e, targetId, containerList) => { handleDragEnd(); };
+            
+            const handleDrop = async (e, targetId, containerList) => {
+                e.preventDefault();
+                if (!draggedRowId || draggedRowId === targetId || !containerList) {
+                    handleDragEnd();
+                    return;
+                }
+
+                const list = [...containerList];
+                const dragIndex = list.findIndex(c => c.id === draggedRowId);
+                const dropIndex = list.findIndex(c => c.id === targetId);
+
+                if (dragIndex === -1 || dropIndex === -1) {
+                    handleDragEnd();
+                    return;
+                }
+
+                const [movedItem] = list.splice(dragIndex, 1);
+                list.splice(dropIndex, 0, movedItem);
+
+                const batch = db.batch();
+                list.forEach((item, idx) => {
+                    if (item.id) {
+                        const ref = db.collection('containers').doc(item.id);
+                        batch.update(ref, { allocNo: idx + 1, sortOrder: idx + 1, updatedAt: new Date().toISOString() });
+                    }
+                });
+
+                try {
+                    await batch.commit();
+                    logOperation('割振り', '並び替え', `行順序を並び替えました (${draggedRowId} ➔ ${targetId})`);
+                } catch (err) {
+                    console.error("Drop Order Update Error:", err);
+                } finally {
+                    handleDragEnd();
+                }
+            };
 
             const contextValue = { 
                 masterData, plans, containers, yoshiiAllocMonth, setYoshiiAllocMonth, 
@@ -778,7 +818,7 @@
                         <header className="h-[44px] bg-indigo-700 text-white flex items-center justify-between px-4 shadow no-print flex-shrink-0">
                             <div className="flex items-center gap-4 min-w-[220px]">
                                 <a href="shipping.html" className="hover:bg-indigo-600 px-2 py-1 border rounded text-sm transition">ホーム</a>
-                                <h1 className="text-lg font-bold hidden md:block">吉井電気<span className="text-sm font-bold bg-indigo-900/80 px-2 py-0.5 rounded text-amber-300 font-mono text-xs ml-2">WebVer. 114</span></h1>
+                                <h1 className="text-lg font-bold hidden md:block">吉井電気<span className="text-sm font-bold bg-indigo-900/80 px-2 py-0.5 rounded text-amber-300 font-mono text-xs ml-2">{SYSTEM_VERSION}</span></h1>
                             </div>
                             
                             <div className="flex items-center justify-center gap-3 flex-1">
@@ -844,8 +884,8 @@
         root.render(<App />);
     </script>
 
-    <!-- 分割コンポーネントおよびビューモジュールの読み込み (WebVer. 114 キャッシュ破棄タグ) -->
-    <script type="text/babel" src="shipping_views_plan.js?v=114"></script>
-    <script type="text/babel" src="shipping_views_ship.js?v=114"></script>
+    <!-- 分割コンポーネントおよびビューモジュールの読み込み (WebVer. 115 キャッシュ破棄タグ) -->
+    <script type="text/babel" src="shipping_views_plan.js?v=115"></script>
+    <script type="text/babel" src="shipping_views_ship.js?v=115"></script>
 </body>
 </html>
