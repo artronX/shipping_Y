@@ -83,7 +83,7 @@
             padding: 0 2px; font-size: 0.75rem; outline: none; box-sizing: border-box;
         }
         .matrix-input:focus { background-color: #e0e7ff; outline: 1px solid #4f46e5; }
-        .matrix-td { padding: 0 !important; border: 1px solid #d1d5db; height: 24px; }
+        .matrix-td { padding: 0 !important; border: 1px solid #d1d5db; height: 24px; position: relative; }
         
         .month-divider td { background-color: #e5e7eb; font-weight: bold; text-align: left !important; padding: 4px 8px !important; color: #374151; }
 
@@ -114,6 +114,7 @@
             font-weight: bold !important;
         }
         
+        /* ツールチップ修復CSS */
         .has-original-tooltip {
             position: relative;
         }
@@ -126,12 +127,12 @@
             border-width: 0 6px 6px 0;
             border-color: transparent #dc2626 transparent transparent;
             pointer-events: none;
-            z-index: 10;
+            z-index: 30;
         }
         .has-original-tooltip:hover::after {
             content: "変更前: " attr(data-original-val) " (" attr(data-original-meta) ")";
             position: absolute;
-            top: 100%;
+            bottom: 100%;
             left: 50%;
             transform: translateX(-50%);
             background-color: #111827;
@@ -144,7 +145,7 @@
             z-index: 99999 !important;
             box-shadow: 0 4px 12px rgba(0,0,0,0.35);
             pointer-events: none;
-            margin-top: 2px;
+            margin-bottom: 4px;
         }
     
         .readonly-cell {
@@ -200,19 +201,7 @@
             return `${parts[0].slice(-2)}${parts[1].padStart(2, '0')}`;
         };
 
-        const parseRefDateToYMD = (ref) => {
-            if (!ref) return "";
-            if (ref.includes('-') && ref.length >= 7) return ref.length === 7 ? `${ref}-01` : ref;
-            if (ref.includes('/')) {
-                const parts = ref.split('/');
-                if (parts.length === 3) return `${parts[0].length === 2 ? `20${parts[0]}` : parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
-            }
-            const match = ref.match(/(\d+)月/);
-            if (match) return `${new Date().getFullYear()}-${match[1].padStart(2, '0')}-01`;
-            return "";
-        };
-
-        // UIコンポーネント: LocalInput
+        // UIコンポーネント: LocalInput (ツールチップ完備)
         const LocalInput = ({ value, onChange, onEnter, onTabOut, onFocusTrigger, type="text", className="", listId, dataGridId, onGridKeyDown, autoFocus, onAutoFocused, refDate, placeholder="", originalValue, originalMeta }) => {
             const ctx = useContext(AppContext);
             const [val, setVal] = useState(value !== undefined && value !== null ? String(value) : '');
@@ -221,15 +210,6 @@
             const inputRef = useRef(null);
 
             useEffect(() => { if (!focused) setVal(value !== undefined && value !== null ? String(value) : ''); }, [value, focused]);
-
-            useEffect(() => {
-                if (autoFocus && inputRef.current) {
-                    inputRef.current.focus({ preventScroll: true });
-                    if (inputRef.current.select) inputRef.current.select();
-                    inputRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    if (onAutoFocused) onAutoFocused();
-                }
-            }, [autoFocus]);
 
             const handleBlur = () => { 
                 setFocused(false); setIsEditing(false);
@@ -248,7 +228,6 @@
                     if (e.key === 'ArrowUp' || e.key === 'ArrowDown') { e.preventDefault(); handleBlur(); onGridKeyDown(e); return; }
                     if (!isEditing && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) { e.preventDefault(); handleBlur(); onGridKeyDown(e); return; }
                 }
-                if (e.key === 'Tab' && !e.shiftKey) { handleBlur(); if (onTabOut) { e.preventDefault(); e.target.blur(); onTabOut(); } }
             };
 
             let displayVal = val;
@@ -302,7 +281,6 @@
             useEffect(() => { if (!focused) setVal(value !== undefined && value !== null ? String(value) : ''); }, [value, focused]);
 
             const handleBlur = () => { setFocused(false); if (val !== (value || '')) onChange(val, value); };
-            const handleKeyDown = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); e.target.blur(); } };
 
             const hasOrig = originalValue !== undefined && originalValue !== null && String(originalValue) !== '';
             const isChanged = hasOrig && String(originalValue) !== String(val);
@@ -312,7 +290,7 @@
 
             return (
                 <div className={`w-full h-full ${tooltipClass}`} data-original-val={originalValue === "" ? "【消去】" : originalValue} data-original-meta={metaStr}>
-                    <textarea value={val} onChange={e => setVal(e.target.value)} onFocus={() => setFocused(true)} onBlur={handleBlur} onKeyDown={handleKeyDown} rows={isCompact ? 1 : 2} disabled={ctx.authUser && !ctx.authUser.canEdit} className={`w-full text-xs px-1 border-none bg-transparent outline-none whitespace-normal break-all resize-y focus:bg-indigo-50 ${isCompact ? 'h-[22px] min-h-[22px] leading-[20px] py-0 overflow-hidden' : 'py-1 min-h-[36px]'} ${className} ${changedClass}`}/>
+                    <textarea value={val} onChange={e => setVal(e.target.value)} onFocus={() => setFocused(true)} onBlur={handleBlur} rows={isCompact ? 1 : 2} disabled={ctx.authUser && !ctx.authUser.canEdit} className={`w-full text-xs px-1 border-none bg-transparent outline-none whitespace-normal break-all resize-y focus:bg-indigo-50 ${isCompact ? 'h-[22px] min-h-[22px] leading-[20px] py-0 overflow-hidden' : 'py-1 min-h-[36px]'} ${className} ${changedClass}`}/>
                 </div>
             );
         };
@@ -325,31 +303,12 @@
 
             useEffect(() => { setVal(value || ''); }, [value]);
 
-            useEffect(() => {
-                if (autoFocus && selectRef.current) {
-                    selectRef.current.focus({ preventScroll: true });
-                    selectRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    if (onAutoFocused) onAutoFocused();
-                }
-            }, [autoFocus]);
-
-            const handleFocus = (e) => {
-                if (!val && autoDefaultValue) { setVal(autoDefaultValue); onChange(autoDefaultValue, category, ''); }
-                if (onFocusTrigger) onFocusTrigger(e);
-            };
-
             const handleChange = (e) => {
                 const newVal = e.target.value;
                 const currentVal = value !== undefined && value !== null ? String(value) : '';
                 const origToPass = originalValue !== undefined && originalValue !== null ? originalValue : currentVal;
                 if (newVal === '__ADD_NEW__') onChange('__ADD_NEW__', category, origToPass);
                 else { setVal(newVal); onChange(newVal, category, origToPass); }
-            };
-
-            const handleKeyDown = (e) => {
-                if (e.key === 'ArrowUp' || e.key === 'ArrowDown') { e.stopPropagation(); return; }
-                if (e.key === 'Enter') { e.preventDefault(); if (onGridKeyDown) onGridKeyDown(e); else e.target.blur(); return; }
-                if (onGridKeyDown && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) { e.preventDefault(); onGridKeyDown(e); }
             };
 
             const hasOrig = originalValue !== undefined && originalValue !== null && String(originalValue) !== '';
@@ -360,7 +319,7 @@
 
             return (
                 <div className={`w-full h-full ${tooltipClass}`} data-original-val={originalValue === "" ? "【消去】" : originalValue} data-original-meta={metaStr}>
-                    <select ref={selectRef} value={val} onChange={handleChange} onFocus={handleFocus} onKeyDown={handleKeyDown} disabled={ctx.authUser && !ctx.authUser.canEdit} className={`cell-input text-center ${className} px-0 ${changedClass}`}>
+                    <select ref={selectRef} value={val} onChange={handleChange} disabled={ctx.authUser && !ctx.authUser.canEdit} className={`cell-input text-center ${className} px-0 ${changedClass}`}>
                         <option value=""></option>
                         {(options || []).map((opt, i) => <option key={i} value={opt}>{opt}</option>)}
                         <option value="__ADD_NEW__" className="font-bold text-blue-600">+ 新規追加</option>
@@ -569,7 +528,7 @@
 
                 let matchedRule = AUTH_TABLE.find(rule => rule.passwords.includes(cleanPass));
                 if (!matchedRule) {
-                    const matchPattern = cleanPass.match(/^(.+)[＠@]\s*8888\$/i);
+                    const matchPattern = cleanPass.match(/^(.+)[＠@]\s*8888$/i);
                     if (matchPattern) {
                         const vendorPrefix = matchPattern[1].trim().toUpperCase();
                         matchedRule = { role: `VENDOR_${vendorPrefix}`, label: `${vendorPrefix}専用 (出荷日程編集/割振り閲覧)`, allowedViews: ['yoshii_alloc', 'yoshii_ship'], editableViews: ['yoshii_ship'], vendorRestriction: vendorPrefix, canEdit: true };
@@ -622,8 +581,6 @@
             const [containers, setContainers] = useState([]);
             const [logs, setLogs] = useState([]);
             const [sessions, setSessions] = useState([]);
-            const currentSessionIdRef = useRef(null);
-            const loginTimestampRef = useRef(null);
 
             const [operatorName, setOperatorName] = useState('');
             const [isLogModalOpen, setIsLogModalOpen] = useState(false);
@@ -684,7 +641,11 @@
             };
 
             const handleStartTracking = () => { setIsChangeTrackingMode(true); alert("変更記録モードを開始しました。"); };
-            const handleClearTracking = async () => { setIsChangeTrackingMode(false); alert("変更箇所を確定（黒文字化）しました。"); };
+            const handleClearTracking = async () => { 
+                setIsChangeTrackingMode(false); 
+                logOperation('出荷管理', '修正', '赤文字ハイライトの確定（黒文字化）');
+                alert("変更箇所を確定（黒文字化）しました。"); 
+            };
 
             useEffect(() => {
                 let unsubMaster = () => {}; let unsubPlans = () => {}; let unsubContainers = () => {}; let unsubLogs = () => {}; let unsubSessions = () => {};

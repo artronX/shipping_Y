@@ -1,5 +1,5 @@
 // =========================================================
-// shipping_views_plan.js - 計画・割振り画面モジュール (WebVer. 109)
+// shipping_views_plan.js - 計画・割振り画面モジュール (WebVer. 110 完全版)
 // =========================================================
 
 const formatModelWithBreak = (m) => {
@@ -22,7 +22,6 @@ const YoshiiPlanView = () => {
 
     const handleExecuteExport = ({ mode, selectedYear: selYr, singleMonth: sgMo, startMonth: sMo, endMonth: eMo }) => {
         const targetVendor = ctx.selectedVendorFilter || 'ALL';
-        
         if (exportModal.type === 'print') {
             setTimeout(() => window.print(), 300);
             return;
@@ -350,7 +349,6 @@ const YoshiiPlanView = () => {
                 </div>
             </div>
 
-            {/* 2行目サブツールバー */}
             <div className="flex justify-between items-center mb-2 no-print gap-2 flex-shrink-0 text-xs">
                 <div className="flex items-center gap-2 font-bold">
                     <div className="flex bg-gray-100 p-0.5 rounded border gap-1">
@@ -399,7 +397,6 @@ const YoshiiPlanView = () => {
                 </div>
             </div>
 
-            {/* テーブル本体 */}
             <div className="table-container flex-grow border rounded shadow-inner overflow-x-auto overflow-y-auto" ref={ctx.tableContainerRef}>
                 <table className="w-full text-center border-collapse text-[11px]">
                     <thead className="sticky top-0 z-30 bg-gray-200 font-bold">
@@ -413,7 +410,6 @@ const YoshiiPlanView = () => {
                                 </div>
                             </th>
 
-                            {/* 型式ドロップダウンリストヘッダー */}
                             <th className="p-0.5 border min-w-[85px] sticky left-[66px] bg-gray-200 z-40 text-[11px] font-bold">
                                 <div className="flex items-center justify-center gap-1 px-1">
                                     <select 
@@ -490,12 +486,10 @@ const YoshiiPlanView = () => {
                                         <LocalInput value={currentJanCode} originalValue={(matchModelDetails.originals || {}).janCode} originalMeta={(matchModelDetails.originalMetas || {}).janCode} onChange={(v, orig) => handleModelDetailChange(model, 'janCode', v)} className="w-full text-[11px] text-center font-mono border-none bg-transparent h-[20px] font-normal"/>
                                     </td>
                                     
-                                    {/* 太字解除（fontWeight: 'normal'）による数値桁揃え */}
                                     <td style={{ fontWeight: 'normal' }} className={`border text-[11px] text-right pr-0.5 bg-emerald-50 text-emerald-900 w-[60px] min-w-[60px] max-w-[60px] ${rowPaddingClass}`}>
                                         {rowTot > 0 ? rowTot.toLocaleString() : '0'}
                                     </td>
                                     
-                                    {/* 納入月データセル（11px確実表示） */}
                                     {displayMonths.map((mo, colIdx) => {
                                         const plan = getPlanData(model, mo);
                                         const rawQty = plan?.quantity;
@@ -581,7 +575,7 @@ const YoshiiPlanView = () => {
     );
 };
 
-// 【コンテナ割振り画面ビュー - 全データ完全修復版】
+// 【コンテナ割振り画面ビュー - ツールチップ完全表示修復版】
 const YoshiiAllocationView = () => {
     const ctx = React.useContext(AppContext);
     const [exportModal, setExportModal] = React.useState({ isOpen: false, type: 'excel' });
@@ -635,7 +629,7 @@ const YoshiiAllocationView = () => {
         const mgmt = String(c.managementNo || '').trim();
         if (!mgmt || mgmt === '-') return 999999;
 
-        const match = mgmt.match(/^([A-Za-z]+)(\d+)(?:-(\d+))?\$/);
+        const match = mgmt.match(/^([A-Za-z]+)(\d+)(?:-(\d+))?$/);
         if (match) {
             const prefix = match[1].toUpperCase();
             const num1 = parseInt(match[2], 10);
@@ -902,13 +896,16 @@ const YoshiiAllocationView = () => {
 
                                         {models.map((m, mIdx) => {
                                             const cellValue = getContainerAllocationQty(container.allocations, m);
+                                            const origAlloc = (container.originals?.allocations || {})[m];
+                                            const metaAlloc = (container.originalMetas?.allocations || {})[m];
+
                                             return (
                                                 <td key={m} className="matrix-td px-0 w-[62px] min-w-[62px] h-[22px]">
                                                     <LocalInput 
                                                         type="number" 
                                                         value={cellValue} 
-                                                        originalValue={(container.originals?.allocations || {})[m]}
-                                                        originalMeta={(container.originalMetas || {})[m]}
+                                                        originalValue={origAlloc}
+                                                        originalMeta={metaAlloc}
                                                         onChange={(v, orig) => handleAllocationValueChange(container, m, v, orig)} 
                                                         className="matrix-input text-emerald-800 pr-0.5 text-right text-[11px] font-normal h-[20px]" 
                                                         dataGridId={`y-alloc-${idx}-${mIdx + 2}`} 
