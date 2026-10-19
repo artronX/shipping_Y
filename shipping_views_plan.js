@@ -1,5 +1,5 @@
 // =========================================================
-// shipping_views_plan.js - 計画・割振り画面モジュール
+// shipping_views_plan.js - 計画・割振り画面モジュール (WebVer. 109)
 // =========================================================
 
 const formatModelWithBreak = (m) => {
@@ -127,10 +127,8 @@ const YoshiiPlanView = () => {
         });
     }
 
-    // 全型式リスト（ドロップダウン用）を確保
     const selectableModelsList = [...allModels];
 
-    // ドロップダウンによる型式絞り込み
     if (selectedModelFilter !== 'ALL') {
         allModels = allModels.filter(m => m === selectedModelFilter);
     }
@@ -415,7 +413,7 @@ const YoshiiPlanView = () => {
                                 </div>
                             </th>
 
-                            {/* 型式ドロップダウンリスト付きヘッダー（復元・絞り込み連動） */}
+                            {/* 型式ドロップダウンリストヘッダー */}
                             <th className="p-0.5 border min-w-[85px] sticky left-[66px] bg-gray-200 z-40 text-[11px] font-bold">
                                 <div className="flex items-center justify-center gap-1 px-1">
                                     <select 
@@ -435,7 +433,6 @@ const YoshiiPlanView = () => {
                             <th className="p-0.5 border w-[100px] min-w-[100px] max-w-[100px] text-[11px] font-bold">JANコード</th>
                             <th className="p-0.5 border w-[60px] min-w-[60px] max-w-[60px] bg-emerald-100 text-[11px] font-bold text-emerald-900">合計</th>
 
-                            {/* 納入月の固定幅指定 (w-[48px] min-w-[48px] max-w-[48px]) */}
                             {displayMonths.map(mo => {
                                 const yr = mo.split('-')[0].slice(-2);
                                 const m = mo.split('-')[1];
@@ -493,12 +490,12 @@ const YoshiiPlanView = () => {
                                         <LocalInput value={currentJanCode} originalValue={(matchModelDetails.originals || {}).janCode} originalMeta={(matchModelDetails.originalMetas || {}).janCode} onChange={(v, orig) => handleModelDetailChange(model, 'janCode', v)} className="w-full text-[11px] text-center font-mono border-none bg-transparent h-[20px] font-normal"/>
                                     </td>
                                     
-                                    {/* データ行合計：太字（font-bold）をインラインスタイルで確実に解除（fontWeight: 'normal'）し桁を揃える */}
+                                    {/* 太字解除（fontWeight: 'normal'）による数値桁揃え */}
                                     <td style={{ fontWeight: 'normal' }} className={`border text-[11px] text-right pr-0.5 bg-emerald-50 text-emerald-900 w-[60px] min-w-[60px] max-w-[60px] ${rowPaddingClass}`}>
                                         {rowTot > 0 ? rowTot.toLocaleString() : '0'}
                                     </td>
                                     
-                                    {/* 納入月データセル（数値11px・表示修復版） */}
+                                    {/* 納入月データセル（11px確実表示） */}
                                     {displayMonths.map((mo, colIdx) => {
                                         const plan = getPlanData(model, mo);
                                         const rawQty = plan?.quantity;

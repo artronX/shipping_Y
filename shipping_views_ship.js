@@ -1,5 +1,5 @@
 // =========================================================
-// shipping_views_ship.js - 出荷日程画面モジュール
+// shipping_views_ship.js - 出荷日程・ドレージ画面モジュール (WebVer. 109)
 // =========================================================
 
 // 【出荷日程画面ビュー】
@@ -42,7 +42,7 @@ const YoshiiShipView = () => {
         c.company === 'yoshii' && displayMonths.includes(c.deliveryMonth)
     );
 
-    // ベンダー制限フィルター
+    // 2. ベンダー制限フィルター
     if (ctx.selectedVendorFilter && ctx.selectedVendorFilter !== 'ALL') {
         targetContainers = targetContainers.filter(c => {
             return Object.keys(c.allocations || {}).some(m => {
@@ -57,7 +57,7 @@ const YoshiiShipView = () => {
         });
     }
 
-    // 重複防止（IDの一意化）
+    // 3. データ重複防止（ID一意化による無限コピー現象の修復）
     const uniqueContainersMap = new Map();
     targetContainers.forEach(c => {
         if (c.id && !uniqueContainersMap.has(c.id)) {
@@ -84,21 +84,21 @@ const YoshiiShipView = () => {
             } else {
                 allocModels.forEach((m, idx) => {
                     const q = allocs[m];
-                    const parts = c.parts?.[m] || {};
+                    const parts = c.spareParts?.[m] || {};
                     rows.push([
                         idx === 0 ? (c.managementNo || '-') : '',
                         idx === 0 ? (c.status || '手配中') : '',
                         idx === 0 ? (c.containerNo || '-') : '',
                         m,
-                        parts.box || 0,
-                        parts.case || 0,
+                        parts.outerBox || 0,
+                        parts.innerBox || 0,
                         parts.label || 0,
                         q,
                         idx === 0 ? Object.values(allocs).reduce((a,b)=>a+Number(b||0),0) : '',
                         idx === 0 ? (c.port || '-') : '',
                         idx === 0 ? (c.etd || '-') : '',
                         idx === 0 ? (c.eta || '-') : '',
-                        idx === 0 ? (c.size || '-') : '',
+                        idx === 0 ? (c.containerSize || c.size || '-') : '',
                         idx === 0 ? (c.vessel || '-') : '',
                         idx === 0 ? (c.shipNotes || '') : ''
                     ]);
@@ -221,7 +221,7 @@ const YoshiiShipView = () => {
                                             <LocalInput type="date" value={container.eta || ''} onChange={(v, orig) => ctx.updateContainer(container.id, { eta: v }, ctx.yoshiiAllocMonth, 'yoshii', 'ETA')} className="w-full text-center border-none bg-transparent"/>
                                         </td>
                                         <td className="border">
-                                            <DynamicSelect value={container.size || ''} onChange={(val, cat, orig) => ctx.handleSelectChange(container.id, 'size', true, 'yoshii', true, 'サイズ')(val, cat, orig)} category="containerSizes" options={ctx.masterData.common.containerSizes} isCommon className="w-full text-center border-none bg-transparent"/>
+                                            <DynamicSelect value={container.containerSize || container.size || ''} onChange={(val, cat, orig) => ctx.handleSelectChange(container.id, 'containerSize', true, 'yoshii', true, 'サイズ')(val, cat, orig)} category="containerSizes" options={ctx.masterData.common.containerSizes} isCommon className="w-full text-center border-none bg-transparent"/>
                                         </td>
                                         <td className="border">
                                             <LocalInput value={container.vessel || ''} onChange={(v, orig) => ctx.updateContainer(container.id, { vessel: v }, ctx.yoshiiAllocMonth, 'yoshii', '本船名')} className="w-full text-center border-none bg-transparent"/>
@@ -235,7 +235,7 @@ const YoshiiShipView = () => {
 
                             return modelKeys.map((m, mIdx) => {
                                 const qty = allocs[m] || 0;
-                                const parts = container.parts?.[m] || {};
+                                const parts = container.spareParts?.[m] || {};
 
                                 return (
                                     <tr key={`${container.id || cIdx}-${m}`} className="hover:bg-emerald-50 border-b h-[24px]">
@@ -253,21 +253,21 @@ const YoshiiShipView = () => {
 
                                         <td className="border font-bold text-left pl-1">{m}</td>
                                         <td className="border">
-                                            <LocalInput type="number" value={parts.box !== undefined ? parts.box : ''} onChange={(v) => {
-                                                const newParts = { ...(container.parts || {}), [m]: { ...(container.parts?.[m] || {}), box: v === '' ? 0 : Number(v) } };
-                                                ctx.updateContainer(container.id, { parts: newParts }, ctx.yoshiiAllocMonth, 'yoshii', `型式 [${m}] 外装箱`);
+                                            <LocalInput type="number" value={parts.outerBox !== undefined ? parts.outerBox : ''} onChange={(v) => {
+                                                const newParts = { ...(container.spareParts || {}), [m]: { ...(container.spareParts?.[m] || {}), outerBox: v === '' ? 0 : Number(v) } };
+                                                ctx.updateContainer(container.id, { spareParts: newParts }, ctx.yoshiiAllocMonth, 'yoshii', `型式 [${m}] 外装箱`);
                                             }} className="w-full text-right pr-1 border-none bg-transparent font-normal"/>
                                         </td>
                                         <td className="border">
-                                            <LocalInput type="number" value={parts.case !== undefined ? parts.case : ''} onChange={(v) => {
-                                                const newParts = { ...(container.parts || {}), [m]: { ...(container.parts?.[m] || {}), case: v === '' ? 0 : Number(v) } };
-                                                ctx.updateContainer(container.id, { parts: newParts }, ctx.yoshiiAllocMonth, 'yoshii', `型式 [${m}] 化粧箱`);
+                                            <LocalInput type="number" value={parts.innerBox !== undefined ? parts.innerBox : ''} onChange={(v) => {
+                                                const newParts = { ...(container.spareParts || {}), [m]: { ...(container.spareParts?.[m] || {}), innerBox: v === '' ? 0 : Number(v) } };
+                                                ctx.updateContainer(container.id, { spareParts: newParts }, ctx.yoshiiAllocMonth, 'yoshii', `型式 [${m}] 化粧箱`);
                                             }} className="w-full text-right pr-1 border-none bg-transparent font-normal"/>
                                         </td>
                                         <td className="border">
                                             <LocalInput type="number" value={parts.label !== undefined ? parts.label : ''} onChange={(v) => {
-                                                const newParts = { ...(container.parts || {}), [m]: { ...(container.parts?.[m] || {}), label: v === '' ? 0 : Number(v) } };
-                                                ctx.updateContainer(container.id, { parts: newParts }, ctx.yoshiiAllocMonth, 'yoshii', `型式 [${m}] ラベル`);
+                                                const newParts = { ...(container.spareParts || {}), [m]: { ...(container.spareParts?.[m] || {}), label: v === '' ? 0 : Number(v) } };
+                                                ctx.updateContainer(container.id, { spareParts: newParts }, ctx.yoshiiAllocMonth, 'yoshii', `型式 [${m}] ラベル`);
                                             }} className="w-full text-right pr-1 border-none bg-transparent font-normal"/>
                                         </td>
                                         <td className="border text-right pr-1 font-bold text-emerald-800">{qty.toLocaleString()}</td>
@@ -285,7 +285,7 @@ const YoshiiShipView = () => {
                                                     <LocalInput type="date" value={container.eta || ''} onChange={(v, orig) => ctx.updateContainer(container.id, { eta: v }, ctx.yoshiiAllocMonth, 'yoshii', 'ETA')} className="w-full text-center border-none bg-transparent"/>
                                                 </td>
                                                 <td rowSpan={rowSpan} className="border bg-white align-middle">
-                                                    <DynamicSelect value={container.size || ''} onChange={(val, cat, orig) => ctx.handleSelectChange(container.id, 'size', true, 'yoshii', true, 'サイズ')(val, cat, orig)} category="containerSizes" options={ctx.masterData.common.containerSizes} isCommon className="w-full text-center border-none bg-transparent"/>
+                                                    <DynamicSelect value={container.containerSize || container.size || ''} onChange={(val, cat, orig) => ctx.handleSelectChange(container.id, 'containerSize', true, 'yoshii', true, 'サイズ')(val, cat, orig)} category="containerSizes" options={ctx.masterData.common.containerSizes} isCommon className="w-full text-center border-none bg-transparent"/>
                                                 </td>
                                                 <td rowSpan={rowSpan} className="border bg-white align-middle">
                                                     <LocalInput value={container.vessel || ''} onChange={(v, orig) => ctx.updateContainer(container.id, { vessel: v }, ctx.yoshiiAllocMonth, 'yoshii', '本船名')} className="w-full text-center border-none bg-transparent"/>
@@ -304,6 +304,17 @@ const YoshiiShipView = () => {
             </div>
 
             <ExportPrintModal isOpen={exportModal.isOpen} onClose={() => setExportModal({ isOpen: false, type: 'excel' })} screenName="出荷日程表" currentMonthStr={ctx.currentMonthStr} defaultMode="year" onStartExport={handleExecuteExport} />
+        </div>
+    );
+};
+
+// 【ドレージ手配画面ビュー】
+const YoshiiDrayageView = () => {
+    const ctx = React.useContext(AppContext);
+    return (
+        <div className="p-4 bg-white flex-grow flex flex-col h-full text-xs">
+            <h2 className="text-base font-bold text-emerald-900 mb-2">吉井電気 ドレージ手配</h2>
+            <p className="text-gray-500">ドレージ手配画面モジュールです。</p>
         </div>
     );
 };
