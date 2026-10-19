@@ -51,7 +51,7 @@
 
     <script type="text/babel">
         // =========================================================
-        // 【最重要】システムバージョン定義（★WebVer. 107へ更新）
+        // システムバージョン定義 (WebVer. 107)
         // =========================================================
         const APP_VERSION = 'WebVer. 107';
 
@@ -576,8 +576,10 @@
     </script>
 
     <!-- モジュールJavaScriptファイルの順次読み込み -->
+    <script type="text/babel" src="shipping_components.js"></script>
     <script type="text/babel" src="shipping_logs.js"></script>
     <script type="text/babel" src="shipping_exports.js"></script>
-    <script type="text/babel" src="shipping_views.js"></script>
+    <script type="text/babel" src="shipping_views_plan.js"></script>
+    <script type="text/babel" src="shipping_views_ship.js"></script>
 </body>
 </html>
