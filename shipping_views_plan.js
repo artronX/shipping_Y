@@ -1,5 +1,5 @@
 // =========================================================
-// shipping_views_plan.js - 計画・割振り画面モジュール (WebVer. 107 修復版)
+// shipping_views_plan.js - 計画・割振り画面モジュール (V83原本レイアウト完全復元版)
 // =========================================================
 
 const formatModelWithBreak = (m) => {
@@ -350,54 +350,67 @@ const YoshiiPlanView = () => {
     const endStr = `${displayMonths[displayMonths.length - 1]?.split('-')[0]}年${displayMonths[displayMonths.length - 1]?.split('-')[1]}月`;
     const dynamicTitle = `吉井電気（株）様向け 納品・出荷計画（${startStr}～${endStr}）`;
 
-    const rowPaddingClass = 'py-0 px-0.5 h-[24px]';
+    const rowPaddingClass = 'py-0 px-0.5 h-[22px]';
 
     return (
-        <div className="p-4 bg-white flex-grow flex flex-col h-full">
-            <div className="hidden print:block font-bold text-sm text-black mb-1.5 border-b pb-1 text-left w-full">
+        <div className="p-3 bg-white flex-grow flex flex-col h-full overflow-hidden">
+            <div className="hidden print:block font-bold text-sm text-black mb-1 border-b pb-1 text-left w-full">
                 {dynamicTitle} [仕入先: {ctx.selectedVendorFilter || 'ALL'}]
             </div>
+
+            {/* V83原本通りのツールバーレイアウト */}
             <div className="mb-2 flex-shrink-0 flex justify-between items-center no-print">
-                <div>
-                    <h2 className="text-base md:text-lg font-extrabold text-emerald-900 border-b-2 border-emerald-600 pb-1">
+                <div className="flex items-center gap-2">
+                    <h2 className="text-base font-extrabold text-emerald-900 border-b-2 border-emerald-600 pb-0.5">
                         {dynamicTitle}
                     </h2>
                 </div>
 
-                <div className="flex items-center gap-1.5 no-print">
-                    <button onClick={() => setExportModal({ isOpen: true, type: 'excel' })} className="px-2.5 py-1 text-xs font-bold rounded bg-emerald-700 hover:bg-emerald-800 text-white shadow transition flex items-center gap-1">
+                <div className="flex items-center gap-2 text-xs font-bold">
+                    <label className="flex items-center gap-1 text-gray-700 cursor-pointer bg-gray-100 px-2 py-1 rounded border hover:bg-gray-200 transition">
+                        <input type="checkbox" checked={onlyCheckedFilter} onChange={e => setOnlyCheckedFilter(e.target.checked)} className="w-3.5 h-3.5 text-emerald-600 rounded"/>
+                        <span>☑ 選択行のみ表示・印刷</span>
+                    </label>
+
+                    <label className="flex items-center gap-1 text-gray-700 cursor-pointer bg-gray-100 px-2 py-1 rounded border hover:bg-gray-200 transition">
+                        <input type="checkbox" checked={showHistory} onChange={e => setShowHistory(e.target.checked)} className="w-3.5 h-3.5 text-emerald-600 rounded"/>
+                        <span>変更履歴を表示</span>
+                    </label>
+
+                    <button onClick={() => setExportModal({ isOpen: true, type: 'excel' })} className="px-2 py-1 text-xs font-bold rounded bg-emerald-700 hover:bg-emerald-800 text-white shadow transition flex items-center gap-1">
                         📊 Excel出力
                     </button>
-                    <button onClick={() => setExportModal({ isOpen: true, type: 'print' })} className="px-2.5 py-1 text-xs font-bold rounded bg-slate-700 hover:bg-slate-800 text-white shadow transition flex items-center gap-1">
+                    <button onClick={() => setExportModal({ isOpen: true, type: 'print' })} className="px-2 py-1 text-xs font-bold rounded bg-slate-700 hover:bg-slate-800 text-white shadow transition flex items-center gap-1">
                         🖨 印刷
                     </button>
-                    <button onClick={ctx.handleStartTracking} className={`px-2.5 py-1 text-xs font-bold rounded shadow transition ${ctx.isChangeTrackingMode ? 'bg-red-600 text-white animate-pulse' : 'bg-gray-200 hover:bg-gray-300 text-gray-800'}`}>
+                    <button onClick={ctx.handleStartTracking} className={`px-2 py-1 text-xs font-bold rounded shadow transition ${ctx.isChangeTrackingMode ? 'bg-red-600 text-white animate-pulse' : 'bg-gray-200 hover:bg-gray-300 text-gray-800'}`}>
                         {ctx.isChangeTrackingMode ? '● 変更記録中' : '変更開始'}
                     </button>
-                    <button onClick={ctx.handleClearTracking} className="px-2.5 py-1 text-xs font-bold rounded bg-gray-600 hover:bg-gray-700 text-white shadow transition">
+                    <button onClick={ctx.handleClearTracking} className="px-2 py-1 text-xs font-bold rounded bg-gray-600 hover:bg-gray-700 text-white shadow transition">
                         変更クリア
                     </button>
                 </div>
             </div>
 
-            <div className="flex flex-wrap justify-between items-center mb-3 no-print gap-3 flex-shrink-0">
-                <div className="flex items-center gap-3 flex-wrap">
+            {/* 2行目サブ操作バー（ボタン・フィルター） */}
+            <div className="flex justify-between items-center mb-2 no-print gap-2 flex-shrink-0 text-xs">
+                <div className="flex items-center gap-2">
                     <div className="flex bg-gray-100 p-0.5 rounded border gap-1">
                         {['全体', 'KS', 'ALC'].map(cat => (
-                            <button key={cat} onClick={() => setCategoryFilter(cat)} className={`px-2.5 py-0.5 rounded text-xs font-bold transition ${categoryFilter === cat ? 'bg-emerald-600 text-white shadow' : 'text-gray-700 hover:bg-gray-200'}`}>
+                            <button key={cat} onClick={() => setCategoryFilter(cat)} className={`px-2 py-0.5 rounded text-xs font-bold transition ${categoryFilter === cat ? 'bg-emerald-600 text-white shadow' : 'text-gray-700 hover:bg-gray-200'}`}>
                                 {cat}
                             </button>
                         ))}
                     </div>
 
-                    <div className="flex items-center gap-2 bg-gray-50 p-1 rounded border text-xs">
+                    <div className="flex items-center gap-1 bg-gray-50 p-0.5 rounded border text-xs">
                         <select value={rangeMode} onChange={e => setRangeMode(e.target.value)} className="font-bold border rounded px-1 py-0.5 bg-white">
                             <option value="year">年度指定</option>
                             <option value="custom">カスタム指定</option>
                         </select>
 
                         {rangeMode === 'year' ? (
-                            <select value={selectedYear} onChange={e => setSelectedYear(Number(e.target.value))} className="font-bold border rounded px-2 py-0.5 bg-white text-emerald-800">
+                            <select value={selectedYear} onChange={e => setSelectedYear(Number(e.target.value))} className="font-bold border rounded px-1 py-0.5 bg-white text-emerald-800">
                                 <option value={2025}>2025年度</option>
                                 <option value={2026}>2026年度</option>
                                 <option value={2027}>2027年度</option>
@@ -411,7 +424,7 @@ const YoshiiPlanView = () => {
                         )}
                     </div>
 
-                    <button onClick={() => setIsAddModalOpen(true)} disabled={ctx.authUser && !ctx.authUser.canEdit} className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 text-white px-3 py-1 rounded text-xs font-bold shadow transition">
+                    <button onClick={() => setIsAddModalOpen(true)} disabled={ctx.authUser && !ctx.authUser.canEdit} className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 text-white px-2.5 py-1 rounded text-xs font-bold shadow transition">
                         + 型式追加
                     </button>
 
@@ -419,36 +432,25 @@ const YoshiiPlanView = () => {
                         ✏ 型式編集
                     </button>
                 </div>
-
-                <div className="flex items-center gap-3">
-                    <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700 cursor-pointer bg-gray-100 px-2 py-1 rounded border hover:bg-gray-200 transition">
-                        <input type="checkbox" checked={onlyCheckedFilter} onChange={e => setOnlyCheckedFilter(e.target.checked)} className="w-3.5 h-3.5 text-emerald-600 rounded"/>
-                        <span>☑ 選択行のみ表示・印刷</span>
-                    </label>
-
-                    <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700 cursor-pointer bg-emerald-50 px-2.5 py-1 rounded border border-emerald-200 shadow-sm hover:bg-emerald-100 transition">
-                        <input type="checkbox" checked={showHistory} onChange={e => setShowHistory(e.target.checked)} className="w-3.5 h-3.5 text-emerald-600 rounded"/>
-                        <span>変更履歴を表示</span>
-                    </label>
-                </div>
             </div>
 
-            <div className="table-container flex-grow border rounded shadow-inner" ref={ctx.tableContainerRef}>
-                <table className="alloc-print-table w-max text-center border-collapse">
+            {/* 1画面に12ヶ月収まるテーブル構造 */}
+            <div className="table-container flex-grow border rounded shadow-inner overflow-x-auto overflow-y-auto" ref={ctx.tableContainerRef}>
+                <table className="w-full text-center border-collapse text-[11px]">
                     <thead className="sticky top-0 z-30 bg-gray-200">
                         <tr>
-                            <th className="p-1 border w-8 sticky left-0 bg-gray-200 z-40 text-xs no-print">順</th>
-                            <th className="p-1 border w-8 sticky left-[32px] bg-gray-200 z-40 text-[10px] leading-tight no-print">
+                            <th className="p-0.5 border w-6 sticky left-0 bg-gray-200 z-40 text-[10px] no-print">順</th>
+                            <th className="p-0.5 border w-6 sticky left-[24px] bg-gray-200 z-40 text-[9px] leading-tight no-print">
                                 表示<br/>
-                                <input type="checkbox" checked={isAllChecked} onChange={handleToggleAllChecked} className="w-3.5 h-3.5 text-emerald-600 rounded cursor-pointer"/>
+                                <input type="checkbox" checked={isAllChecked} onChange={handleToggleAllChecked} className="w-3 h-3 text-emerald-600 rounded cursor-pointer"/>
                             </th>
-                            <th className="p-1 border w-[60px] min-w-[60px] sticky left-[64px] bg-gray-200 z-40 text-xs text-center align-middle">
+                            <th className="p-0.5 border w-[42px] min-w-[42px] sticky left-[48px] bg-gray-200 z-40 text-[10px] text-center align-middle">
                                 <div className="relative flex items-center justify-center w-full h-full">
                                     <div className="flex items-center justify-center gap-0.5 w-full cursor-pointer hover:text-emerald-700">
-                                        <span className="text-[11px] font-bold text-gray-800 truncate">
+                                        <span className="font-bold text-gray-800 truncate">
                                             {ctx.selectedVendorFilter === 'ALL' ? '仕入先' : ctx.selectedVendorFilter}
                                         </span>
-                                        <span className="text-[9px] text-gray-500 no-print">▼</span>
+                                        <span className="text-[8px] text-gray-500 no-print">▼</span>
                                         <select value={ctx.selectedVendorFilter} onChange={e => ctx.setSelectedVendorFilter(e.target.value)} className="no-print absolute inset-0 w-full h-full opacity-0 cursor-pointer text-xs font-bold">
                                             <option value="ALL">全体 (全表示)</option>
                                             {Array.from(new Set(['JP', 'GM', 'LDS', 'SLT', 'YO', ...(ctx.masterData.yoshii?.vendors || [])])).map(v => (
@@ -458,39 +460,39 @@ const YoshiiPlanView = () => {
                                     </div>
                                 </div>
                             </th>
-                            <th className="p-1 border w-[110px] min-w-[110px] sticky left-[124px] bg-gray-200 z-40 text-xs">型式</th>
-                            <th className="p-1 border min-w-[280px] text-xs">品名</th>
-                            <th className="p-1 border min-w-[95px] max-w-[100px] text-xs">JANコード</th>
-                            <th className="p-1 border w-[65px] min-w-[65px] bg-emerald-100 text-xs font-bold text-emerald-900">合計</th>
+                            <th className="p-0.5 border w-[95px] min-w-[95px] sticky left-[90px] bg-gray-200 z-40 text-[11px]">型式</th>
+                            <th className="p-0.5 border w-[180px] min-w-[170px] text-[11px]">品名</th>
+                            <th className="p-0.5 border w-[90px] min-w-[85px] text-[11px]">JANコード</th>
+                            <th className="p-0.5 border w-[50px] min-w-[50px] bg-emerald-100 text-[11px] font-bold text-emerald-900">合計</th>
                             {displayMonths.map(mo => {
                                 const yr = mo.split('-')[0].slice(-2);
                                 const m = mo.split('-')[1];
                                 return (
-                                    <th key={mo} className="p-1 border w-[55px] min-w-[55px] max-w-[55px] text-xs font-bold bg-gray-200 text-center">
+                                    <th key={mo} className="p-0.5 border w-[50px] min-w-[50px] text-[11px] font-bold bg-gray-200 text-center">
                                         {yr}/{m}
                                     </th>
                                 );
                             })}
-                            <th className="p-1 border min-w-[180px] text-xs font-bold bg-gray-200">備考 / 出荷調整状況</th>
+                            <th className="p-0.5 border min-w-[120px] text-[11px] font-bold bg-gray-200">備考 / 出荷調整状況</th>
                         </tr>
 
-                        <tr className="bg-emerald-50 font-bold text-xs text-emerald-900 border-b-2 border-emerald-300">
-                            <td className="p-1 border sticky left-0 bg-emerald-100 z-40 text-center no-print">-</td>
-                            <td className="p-1 border sticky left-[32px] bg-emerald-100 z-40 text-center no-print">-</td>
-                            <td className="p-1 border sticky left-[64px] bg-emerald-100 z-40 text-center">-</td>
-                            <td className="p-1 border sticky left-[124px] bg-emerald-100 z-40 text-center">月間合計</td>
-                            <td className="p-1 border text-center">-</td>
-                            <td className="p-1 border text-center">-</td>
-                            <td className="p-1 border text-right pr-1 text-xs font-extrabold text-emerald-800 bg-emerald-200">{totalGrandTotal.toLocaleString()}</td>
+                        <tr className="bg-emerald-50 font-bold text-[11px] text-emerald-900 border-b-2 border-emerald-300">
+                            <td className="p-0.5 border sticky left-0 bg-emerald-100 z-40 text-center no-print">-</td>
+                            <td className="p-0.5 border sticky left-[24px] bg-emerald-100 z-40 text-center no-print">-</td>
+                            <td className="p-0.5 border sticky left-[48px] bg-emerald-100 z-40 text-center">-</td>
+                            <td className="p-0.5 border sticky left-[90px] bg-emerald-100 z-40 text-center">月間合計</td>
+                            <td className="p-0.5 border text-center">-</td>
+                            <td className="p-0.5 border text-center">-</td>
+                            <td className="p-0.5 border text-right pr-1 font-extrabold text-emerald-800 bg-emerald-200">{totalGrandTotal.toLocaleString()}</td>
                             {displayMonths.map(mo => {
                                 const colTot = calculateColTotal(mo);
                                 return (
-                                    <td key={`tot-${mo}`} className="p-1 border text-right pr-1 font-bold text-[11px] w-[55px] min-w-[55px]">
-                                        {colTot > 0 ? colTot.toLocaleString() : '0'}
+                                    <td key={`tot-${mo}`} className="p-0.5 border text-right pr-1 font-bold text-[11px] w-[50px] min-w-[50px]">
+                                        {colTot > 0 ? colTot.toLocaleString() : ''}
                                     </td>
                                 );
                             })}
-                            <td className="p-1 border text-center">-</td>
+                            <td className="p-0.5 border text-center">-</td>
                         </tr>
                     </thead>
                     <tbody>
@@ -510,20 +512,20 @@ const YoshiiPlanView = () => {
                             return (
                                 <tr key={model} onDragOver={e => handleModelDragOver(e, model)} onDrop={e => handleModelDrop(e, model)} className={`hover:bg-emerald-50 border-b ${dragOverModel === model ? 'border-t-2 border-t-emerald-600 bg-emerald-100' : ''}`}>
                                     <td draggable onDragStart={e => handleModelDragStart(e, model)} className={`border font-bold text-xs sticky left-0 bg-white z-10 text-center drag-handle text-gray-400 hover:text-emerald-600 cursor-grab active:cursor-grabbing ${rowPaddingClass}`}>≡</td>
-                                    <td className={`border sticky left-[32px] bg-white z-10 text-center ${rowPaddingClass}`}>
-                                        <input type="checkbox" checked={isRowChecked} onChange={() => handleToggleSingleChecked(model)} className="w-3.5 h-3.5 text-emerald-600 rounded cursor-pointer"/>
+                                    <td className={`border sticky left-[24px] bg-white z-10 text-center ${rowPaddingClass}`}>
+                                        <input type="checkbox" checked={isRowChecked} onChange={() => handleToggleSingleChecked(model)} className="w-3 h-3 text-emerald-600 rounded cursor-pointer"/>
                                     </td>
-                                    <td className={`border text-xs text-center sticky left-[64px] bg-white z-10 w-[52px] min-w-[52px] ${rowPaddingClass}`}>
-                                        <LocalInput value={currentVendorCode} originalValue={(matchModelDetails.originals || {}).vendorCode} originalMeta={(matchModelDetails.originalMetas || {}).vendorCode} onChange={(v, orig) => handleModelDetailChange(model, 'vendorCode', v)} className="w-full text-xs text-center font-mono border-none bg-transparent h-[22px]"/>
+                                    <td className={`border text-[11px] text-center sticky left-[48px] bg-white z-10 w-[42px] min-w-[42px] ${rowPaddingClass}`}>
+                                        <LocalInput value={currentVendorCode} originalValue={(matchModelDetails.originals || {}).vendorCode} originalMeta={(matchModelDetails.originalMetas || {}).vendorCode} onChange={(v, orig) => handleModelDetailChange(model, 'vendorCode', v)} className="w-full text-[11px] text-center font-mono border-none bg-transparent h-[20px]"/>
                                     </td>
-                                    <td className={`border font-bold text-xs sticky left-[124px] bg-white z-10 text-left pl-2 ${rowPaddingClass}`}>{model}</td>
-                                    <td className={`border text-xs text-left min-w-[280px] ${rowPaddingClass}`}>
-                                        <LocalInput value={currentProdName} originalValue={(matchModelDetails.originals || {}).productName} originalMeta={(matchModelDetails.originalMetas || {}).productName} onChange={(v, orig) => handleModelDetailChange(model, 'productName', v)} listId="auto_yoshii_productNames" className="w-full text-xs text-left px-1 border-none bg-transparent h-[22px]"/>
+                                    <td className={`border font-bold text-[11px] sticky left-[90px] bg-white z-10 text-left pl-1 ${rowPaddingClass}`}>{model}</td>
+                                    <td className={`border text-[11px] text-left w-[180px] min-w-[170px] ${rowPaddingClass}`}>
+                                        <LocalInput value={currentProdName} originalValue={(matchModelDetails.originals || {}).productName} originalMeta={(matchModelDetails.originalMetas || {}).productName} onChange={(v, orig) => handleModelDetailChange(model, 'productName', v)} listId="auto_yoshii_productNames" className="w-full text-[11px] text-left px-0.5 border-none bg-transparent h-[20px]"/>
                                     </td>
-                                    <td className={`border text-xs text-center min-w-[95px] max-w-[100px] ${rowPaddingClass}`}>
-                                        <LocalInput value={currentJanCode} originalValue={(matchModelDetails.originals || {}).janCode} originalMeta={(matchModelDetails.originalMetas || {}).janCode} onChange={(v, orig) => handleModelDetailChange(model, 'janCode', v)} className="w-full text-xs text-center font-mono border-none bg-transparent h-[22px]"/>
+                                    <td className={`border text-[11px] text-center w-[90px] min-w-[85px] ${rowPaddingClass}`}>
+                                        <LocalInput value={currentJanCode} originalValue={(matchModelDetails.originals || {}).janCode} originalMeta={(matchModelDetails.originalMetas || {}).janCode} onChange={(v, orig) => handleModelDetailChange(model, 'janCode', v)} className="w-full text-[11px] text-center font-mono border-none bg-transparent h-[20px]"/>
                                     </td>
-                                    <td className={`border font-extrabold text-xs text-right pr-1 bg-emerald-50 text-emerald-800 ${rowPaddingClass}`}>{rowTot > 0 ? rowTot.toLocaleString() : '0'}</td>
+                                    <td className={`border font-extrabold text-[11px] text-right pr-1 bg-emerald-50 text-emerald-800 ${rowPaddingClass}`}>{rowTot > 0 ? rowTot.toLocaleString() : '0'}</td>
                                     
                                     {displayMonths.map((mo, colIdx) => {
                                         const plan = getPlanData(model, mo);
@@ -531,11 +533,11 @@ const YoshiiPlanView = () => {
                                         const historyList = plan?.qtyHistory || [];
 
                                         return (
-                                            <td key={mo} className="matrix-td align-top p-0 w-[55px] min-w-[55px]">
-                                                <LocalInput type="number" value={currentQty} originalValue={plan?.originalVal} originalMeta={plan?.originalMeta} onChange={(v, orig) => handleQuantityChange(model, mo, v, orig)} className="matrix-input text-right font-bold pr-0.5 text-xs h-[22px]" dataGridId={`y-matrix-plan-${rowIdx}-${colIdx}`} onGridKeyDown={handleGridNav}/>
+                                            <td key={mo} className="matrix-td align-top p-0 w-[50px] min-w-[50px]">
+                                                <LocalInput type="number" value={currentQty} originalValue={plan?.originalVal} originalMeta={plan?.originalMeta} onChange={(v, orig) => handleQuantityChange(model, mo, v, orig)} className="matrix-input text-right font-bold pr-0.5 text-[11px] h-[20px]" dataGridId={`y-matrix-plan-${rowIdx}-${colIdx}`} onGridKeyDown={handleGridNav}/>
                                                 {showHistory && historyList.length > 0 && (
                                                     <div className="relative group/hist no-print">
-                                                        <span className="absolute -top-5 right-0.5 text-[9px] bg-amber-100 text-amber-800 border border-amber-300 px-1 rounded cursor-pointer font-bold z-10 shadow-sm">📜{historyList.length}</span>
+                                                        <span className="absolute -top-4 right-0.5 text-[8px] bg-amber-100 text-amber-800 border border-amber-300 px-0.5 rounded cursor-pointer font-bold z-10 shadow-sm">📜{historyList.length}</span>
                                                         <div className="hidden group-hover/hist:block absolute right-0 top-0 mt-1 w-44 bg-slate-800 text-white p-2 rounded shadow-xl z-50 text-[10px] space-y-1 border border-slate-600">
                                                             <div className="font-bold border-b border-slate-600 pb-1 text-amber-300">履歴一覧 ({model} {mo})</div>
                                                             <div className="max-h-36 overflow-y-auto space-y-1">
@@ -556,7 +558,7 @@ const YoshiiPlanView = () => {
                                         );
                                     })}
 
-                                    <td className={`border text-xs text-left min-w-[180px] ${rowPaddingClass}`}>
+                                    <td className={`border text-[11px] text-left min-w-[120px] ${rowPaddingClass}`}>
                                         <LocalTextArea value={currentNotes} originalValue={(matchModelDetails.originals || {}).notes} originalMeta={(matchModelDetails.originalMetas || {}).notes} onChange={(v, orig) => handleModelDetailChange(model, 'notes', v)} isCompact={!showHistory}/>
                                     </td>
                                 </tr>
@@ -568,27 +570,27 @@ const YoshiiPlanView = () => {
 
             {isAddModalOpen && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-                    <form onSubmit={handleAddNewModelSubmit} className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md flex flex-col gap-4">
-                        <h3 className="font-bold text-base border-b pb-2 text-emerald-800">+ 新規型式の追加</h3>
+                    <form onSubmit={handleAddNewModelSubmit} className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md flex flex-col gap-4 text-xs">
+                        <h3 className="font-bold text-sm border-b pb-2 text-emerald-800">+ 新規型式の追加</h3>
                         <div>
-                            <label className="block text-xs font-bold mb-1">品番 (型式名) <span className="text-red-500">*</span></label>
-                            <input type="text" required value={newModel} onChange={e => setNewModel(e.target.value)} placeholder="例: ALC-08SK" className="w-full border p-1.5 rounded text-sm"/>
+                            <label className="block font-bold mb-1">品番 (型式名) <span className="text-red-500">*</span></label>
+                            <input type="text" required value={newModel} onChange={e => setNewModel(e.target.value)} placeholder="例: ALC-08SK" className="w-full border p-1.5 rounded font-bold text-xs"/>
                         </div>
                         <div>
-                            <label className="block text-xs font-bold mb-1">仕入先コード (3桁)</label>
-                            <input type="text" maxLength={3} value={newVendorCode} onChange={e => setNewJanVendorCode(e.target.value)} placeholder="例: 001" className="w-full border p-1.5 rounded text-sm font-mono text-center"/>
+                            <label className="block font-bold mb-1">仕入先コード (3桁)</label>
+                            <input type="text" maxLength={3} value={newVendorCode} onChange={e => setNewJanVendorCode(e.target.value)} placeholder="例: 001" className="w-full border p-1.5 rounded font-bold font-mono text-center text-xs"/>
                         </div>
                         <div>
-                            <label className="block text-xs font-bold mb-1">品名 (製品名)</label>
-                            <input type="text" value={newProductName} onChange={e => setNewProductName(e.target.value)} placeholder="例: ｱﾋﾞﾃﾗｯックス LEDｼｰﾘﾝｸﾞ" className="w-full border p-1.5 rounded text-sm"/>
+                            <label className="block font-bold mb-1">品名 (製品名)</label>
+                            <input type="text" value={newProductName} onChange={e => setNewProductName(e.target.value)} placeholder="例: ｱﾋﾞﾃﾗｯックス LEDｼｰﾘﾝｸﾞ" className="w-full border p-1.5 rounded text-xs"/>
                         </div>
                         <div>
-                            <label className="block text-xs font-bold mb-1">JANコード</label>
-                            <input type="text" value={newJanCode} onChange={e => setNewJanCode(e.target.value)} placeholder="例: 4912345678901" className="w-full border p-1.5 rounded text-sm"/>
+                            <label className="block font-bold mb-1">JANコード</label>
+                            <input type="text" value={newJanCode} onChange={e => setNewJanCode(e.target.value)} placeholder="例: 4912345678901" className="w-full border p-1.5 rounded text-xs"/>
                         </div>
                         <div className="flex justify-end gap-2 border-t pt-3 mt-2">
-                            <button type="button" onClick={() => setIsAddModalOpen(false)} className="bg-gray-200 text-gray-700 px-4 py-1.5 rounded text-xs font-bold">キャンセル</button>
-                            <button type="submit" className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-1.5 rounded text-xs font-bold shadow">追加する</button>
+                            <button type="button" onClick={() => setIsAddModalOpen(false)} className="bg-gray-200 text-gray-700 px-3 py-1 rounded font-bold">キャンセル</button>
+                            <button type="submit" className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded font-bold shadow">追加する</button>
                         </div>
                     </form>
                 </div>
@@ -600,7 +602,7 @@ const YoshiiPlanView = () => {
     );
 };
 
-// 【コンテナ割振り画面ビュー - V95原本通り一律固定幅 (w-[62px] min-w-[62px])】
+// 【コンテナ割振り画面ビュー - V95/V83原本通り一律固定幅】
 const YoshiiAllocationView = () => {
     const ctx = React.useContext(AppContext);
     const [exportModal, setExportModal] = React.useState({ isOpen: false, type: 'excel' });
@@ -811,64 +813,62 @@ const YoshiiAllocationView = () => {
     };
 
     return (
-        <div className="p-4 bg-white flex-grow flex flex-col h-full">
+        <div className="p-3 bg-white flex-grow flex flex-col h-full overflow-hidden">
             <div className="hidden print:block font-bold text-sm text-black mb-1.5 border-b pb-1 text-left w-full">
                 吉井電気 コンテナ割振り [対象年月: {ctx.yoshiiAllocMonth}] [仕入先: {ctx.selectedVendorFilter || 'ALL'}]
             </div>
-            <div className="flex justify-between items-center mb-3 no-print flex-shrink-0">
-                <div className="flex gap-4 items-center bg-gray-50 p-2 rounded border">
-                    <h2 className="text-lg font-bold">吉井電気 コンテナ割振り</h2>
-                    <label className="font-bold text-sm ml-4">対象年月:</label>
-                    <input type="month" value={ctx.yoshiiAllocMonth} onChange={e => ctx.setYoshiiAllocMonth(e.target.value)} className="border p-1 rounded text-sm text-center" />
-                    <label className="font-bold text-sm ml-4">コンテナ枠数:</label>
+            <div className="flex justify-between items-center mb-2 no-print flex-shrink-0">
+                <div className="flex gap-4 items-center bg-gray-50 p-1.5 rounded border">
+                    <h2 className="text-base font-bold">吉井電気 コンテナ割振り</h2>
+                    <label className="font-bold text-xs ml-2">対象年月:</label>
+                    <input type="month" value={ctx.yoshiiAllocMonth} onChange={e => ctx.setYoshiiAllocMonth(e.target.value)} className="border p-0.5 rounded text-xs text-center font-bold" />
+                    <label className="font-bold text-xs ml-2">コンテナ枠数:</label>
                     <div className="flex items-center gap-1">
-                        <button onClick={() => { if (displayRows > monthContainers.length) setRowLimit(displayRows - 1); }} disabled={ctx.authUser && !ctx.authUser.canEdit} className="bg-gray-300 hover:bg-gray-400 disabled:opacity-30 w-8 h-8 rounded font-bold transition">-</button>
-                        <span className="w-8 text-center font-bold">{displayRows}</span>
-                        <button onClick={handleAddRow} disabled={ctx.authUser && !ctx.authUser.canEdit} className="bg-gray-300 hover:bg-gray-400 disabled:opacity-30 w-8 h-8 rounded font-bold transition">+</button>
+                        <button onClick={() => { if (displayRows > monthContainers.length) setRowLimit(displayRows - 1); }} disabled={ctx.authUser && !ctx.authUser.canEdit} className="bg-gray-300 hover:bg-gray-400 disabled:opacity-30 w-6 h-6 rounded font-bold transition text-xs">-</button>
+                        <span className="w-6 text-center font-bold text-xs">{displayRows}</span>
+                        <button onClick={handleAddRow} disabled={ctx.authUser && !ctx.authUser.canEdit} className="bg-gray-300 hover:bg-gray-400 disabled:opacity-30 w-6 h-6 rounded font-bold transition text-xs">+</button>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-1.5 no-print">
-                        <button onClick={() => setExportModal({ isOpen: true, type: 'excel' })} className="px-2.5 py-1 text-xs font-bold rounded bg-emerald-700 hover:bg-emerald-800 text-white shadow transition flex items-center gap-1">📊 Excel出力</button>
-                        <button onClick={() => setExportModal({ isOpen: true, type: 'print' })} className="px-2.5 py-1 text-xs font-bold rounded bg-slate-700 hover:bg-slate-800 text-white shadow transition flex items-center gap-1">🖨 印刷</button>
-                        <button onClick={ctx.handleStartTracking} className={`px-2.5 py-1 text-xs font-bold rounded shadow transition ${ctx.isChangeTrackingMode ? 'bg-red-600 text-white animate-pulse' : 'bg-gray-200 hover:bg-gray-300 text-gray-800'}`}>{ctx.isChangeTrackingMode ? '● 変更記録中' : '変更開始'}</button>
-                        <button onClick={ctx.handleClearTracking} className="px-2.5 py-1 text-xs font-bold rounded bg-gray-600 hover:bg-gray-700 text-white shadow transition">変更クリア</button>
-                    </div>
+                <div className="flex items-center gap-2">
+                    <button onClick={() => setExportModal({ isOpen: true, type: 'excel' })} className="px-2 py-1 text-xs font-bold rounded bg-emerald-700 hover:bg-emerald-800 text-white shadow transition flex items-center gap-1">📊 Excel出力</button>
+                    <button onClick={() => setExportModal({ isOpen: true, type: 'print' })} className="px-2 py-1 text-xs font-bold rounded bg-slate-700 hover:bg-slate-800 text-white shadow transition flex items-center gap-1">🖨 印刷</button>
+                    <button onClick={ctx.handleStartTracking} className={`px-2 py-1 text-xs font-bold rounded shadow transition ${ctx.isChangeTrackingMode ? 'bg-red-600 text-white animate-pulse' : 'bg-gray-200 hover:bg-gray-300 text-gray-800'}`}>{ctx.isChangeTrackingMode ? '● 変更記録中' : '変更開始'}</button>
+                    <button onClick={ctx.handleClearTracking} className="px-2 py-1 text-xs font-bold rounded bg-gray-600 hover:bg-gray-700 text-white shadow transition">変更クリア</button>
                 </div>
             </div>
 
-            {!ctx.yoshiiAllocMonth ? <p className="text-gray-500">対象年月を選択してください。</p> : models.length === 0 ? <p className="text-gray-500">この月（{ctx.yoshiiAllocMonth}）の計画データが存在しません。</p> : (
-                <div className="table-container flex-grow" ref={ctx.tableContainerRef}>
-                    <table className="alloc-print-table w-max text-center border-collapse">
+            {!ctx.yoshiiAllocMonth ? <p className="text-gray-500 text-xs">対象年月を選択してください。</p> : models.length === 0 ? <p className="text-gray-500 text-xs">この月（{ctx.yoshiiAllocMonth}）の計画データが存在しません。</p> : (
+                <div className="table-container flex-grow border rounded shadow-inner overflow-x-auto overflow-y-auto" ref={ctx.tableContainerRef}>
+                    <table className="alloc-print-table w-max text-center border-collapse text-[11px]">
                         <thead className="sticky top-0 z-30 bg-gray-200 shadow-sm">
                             <tr className="bg-gray-200">
-                                <th className="p-1 border w-10 sticky left-0 top-0 bg-gray-200 z-40 text-xs no-print">移動</th>
-                                <th className="p-1 border w-16 sticky left-10 top-0 bg-gray-200 z-40 text-xs">項目</th>
-                                <th className="p-1 border w-[90px] min-w-[90px] sticky left-[104px] top-0 bg-gray-200 z-40 text-xs">管理番号</th>
-                                <th className="p-1 border w-[76px] min-w-[70px] sticky left-[194px] top-0 bg-gray-200 z-40 text-xs">到着港</th>
+                                <th className="p-0.5 border w-8 sticky left-0 top-0 bg-gray-200 z-40 text-[10px] no-print">移動</th>
+                                <th className="p-0.5 border w-14 sticky left-[32px] top-0 bg-gray-200 z-40 text-[10px]">項目</th>
+                                <th className="p-0.5 border w-[85px] min-w-[85px] sticky left-[88px] top-0 bg-gray-200 z-40 text-[10px]">管理番号</th>
+                                <th className="p-0.5 border w-[65px] min-w-[65px] sticky left-[173px] top-0 bg-gray-200 z-40 text-[10px]">到着港</th>
                                 {models.map(m => (
-                                    <th key={m} className="p-1 border bg-emerald-100 text-xs leading-tight align-bottom model-hdr w-[62px] min-w-[62px]" title={m}>
+                                    <th key={m} className="p-0.5 border bg-emerald-100 text-[10px] leading-tight align-bottom model-hdr w-[62px] min-w-[62px]" title={m}>
                                         {formatModelWithBreak(m)}
                                     </th>
                                 ))}
-                                <th className="p-1 border w-12 bg-gray-200 no-print">削除</th>
+                                <th className="p-0.5 border w-10 bg-gray-200 no-print">削除</th>
                             </tr>
-                            <tr className="bg-gray-50 font-bold text-xs text-gray-700 border-b">
-                                <td className="p-1 border sticky left-0 bg-gray-50 z-40 text-center no-print">-</td>
-                                <td className="p-1 border sticky left-10 bg-gray-50 z-40 text-center">計画数</td>
-                                <td className="p-1 border sticky left-[104px] bg-gray-50 z-40 text-center text-gray-500 font-normal">(合計)</td>
-                                <td className="p-1 border sticky left-[194px] bg-gray-50 z-40 text-right pr-1.5 font-extrabold text-emerald-900 bg-emerald-100/60">
+                            <tr className="bg-gray-50 font-bold text-[11px] text-gray-700 border-b">
+                                <td className="p-0.5 border sticky left-0 bg-gray-50 z-40 text-center no-print">-</td>
+                                <td className="p-0.5 border sticky left-[32px] bg-gray-50 z-40 text-center">計画数</td>
+                                <td className="p-0.5 border sticky left-[88px] bg-gray-50 z-40 text-center text-gray-500 font-normal">(合計)</td>
+                                <td className="p-0.5 border sticky left-[173px] bg-gray-50 z-40 text-right pr-1 font-extrabold text-emerald-900 bg-emerald-100/60">
                                     {models.reduce((sum, m) => sum + (Number(modelTotals[m]) || 0), 0).toLocaleString()}
                                 </td>
-                                {models.map(m => <td key={m} className="p-1 border font-bold text-right pr-1.5 text-xs w-[62px] min-w-[62px]">{Number(modelTotals[m]).toLocaleString()}</td>)}
-                                <td className="p-1 border bg-gray-50 no-print"></td>
+                                {models.map(m => <td key={m} className="p-0.5 border font-bold text-right pr-1 text-[11px] w-[62px] min-w-[62px]">{Number(modelTotals[m]).toLocaleString()}</td>)}
+                                <td className="p-0.5 border bg-gray-50 no-print"></td>
                             </tr>
-                            <tr className="bg-gray-100 font-bold text-xs text-gray-800 border-b-2 border-gray-300">
-                                <td className="p-1 border sticky left-0 bg-gray-100 z-40 text-center no-print">-</td>
-                                <td className="p-1 border sticky left-10 bg-gray-100 z-40 text-center">残数</td>
-                                <td className="p-1 border sticky left-[104px] bg-gray-100 z-40 text-center text-gray-500 font-normal">(合計)</td>
-                                <td className="p-1 border sticky left-[194px] bg-gray-100 z-40 text-right pr-1.5 font-extrabold text-indigo-900 bg-indigo-100/60">
+                            <tr className="bg-gray-100 font-bold text-[11px] text-gray-800 border-b-2 border-gray-300">
+                                <td className="p-0.5 border sticky left-0 bg-gray-100 z-40 text-center no-print">-</td>
+                                <td className="p-0.5 border sticky left-[32px] bg-gray-100 z-40 text-center">残数</td>
+                                <td className="p-0.5 border sticky left-[88px] bg-gray-100 z-40 text-center text-gray-500 font-normal">(合計)</td>
+                                <td className="p-0.5 border sticky left-[173px] bg-gray-100 z-40 text-right pr-1 font-extrabold text-indigo-900 bg-indigo-100/60">
                                     {models.reduce((sum, m) => {
                                         const allocated = monthContainers.reduce((cSum, c) => cSum + (Number(getContainerAllocationQty(c.allocations, m)) || 0), 0);
                                         return sum + (modelTotals[m] - allocated);
@@ -877,9 +877,9 @@ const YoshiiAllocationView = () => {
                                 {models.map(m => {
                                     const allocated = monthContainers.reduce((sum, c) => sum + (Number(getContainerAllocationQty(c.allocations, m)) || 0), 0);
                                     const remain = modelTotals[m] - allocated;
-                                    return <td key={m} className={`p-1 border font-bold text-right pr-1.5 text-xs w-[62px] min-w-[62px] ${remain < 0 ? 'text-red-600' : remain > 0 ? 'text-blue-600' : 'text-green-600'}`}>{remain.toLocaleString()}</td>;
+                                    return <td key={m} className={`p-0.5 border font-bold text-right pr-1 text-[11px] w-[62px] min-w-[62px] ${remain < 0 ? 'text-red-600' : remain > 0 ? 'text-blue-600' : 'text-green-600'}`}>{remain.toLocaleString()}</td>;
                                 })}
-                                <td className="p-1 border bg-gray-100 no-print"></td>
+                                <td className="p-0.5 border bg-gray-100 no-print"></td>
                             </tr>
                         </thead>
                         <tbody>
@@ -893,22 +893,22 @@ const YoshiiAllocationView = () => {
                                         onDragEnd={ctx.handleDragEnd}
                                         className={`hover:bg-emerald-50 ${ctx.dragOverRowId === container.id ? (ctx.dragDirection === 'top' ? 'drag-over-top' : 'drag-over-bottom') : ''} ${ctx.draggedRowId === container.id ? 'dragging-row' : ''}`}
                                     >
-                                        <td draggable={!!container.id && (ctx.authUser ? ctx.authUser.canEdit : true)} onDragStart={(e) => ctx.handleDragStart(e, container.id, 'containers')} className="p-1 border bg-white sticky left-0 z-20 text-center drag-handle text-gray-400 hover:text-emerald-600 font-bold text-base cursor-grab active:cursor-grabbing no-print">≡</td>
-                                        <td className="p-1 border bg-white sticky left-10 z-20 text-[11px] font-medium whitespace-nowrap">コンテナ {idx + 1}</td>
+                                        <td draggable={!!container.id && (ctx.authUser ? ctx.authUser.canEdit : true)} onDragStart={(e) => ctx.handleDragStart(e, container.id, 'containers')} className="p-0.5 border bg-white sticky left-0 z-20 text-center drag-handle text-gray-400 hover:text-emerald-600 font-bold text-sm cursor-grab active:cursor-grabbing no-print">≡</td>
+                                        <td className="p-0.5 border bg-white sticky left-[32px] z-20 text-[10px] font-medium whitespace-nowrap">コンテナ {idx + 1}</td>
                                         
-                                        <td className="matrix-td px-0 sticky left-[104px] bg-white z-20">
+                                        <td className="matrix-td px-0 sticky left-[88px] bg-white z-20">
                                             <LocalInput 
                                                 value={container.managementNo} 
                                                 originalValue={(container.originals || {}).managementNo}
                                                 originalMeta={(container.originalMetas || {}).managementNo}
                                                 onChange={(v, orig) => ctx.updateContainer(container.id, { managementNo: v, originals: { ...(container.originals || {}), managementNo: container.originals?.managementNo !== undefined ? container.originals.managementNo : orig }, originalMetas: { ...(container.originalMetas || {}), managementNo: container.originalMetas?.managementNo !== undefined ? container.originalMetas.managementNo : `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}` } }, ctx.yoshiiAllocMonth, 'yoshii', '管理番号')} 
-                                                className="matrix-input text-center text-xs font-bold" 
+                                                className="matrix-input text-center text-[11px] font-bold" 
                                                 dataGridId={`y-alloc-${idx}-0`} 
                                                 onGridKeyDown={handleGridNav} 
                                             />
                                         </td>
 
-                                        <td className="matrix-td px-0 sticky left-[194px] bg-white z-20">
+                                        <td className="matrix-td px-0 sticky left-[173px] bg-white z-20">
                                             <DynamicSelect 
                                                 value={container.port} 
                                                 originalValue={(container.originals || {}).port}
@@ -920,7 +920,7 @@ const YoshiiAllocationView = () => {
                                                 onGridKeyDown={handleGridNav} 
                                                 autoFocus={focusTargetIdx === idx}
                                                 onAutoFocused={() => setFocusTargetIdx(null)}
-                                                className="w-full h-full text-xs border-none bg-transparent outline-none text-center min-w-0 px-0" 
+                                                className="w-full h-full text-[11px] border-none bg-transparent outline-none text-center min-w-0 px-0" 
                                             />
                                         </td>
 
@@ -934,7 +934,7 @@ const YoshiiAllocationView = () => {
                                                         originalValue={(container.originals?.allocations || {})[m]}
                                                         originalMeta={(container.originalMetas || {})[m]}
                                                         onChange={(v, orig) => handleAllocationValueChange(container, m, v, orig)} 
-                                                        className="matrix-input text-emerald-800 font-bold pr-1 text-right" 
+                                                        className="matrix-input text-emerald-800 font-bold pr-0.5 text-right text-[11px]" 
                                                         dataGridId={`y-alloc-${idx}-${mIdx + 2}`} 
                                                         onGridKeyDown={handleGridNav} 
                                                     />
@@ -942,13 +942,13 @@ const YoshiiAllocationView = () => {
                                             );
                                         })}
                                         
-                                        <td className="p-1 border text-center align-middle whitespace-nowrap relative no-print">
-                                            <button tabIndex="-1" onClick={() => setDeleteConfirmTarget(deleteConfirmTarget === idx ? null : idx)} disabled={ctx.authUser && !ctx.authUser.canEdit} className="text-red-500 hover:text-red-700 disabled:opacity-30 font-bold text-lg leading-none">×</button>
+                                        <td className="p-0.5 border text-center align-middle whitespace-nowrap relative no-print">
+                                            <button tabIndex="-1" onClick={() => setDeleteConfirmTarget(deleteConfirmTarget === idx ? null : idx)} disabled={ctx.authUser && !ctx.authUser.canEdit} className="text-red-500 hover:text-red-700 disabled:opacity-30 font-bold text-base leading-none">×</button>
                                             {deleteConfirmTarget === idx && (
-                                                <div className="absolute right-8 top-1/2 -translate-y-1/2 bg-white border border-red-300 shadow-lg rounded p-2 z-50 text-xs flex items-center gap-2 font-bold whitespace-nowrap">
+                                                <div className="absolute right-6 top-1/2 -translate-y-1/2 bg-white border border-red-300 shadow-lg rounded p-1.5 z-50 text-[10px] flex items-center gap-1 font-bold whitespace-nowrap">
                                                     <span className="text-red-700">削除しますか？</span>
-                                                    <button onClick={() => handleExecuteDeleteRow(container.id, idx)} className="bg-red-600 hover:bg-red-700 text-white px-2 py-0.5 rounded text-[11px]">削除</button>
-                                                    <button onClick={() => setDeleteConfirmTarget(null)} className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-2 py-0.5 rounded text-[11px]">消す</button>
+                                                    <button onClick={() => handleExecuteDeleteRow(container.id, idx)} className="bg-red-600 hover:bg-red-700 text-white px-1.5 py-0.5 rounded text-[10px]">削除</button>
+                                                    <button onClick={() => setDeleteConfirmTarget(null)} className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-1.5 py-0.5 rounded text-[10px]">消す</button>
                                                 </div>
                                             )}
                                         </td>
