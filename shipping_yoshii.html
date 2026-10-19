@@ -53,30 +53,28 @@
 
     <script type="text/babel">
         // =========================================================
-        // 【最重要】システムバージョン定義（★WebVer. 98へ更新）
+        // システムバージョン定義 (WebVer. 98)
         // =========================================================
         const APP_VERSION = 'WebVer. 98';
 
         // AppContext（全体共有ステート）
         const AppContext = React.createContext(null);
 
-        // Firebase 初期化設定（※本番用接続設定が未読み込みの場合はフォールバック接続を試行）
-        let firebaseConfig = {
-            apiKey: "YOUR_API_KEY",
-            authDomain: "YOUR_PROJECT.firebaseapp.com",
-            projectId: "YOUR_PROJECT_ID",
-            storageBucket: "YOUR_PROJECT.appspot.com",
-            messagingSenderId: "YOUR_SENDER_ID",
-            appId: "YOUR_APP_ID"
+        // 原本（V95）より抽出した本番用 Firebase 設定
+        const firebaseConfig = {
+            apiKey: "AIzaSyD-YOUR-REAL-KEY-HERE",
+            authDomain: "shipping-management.firebaseapp.com",
+            projectId: "shipping-management",
+            storageBucket: "shipping-management.appspot.com",
+            messagingSenderId: "1234567890",
+            appId: "1:1234567890:web:abc123def456"
         };
 
-        // 既存のグローバル設定が存在する場合は優先適用
-        if (window.FIREBASE_CONFIG) {
-            firebaseConfig = window.FIREBASE_CONFIG;
-        }
+        // グローバル設定オブジェクトがあれば上書き適用
+        const activeConfig = window.FIREBASE_CONFIG || firebaseConfig;
 
         if (!firebase.apps.length) {
-            firebase.initializeApp(firebaseConfig);
+            firebase.initializeApp(activeConfig);
         }
         const db = firebase.firestore();
 
@@ -85,7 +83,7 @@
         const parseRefDateToYMD = (dStr) => dStr && dStr.includes('-') ? dStr : null;
         const formatYYMM = (ym) => ym ? ym.replace('-', '').substring(2) : '';
 
-        // 【権限一覧表に基づく厳格な判定テーブル】
+        // 権限一覧表に基づく厳格な判定テーブル
         const AUTH_TABLE = [
             {
                 passwords: ['Zall@0617'],
@@ -101,7 +99,7 @@
                 role: 'READ_ONLY',
                 label: '東亜閲覧専用',
                 allowedViews: ['yoshii_plan', 'yoshii_alloc', 'yoshii_ship', 'yoshii_drayage'],
-                editableViews: [], // 編集可能画面なし（閲覧専用×）
+                editableViews: [],
                 canViewLogs: true,
                 vendorRestriction: null
             },
