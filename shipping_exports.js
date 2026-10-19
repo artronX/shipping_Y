@@ -1,356 +1,308 @@
 // ==========================================
-// 吉井電気 製品出荷管理システム (WebVer. 96)
-// エクセル出力・印刷関係モジュール (shipping_exports.js)
+// 吉井電気 製品出荷管理システム (WebVer. 97)
+// Excel出力・印刷関係モジュール (shipping_exports.js)
 // ==========================================
 
-// 1. 簡易データ用 Excel出力関数 (計画・割振り用)
-const exportToExcelSimple = ({ title, headers, rows, filename }) => {
-    if (typeof ExcelJS === 'undefined') {
-        alert("ExcelJSライブラリが読み込まれていません。");
-        return;
-    }
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet('出荷管理データ');
-
-    const headerFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'D1FAE5' } };
-    const fontBold = { name: 'MS PGothic', size: 9, bold: true };
-    const fontNormal = { name: 'MS PGothic', size: 8.5, bold: false };
-    const borderThin = {
-        top: { style: 'thin', color: { argb: 'BFBFBF' } },
-        left: { style: 'thin', color: { argb: 'BFBFBF' } },
-        bottom: { style: 'thin', color: { argb: 'BFBFBF' } },
-        right: { style: 'thin', color: { argb: 'BFBFBF' } }
-    };
-
-    // タイトル行
-    const titleRow = worksheet.addRow(['', title]);
-    titleRow.getCell(2).font = { name: 'MS PGothic', size: 11, bold: true };
-    worksheet.addRow([]);
-
-    // ヘッダー行
-    const headerRowValues = ['', ...headers];
-    const headerRow = worksheet.addRow(headerRowValues);
-    headerRow.eachCell((cell, colNum) => {
-        if (colNum >= 2) {
-            cell.fill = headerFill;
-            cell.font = fontBold;
-            cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
-            cell.border = borderThin;
-        }
-    });
-    headerRow.height = 28;
-
-    // データ行（数値セルのフォーマット補正）
-    rows.forEach(r => {
-        const sanitizedRow = r.map(v => (v === undefined || v === null) ? '' : String(v).startsWith('=') ? `'${v}` : v);
-        const rowData = ['', ...sanitizedRow];
-        const row = worksheet.addRow(rowData);
-        row.eachCell((cell, colNum) => {
-            if (colNum >= 2) {
-                cell.font = fontNormal;
-                cell.border = borderThin;
-                
-                if (typeof cell.value === 'number') {
-                    cell.alignment = { vertical: 'middle', horizontal: 'right' };
-                    cell.numFmt = '#,##0';
-                } else {
-                    cell.value = cell.value === undefined || cell.value === null ? '' : String(cell.value);
-                    cell.alignment = { vertical: 'middle', horizontal: 'center' };
-                }
-            }
-        });
-    });
-
-    // 列幅自動調整
-    worksheet.getColumn(1).width = 3;
-    worksheet.getColumn(2).width = 10;
-    worksheet.getColumn(3).width = 8;
-    for (let i = 4; i <= headers.length + 1; i++) {
-        worksheet.getColumn(i).width = 7.5;
-    }
-
-    workbook.xlsx.writeBuffer().then(buffer => {
-        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        a.click();
-        window.URL.revokeObjectURL(url);
-    });
-};
-
-// 2. セル結合対応 Excel出力関数 (出荷日程表・ドレージ用)
-const exportToExcelAdvanced = ({ title, headers, containerGroups, filename, isDrayage = false }) => {
-    if (typeof ExcelJS === 'undefined') {
-        alert("ExcelJSライブラリが読み込まれていません。");
-        return;
-    }
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet('出荷管理データ');
-
-    const headerFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'E2EFDA' } };
-    const fontBold = { name: 'MS PGothic', size: 9, bold: true };
-    const fontNormal = { name: 'MS PGothic', size: 8.5, bold: false };
-    const borderThin = {
-        top: { style: 'thin', color: { argb: 'BFBFBF' } },
-        left: { style: 'thin', color: { argb: 'BFBFBF' } },
-        bottom: { style: 'thin', color: { argb: 'BFBFBF' } },
-        right: { style: 'thin', color: { argb: 'BFBFBF' } }
-    };
-
-    // タイトル行
-    const titleRow = worksheet.addRow(['', title]);
-    titleRow.getCell(2).font = { name: 'MS PGothic', size: 11, bold: true };
-    worksheet.addRow([]);
-
-    // ヘッダー行
-    const headerRowValues = ['', ...headers];
-    const headerRow = worksheet.addRow(headerRowValues);
-    headerRow.eachCell((cell, colNum) => {
-        if (colNum >= 2) {
-            cell.fill = headerFill;
-            cell.font = fontBold;
-            cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
-            cell.border = borderThin;
-        }
-    });
-
-    let currentRowIdx = 4;
-
-    // グループごとの行出力および同一コンテナのセル結合処理
-    containerGroups.forEach(grp => {
-        const groupRowCount = grp.rows.length;
-        const startRow = currentRowIdx;
-        const endRow = startRow + groupRowCount - 1;
-
-        grp.rows.forEach(r => {
-            const sanitizedRow = r.map(v => (v === undefined || v === null) ? '' : String(v).startsWith('=') ? `'${v}` : v);
-            const rowData = ['', ...sanitizedRow];
-            const row = worksheet.addRow(rowData);
-            row.eachCell((cell, colNum) => {
-                if (colNum >= 2) {
-                    cell.font = fontNormal;
-                    cell.border = borderThin;
-                    
-                    if (typeof cell.value === 'number') {
-                        cell.alignment = { vertical: 'middle', horizontal: 'right' };
-                        cell.numFmt = '#,##0';
-                    } else {
-                        cell.value = cell.value === undefined || cell.value === null ? '' : String(cell.value);
-                        cell.alignment = { vertical: 'middle', horizontal: 'center' };
-                    }
-                }
-            });
-            currentRowIdx++;
-        });
-
-        // 複数型式積載時のセル結合
-        if (groupRowCount > 1) {
-            grp.mergeColIndices.forEach(colIdx => {
-                const excelColNum = colIdx + 1;
-                worksheet.mergeCells(startRow, excelColNum, endRow, excelColNum);
-            });
-        }
-    });
-
-    // 列幅の指定
-    if (isDrayage) {
-        worksheet.getColumn(1).width = 3;
-        worksheet.getColumn(2).width = 10;
-        worksheet.getColumn(3).width = 10;
-        worksheet.getColumn(4).width = 15;
-        worksheet.getColumn(5).width = 20;
-        worksheet.getColumn(6).width = 6;
-        worksheet.getColumn(7).width = 6;
-        worksheet.getColumn(8).width = 6;
-        worksheet.getColumn(9).width = 11;
-        worksheet.getColumn(10).width = 11;
-        worksheet.getColumn(11).width = 8;
-        worksheet.getColumn(12).width = 12;
-        worksheet.getColumn(13).width = 12;
-        worksheet.getColumn(14).width = 11;
-        worksheet.getColumn(15).width = 12;
-        worksheet.getColumn(16).width = 10;
-        worksheet.getColumn(17).width = 22;
-        worksheet.getColumn(18).width = 16;
-        worksheet.getColumn(19).width = 9;
-        worksheet.getColumn(20).width = 18;
-    } else {
-        worksheet.getColumn(1).width = 3;
-        worksheet.getColumn(2).width = 10;
-        worksheet.getColumn(3).width = 10;
-        worksheet.getColumn(4).width = 15;
-        worksheet.getColumn(5).width = 20;
-        worksheet.getColumn(6).width = 6;
-        worksheet.getColumn(7).width = 6;
-        worksheet.getColumn(8).width = 6;
-        worksheet.getColumn(9).width = 11;
-        worksheet.getColumn(10).width = 11;
-        worksheet.getColumn(11).width = 8;
-        worksheet.getColumn(12).width = 12;
-        worksheet.getColumn(13).width = 12;
-        worksheet.getColumn(14).width = 9;
-        worksheet.getColumn(15).width = 18;
-        worksheet.getColumn(16).width = 16;
-    }
-
-    workbook.xlsx.writeBuffer().then(buffer => {
-        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        a.click();
-        window.URL.revokeObjectURL(url);
-    });
-};
-
-// 3. 出力・印刷設定モーダルコンポーネント
+// 共通エクスポート・印刷設定モーダル (ExportPrintModal)
 const ExportPrintModal = ({ isOpen, onClose, screenName, currentMonthStr, onStartExport, defaultMode = 'year' }) => {
     const [mode, setMode] = React.useState(defaultMode);
-    const currentYearNum = new Date().getFullYear();
-    const [selectedYear, setSelectedYear] = React.useState(currentYearNum);
-    const [singleMonth, setSingleMonth] = React.useState(currentMonthStr);
-    const [startMonth, setStartMonth] = React.useState(currentMonthStr);
-    const [endMonth, setEndMonth] = React.useState(currentMonthStr);
+    const [selectedYear, setSelectedYear] = React.useState(2026);
+    const [singleMonth, setSingleMonth] = React.useState(currentMonthStr || '2026-10');
+    const [startMonth, setStartMonth] = React.useState('2026-04');
+    const [endMonth, setEndMonth] = React.useState('2027-03');
+
+    React.useEffect(() => {
+        if (isOpen) {
+            setMode(defaultMode);
+            if (currentMonthStr) setSingleMonth(currentMonthStr);
+        }
+    }, [isOpen, defaultMode, currentMonthStr]);
 
     if (!isOpen) return null;
 
-    const dynamicYears = [];
-    for (let i = -1; i <= 3; i++) {
-        dynamicYears.push(currentYearNum + i);
-    }
-
     const handleConfirm = () => {
-        onStartExport({ mode, selectedYear, singleMonth, startMonth, endMonth });
+        onStartExport({
+            mode,
+            selectedYear: Number(selectedYear),
+            singleMonth,
+            startMonth,
+            endMonth
+        });
         onClose();
     };
 
     return (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-xl shadow-2xl border border-slate-200 max-w-md w-full p-6 space-y-4">
-                <div className="flex justify-between items-center border-b pb-2">
-                    <h3 className="font-bold text-base text-slate-800">⚙ 出力・印刷設定 ({screenName})</h3>
-                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600 font-bold text-lg">×</button>
+        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md border border-slate-300 overflow-hidden flex flex-col">
+                <div className="p-4 bg-emerald-800 text-white flex justify-between items-center">
+                    <h3 className="font-bold text-sm flex items-center gap-2">
+                        📊 出力・印刷の期間指定 ({screenName})
+                    </h3>
+                    <button onClick={onClose} className="text-xl font-bold hover:text-gray-300 leading-none">×</button>
                 </div>
 
-                <div className="space-y-3 text-xs">
+                <div className="p-5 space-y-4 text-xs font-bold text-slate-700">
                     <div>
-                        <label className="block font-bold text-gray-700 mb-1">📅 対象期間の指定</label>
-                        <div className="flex flex-col gap-2 bg-gray-50 p-2.5 rounded border">
-                            <label className="flex items-center gap-1.5 font-bold cursor-pointer">
-                                <input 
-                                    type="radio" 
-                                    name="exportMode" 
-                                    value="current" 
-                                    checked={mode === 'current'} 
-                                    onChange={() => setMode('current')}
-                                    className="text-indigo-600"
-                                />
-                                <span>当月のみ ({currentMonthStr.replace('-', '/')})</span>
-                            </label>
-
-                            <label className="flex items-center gap-1.5 font-bold cursor-pointer">
-                                <input 
-                                    type="radio" 
-                                    name="exportMode" 
-                                    value="year" 
-                                    checked={mode === 'year'} 
-                                    onChange={() => setMode('year')}
-                                    className="text-indigo-600"
-                                />
-                                <span>年度指定</span>
-                            </label>
-
-                            <label className="flex items-center gap-1.5 font-bold cursor-pointer">
-                                <input 
-                                    type="radio" 
-                                    name="exportMode" 
-                                    value="single" 
-                                    checked={mode === 'single'} 
-                                    onChange={() => setMode('single')}
-                                    className="text-indigo-600"
-                                />
-                                <span>指定月のみ</span>
-                            </label>
-
-                            <label className="flex items-center gap-1.5 font-bold cursor-pointer">
-                                <input 
-                                    type="radio" 
-                                    name="exportMode" 
-                                    value="range" 
-                                    checked={mode === 'range'} 
-                                    onChange={() => setMode('range')}
-                                    className="text-indigo-600"
-                                />
-                                <span>範囲指定</span>
-                            </label>
-                        </div>
+                        <label className="block mb-1.5 text-gray-600">出力対象範囲の選択:</label>
+                        <select 
+                            value={mode} 
+                            onChange={e => setMode(e.target.value)}
+                            className="w-full border p-2 rounded text-sm bg-gray-50 text-emerald-900 font-bold focus:bg-white"
+                        >
+                            <option value="year">年度指定 (12ヶ月分)</option>
+                            <option value="current">当月のみ ({currentMonthStr ? currentMonthStr.replace('-', '/') : ''})</option>
+                            <option value="single">単月指定</option>
+                            <option value="range">範囲指定 (開始月〜終了月)</option>
+                        </select>
                     </div>
 
                     {mode === 'year' && (
-                        <div className="bg-indigo-50/60 border border-indigo-100 p-2.5 rounded space-y-2">
-                            <label className="block font-bold text-indigo-900">対象年度:</label>
+                        <div className="bg-emerald-50 p-3 rounded border border-emerald-200">
+                            <label className="block mb-1 text-emerald-900">対象年度:</label>
                             <select 
                                 value={selectedYear} 
-                                onChange={e => setSelectedYear(Number(e.target.value))} 
-                                className="border p-1 rounded bg-white text-xs font-bold w-full text-indigo-900"
+                                onChange={e => setSelectedYear(Number(e.target.value))}
+                                className="w-full border p-1.5 rounded text-sm bg-white font-bold text-indigo-900"
                             >
-                                {dynamicYears.map(yr => (
-                                    <option key={yr} value={yr}>{yr}年度 ({yr}/04 〜 {yr+1}/03)</option>
-                                ))}
+                                <option value={2025}>2025年度 (2025/04 ～ 2026/03)</option>
+                                <option value={2026}>2026年度 (2026/04 ～ 2027/03)</option>
+                                <option value={2027}>2027年度 (2027/04 ～ 2028/03)</option>
                             </select>
                         </div>
                     )}
 
                     {mode === 'single' && (
-                        <div className="bg-indigo-50/60 border border-indigo-100 p-2.5 rounded space-y-2">
-                            <label className="block font-bold text-indigo-900">対象年月:</label>
+                        <div className="bg-emerald-50 p-3 rounded border border-emerald-200">
+                            <label className="block mb-1 text-emerald-900">対象月:</label>
                             <input 
                                 type="month" 
                                 value={singleMonth} 
-                                onChange={e => setSingleMonth(e.target.value)} 
-                                className="border p-1 rounded bg-white text-xs font-bold w-full"
+                                onChange={e => setSingleMonth(e.target.value)}
+                                className="w-full border p-1.5 rounded text-sm bg-white text-center font-bold"
                             />
                         </div>
                     )}
 
                     {mode === 'range' && (
-                        <div className="bg-indigo-50/60 border border-indigo-100 p-2.5 rounded space-y-2">
-                            <label className="block font-bold text-indigo-900">出力年月範囲:</label>
-                            <div className="flex items-center gap-2 font-bold">
+                        <div className="bg-emerald-50 p-3 rounded border border-emerald-200 space-y-2">
+                            <div>
+                                <label className="block mb-0.5 text-emerald-900">開始月:</label>
                                 <input 
                                     type="month" 
                                     value={startMonth} 
-                                    onChange={e => setStartMonth(e.target.value)} 
-                                    className="border p-1 rounded bg-white text-xs"
+                                    onChange={e => setStartMonth(e.target.value)}
+                                    className="w-full border p-1 rounded text-sm bg-white text-center font-bold"
                                 />
-                                <span>〜</span>
+                            </div>
+                            <div>
+                                <label className="block mb-0.5 text-emerald-900">終了月:</label>
                                 <input 
                                     type="month" 
                                     value={endMonth} 
-                                    onChange={e => setEndMonth(e.target.value)} 
-                                    className="border p-1 rounded bg-white text-xs"
+                                    onChange={e => setEndMonth(e.target.value)}
+                                    className="w-full border p-1 rounded text-sm bg-white text-center font-bold"
                                 />
                             </div>
                         </div>
                     )}
-
-                    <div className="text-[11px] text-gray-500 bg-amber-50 p-2 rounded border border-amber-200">
-                        💡 現在ヘッダーで選択中の仕入先コードに完全連動して出力されます。
-                    </div>
                 </div>
 
-                <div className="flex justify-end gap-2 border-t pt-3">
-                    <button onClick={onClose} className="px-3 py-1.5 rounded bg-gray-200 hover:bg-gray-300 font-bold text-xs text-gray-700">
+                <div className="p-3 bg-gray-100 border-t flex justify-end gap-2">
+                    <button onClick={onClose} className="px-4 py-1.5 rounded text-xs font-bold bg-gray-200 hover:bg-gray-300 text-gray-700">
                         キャンセル
                     </button>
-                    <button onClick={handleConfirm} className="px-4 py-1.5 rounded bg-emerald-600 hover:bg-emerald-700 font-bold text-xs text-white shadow">
-                        出力開始
+                    <button onClick={handleConfirm} className="px-5 py-1.5 rounded text-xs font-bold bg-emerald-700 hover:bg-emerald-800 text-white shadow">
+                        実行する
                     </button>
                 </div>
             </div>
         </div>
     );
+};
+
+// 汎用Excel出力関数 (exportToExcelSimple)
+const exportToExcelSimple = ({ title, headers, rows, filename }) => {
+    if (typeof ExcelJS === 'undefined') {
+        alert("ExcelJS ライブラリが読み込まれていません。");
+        return;
+    }
+
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Sheet1');
+
+    // タイトル行
+    worksheet.addRow([title]);
+    worksheet.mergeCells(1, 1, 1, headers.length);
+    const titleCell = worksheet.getCell(1, 1);
+    titleCell.font = { name: 'Meiryo', size: 12, bold: true, color: { argb: 'FFFFFFFF' } };
+    titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F5132' } };
+    titleCell.alignment = { vertical: 'middle', horizontal: 'left' };
+    worksheet.getRow(1).height = 28;
+
+    // 空白行
+    worksheet.addRow([]);
+
+    // ヘッダー行
+    const headerRow = worksheet.addRow(headers);
+    headerRow.height = 22;
+    headerRow.eachCell((cell) => {
+        cell.font = { name: 'Meiryo', size: 9, bold: true, color: { argb: 'FF111827' } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE5E7EB' } };
+        cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+        cell.border = {
+            top: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+            left: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+            bottom: { style: 'medium', color: { argb: 'FF9CA3AF' } },
+            right: { style: 'thin', color: { argb: 'FFD1D5DB' } }
+        };
+    });
+
+    // データ行
+    rows.forEach((rData) => {
+        const row = worksheet.addRow(rData);
+        row.height = 20;
+
+        const isTotalRow = String(rData[2] || '').includes('月間合計') || String(rData[0] || '').includes('計画数') || String(rData[0] || '').includes('残数');
+
+        row.eachCell((cell, colNumber) => {
+            cell.font = { name: 'Meiryo', size: 9, bold: isTotalRow };
+            cell.border = {
+                top: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+                left: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+                bottom: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+                right: { style: 'thin', color: { argb: 'FFE5E7EB' } }
+            };
+
+            if (isTotalRow) {
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0F2FE' } };
+            }
+
+            // 数値判定と右寄せ
+            if (typeof cell.value === 'number') {
+                cell.alignment = { vertical: 'middle', horizontal: 'right' };
+                cell.numFmt = '#,##0';
+            } else {
+                cell.alignment = { vertical: 'middle', horizontal: 'center' };
+            }
+        });
+    });
+
+    // 列幅自動調整
+    worksheet.columns.forEach((column) => {
+        let maxLen = 10;
+        column.eachCell({ includeEmpty: true }, (cell) => {
+            const valStr = cell.value ? String(cell.value) : '';
+            if (valStr.length > maxLen) maxLen = Math.min(valStr.length + 3, 35);
+        });
+        column.width = maxLen;
+    });
+
+    workbook.xlsx.writeBuffer().then((buffer) => {
+        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.click();
+        window.URL.revokeObjectURL(url);
+    });
+};
+
+// 高度Excel出力関数（結合・グループ化対応：出荷日程表＆ドレージ手配用）
+const exportToExcelAdvanced = ({ title, headers, containerGroups, filename, isDrayage = false }) => {
+    if (typeof ExcelJS === 'undefined') {
+        alert("ExcelJS ライブラリが読み込まれていません。");
+        return;
+    }
+
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Sheet1');
+
+    // タイトル行
+    worksheet.addRow([title]);
+    worksheet.mergeCells(1, 1, 1, headers.length);
+    const titleCell = worksheet.getCell(1, 1);
+    titleCell.font = { name: 'Meiryo', size: 12, bold: true, color: { argb: 'FFFFFFFF' } };
+    titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F5132' } };
+    titleCell.alignment = { vertical: 'middle', horizontal: 'left' };
+    worksheet.getRow(1).height = 28;
+
+    worksheet.addRow([]);
+
+    // ヘッダー行
+    const headerRow = worksheet.addRow(headers);
+    headerRow.height = 22;
+    headerRow.eachCell((cell) => {
+        cell.font = { name: 'Meiryo', size: 9, bold: true, color: { argb: 'FF111827' } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE5E7EB' } };
+        cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+        cell.border = {
+            top: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+            left: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+            bottom: { style: 'medium', color: { argb: 'FF9CA3AF' } },
+            right: { style: 'thin', color: { argb: 'FFD1D5DB' } }
+        };
+    });
+
+    let currentRowIdx = 4;
+
+    containerGroups.forEach((group) => {
+        const rowCount = group.rows.length;
+        const startRow = currentRowIdx;
+
+        group.rows.forEach((rData) => {
+            const row = worksheet.addRow(rData);
+            row.height = 20;
+
+            row.eachCell((cell) => {
+                cell.font = { name: 'Meiryo', size: 9, bold: false };
+                cell.border = {
+                    top: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+                    left: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+                    bottom: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+                    right: { style: 'thin', color: { argb: 'FFE5E7EB' } }
+                };
+
+                if (typeof cell.value === 'number') {
+                    cell.alignment = { vertical: 'middle', horizontal: 'right' };
+                    cell.numFmt = '#,##0';
+                } else {
+                    cell.alignment = { vertical: 'middle', horizontal: 'center' };
+                }
+            });
+            currentRowIdx++;
+        });
+
+        // 複数型式コンテナのセル結合処理
+        if (rowCount > 1 && group.mergeColIndices) {
+            const endRow = startRow + rowCount - 1;
+            group.mergeColIndices.forEach((colIdx) => {
+                try {
+                    worksheet.mergeCells(startRow, colIdx, endRow, colIdx);
+                    const mergedCell = worksheet.getCell(startRow, colIdx);
+                    mergedCell.alignment = { vertical: 'middle', horizontal: 'center' };
+                } catch (e) { console.error("Excel merge error:", e); }
+            });
+        }
+    });
+
+    // 列幅自動調整
+    worksheet.columns.forEach((column) => {
+        let maxLen = 10;
+        column.eachCell({ includeEmpty: true }, (cell) => {
+            const valStr = cell.value ? String(cell.value) : '';
+            if (valStr.length > maxLen) maxLen = Math.min(valStr.length + 3, 30);
+        });
+        column.width = maxLen;
+    });
+
+    workbook.xlsx.writeBuffer().then((buffer) => {
+        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.click();
+        window.URL.revokeObjectURL(url);
+    });
 };

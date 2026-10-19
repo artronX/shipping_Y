@@ -1,5 +1,5 @@
 // ==========================================
-// 吉井電気 製品出荷管理システム (WebVer. 96)
+// 吉井電気 製品出荷管理システム (WebVer. 97)
 // 操作・接続ログ管理モジュール (shipping_logs.js)
 // ==========================================
 
@@ -7,6 +7,9 @@ const LogViewModal = ({ isOpen, onClose, logs, sessions }) => {
     const [activeTab, setActiveTab] = React.useState('data_logs');
 
     if (!isOpen) return null;
+
+    // アプリ全体の先頭定義定数を参照（未定義時のフォールバック付）
+    const currentAppVer = typeof APP_VERSION !== 'undefined' ? APP_VERSION : 'WebVer. 97';
 
     return (
         <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -16,7 +19,7 @@ const LogViewModal = ({ isOpen, onClose, logs, sessions }) => {
                     <div className="flex items-center gap-3">
                         <h3 className="font-bold text-base flex items-center gap-2">⚙ システム管理ログ・接続履歴</h3>
                         <span className="bg-amber-400 text-slate-900 text-[10px] font-extrabold px-2 py-0.5 rounded font-mono">
-                            WebVer. 96
+                            {currentAppVer}
                         </span>
                     </div>
                     <button onClick={onClose} className="text-2xl font-bold hover:text-gray-300 leading-none">×</button>
@@ -93,8 +96,8 @@ const LogViewModal = ({ isOpen, onClose, logs, sessions }) => {
                                     sessions.map(s => (
                                         <tr key={s.id} className="border-b hover:bg-slate-50 text-[11px]">
                                             <td className="p-1.5 border font-bold text-indigo-950 whitespace-nowrap truncate">{s.operator || '未設定'}</td>
-                                            <td className="p-1.5 border whitespace-nowrap text-slate-600 font-bold truncate">{s.roleLabel ? s.roleLabel.replace('東亜全体 (全画面編集)', '東亜全体').replace('閲覧専用', '東亜閲覧') : '一般'}</td>
-                                            <td className="p-1.5 border whitespace-nowrap font-mono font-bold text-amber-700 bg-amber-50 text-center">{s.appVersion || 'WebVer. 96'}</td>
+                                            <td className="p-1.5 border whitespace-nowrap text-slate-600 font-bold truncate">{s.roleLabel ? s.roleLabel.replace('東亜全体 (全画面編集)', '東亜全体').replace('東亜閲覧専用', '東亜閲覧') : '一般'}</td>
+                                            <td className="p-1.5 border whitespace-nowrap font-mono font-bold text-amber-700 bg-amber-50 text-center">{s.appVersion || currentAppVer}</td>
                                             <td className="p-1.5 border whitespace-nowrap font-mono text-blue-700 font-bold truncate">{s.ipAddress || '―'}</td>
                                             <td className="p-1.5 border whitespace-nowrap text-slate-700 font-bold truncate">{s.ipLocation || '―'}</td>
                                             <td className="p-1.5 border whitespace-nowrap text-slate-600 font-mono truncate">{s.deviceInfo || '―'}</td>
@@ -116,7 +119,7 @@ const LogViewModal = ({ isOpen, onClose, logs, sessions }) => {
                                                         const nowDate = new Date();
                                                         const diffMinutes = (nowDate.getTime() - createdDate.getTime()) / (1000 * 60);
                                                         if (createdDate.toDateString() !== nowDate.toDateString() || diffMinutes >= 15) {
-                                                            finalLogout = "23:59強制切断";
+                                                            finalLogout = "15分無操作切断";
                                                         }
                                                     }
                                                     return finalLogout ? (
