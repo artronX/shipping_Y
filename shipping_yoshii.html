@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>吉井電気 製品出荷管理システム (WebVer. 113)</title>
+    <title>吉井電気 製品出荷管理システム (WebVer. 114)</title>
     
     <!-- React 18 -->
     <script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js" crossorigin></script>
@@ -68,7 +68,7 @@
         }
 
         .print-only { display: none; }
-        .table-container { overflow-x: auto; max-width: 100%; scroll-behavior: auto; max-height: calc(100vh - 180px); overflow-y: auto; position: relative; }
+        .table-container { overflow-x: auto; max-width: 100%; max-height: calc(100vh - 180px); overflow-y: auto; position: relative; }
         th, td { white-space: nowrap; }
         th { text-align: center !important; }
         
@@ -114,6 +114,12 @@
             font-weight: bold !important;
         }
         
+        /* 編集不可（固定表示）セルのグレー装飾 */
+        .readonly-cell {
+            background-color: #f3f4f6 !important;
+            color: #374151 !important;
+        }
+        
         /* 赤三角＆ツールチップ表示用修復スタイル */
         .has-original-tooltip {
             position: relative;
@@ -146,11 +152,6 @@
             box-shadow: 0 4px 12px rgba(0,0,0,0.35);
             pointer-events: none;
             margin-bottom: 4px;
-        }
-    
-        .readonly-cell {
-            background-color: #f3f4f6 !important;
-            color: #374151 !important;
         }
     </style>
 </head>
@@ -202,7 +203,7 @@
         };
 
         // UIコンポーネント: LocalInput
-        const LocalInput = ({ value, onChange, onEnter, onTabOut, onFocusTrigger, type="text", className="", listId, dataGridId, onGridKeyDown, autoFocus, onAutoFocused, refDate, placeholder="", originalValue, originalMeta }) => {
+        const LocalInput = ({ value, onChange, onEnter, onTabOut, onFocusTrigger, type="text", className="", listId, dataGridId, onGridKeyDown, autoFocus, onAutoFocused, refDate, placeholder="", originalValue, originalMeta, disabled=false }) => {
             const ctx = useContext(AppContext);
             const [val, setVal] = useState(value !== undefined && value !== null ? String(value) : '');
             const [focused, setFocused] = useState(false);
@@ -210,6 +211,8 @@
             const inputRef = useRef(null);
 
             useEffect(() => { if (!focused) setVal(value !== undefined && value !== null ? String(value) : ''); }, [value, focused]);
+
+            const isDisabled = disabled || (ctx.authUser && !ctx.authUser.canEdit);
 
             const handleBlur = () => { 
                 setFocused(false); setIsEditing(false);
@@ -256,29 +259,33 @@
                 }
                 return (
                     <div className={`relative flex items-center justify-between w-full h-full group bg-transparent text-center min-w-[68px] ${changedClass} ${tooltipClass}`} data-original-val={originalValue === "" ? "【消去】" : originalValue} data-original-meta={metaStr}>
-                        <input ref={inputRef} type="text" value={formattedDate} onChange={handleChange} onFocus={handleFocus} onBlur={handleBlur} onKeyDown={handleKeyDown} disabled={ctx.authUser && !ctx.authUser.canEdit} className={`cell-input text-center pr-5 ${className} ${changedClass}`} data-grid-id={dataGridId} placeholder={placeholder}/>
-                        <div className="absolute right-0.5 w-4 h-full flex items-center justify-center flex-shrink-0 no-print opacity-40 group-hover:opacity-100 transition-all cursor-pointer">
-                            <span className="text-[9px]">📅</span>
-                            <input type="date" value={val.includes('-') ? val : ""} disabled={ctx.authUser && !ctx.authUser.canEdit} onChange={e => { setVal(e.target.value); onChange(e.target.value, val); }} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
-                        </div>
+                        <input ref={inputRef} type="text" value={formattedDate} onChange={handleChange} onFocus={handleFocus} onBlur={handleBlur} onKeyDown={handleKeyDown} disabled={isDisabled} className={`cell-input text-center ${isDisabled ? 'bg-transparent border-none' : ''} pr-5 ${className} ${changedClass}`} data-grid-id={dataGridId} placeholder={placeholder}/>
+                        {!isDisabled && (
+                            <div className="absolute right-0.5 w-4 h-full flex items-center justify-center flex-shrink-0 no-print opacity-40 group-hover:opacity-100 transition-all cursor-pointer">
+                                <span className="text-[9px]">📅</span>
+                                <input type="date" value={val.includes('-') ? val : ""} disabled={isDisabled} onChange={e => { setVal(e.target.value); onChange(e.target.value, val); }} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                            </div>
+                        )}
                     </div>
                 );
             }
 
             return (
                 <div className={`w-full h-full ${tooltipClass}`} data-original-val={originalValue === "" ? "【消去】" : originalValue} data-original-meta={metaStr}>
-                    <input ref={inputRef} type={currentType} list={listId} value={displayVal} onChange={handleChange} onFocus={handleFocus} onBlur={handleBlur} onKeyDown={handleKeyDown} disabled={ctx.authUser && !ctx.authUser.canEdit} className={className.includes('matrix-input') ? `${className} ${extraClass} ${changedClass}` : `cell-input ${extraClass} ${className} ${changedClass}`} data-grid-id={dataGridId} placeholder={placeholder}/>
+                    <input ref={inputRef} type={currentType} list={listId} value={displayVal} onChange={handleChange} onFocus={handleFocus} onBlur={handleBlur} onKeyDown={handleKeyDown} disabled={isDisabled} className={className.includes('matrix-input') ? `${className} ${extraClass} ${changedClass}` : `cell-input ${extraClass} ${className} ${changedClass}`} data-grid-id={dataGridId} placeholder={placeholder}/>
                 </div>
             );
         };
 
         // UIコンポーネント: LocalTextArea
-        const LocalTextArea = ({ value, onChange, isCompact=false, className="", originalValue, originalMeta }) => {
+        const LocalTextArea = ({ value, onChange, isCompact=false, className="", originalValue, originalMeta, disabled=false }) => {
             const ctx = useContext(AppContext);
             const [val, setVal] = useState(value !== undefined && value !== null ? String(value) : '');
             const [focused, setFocused] = useState(false);
 
             useEffect(() => { if (!focused) setVal(value !== undefined && value !== null ? String(value) : ''); }, [value, focused]);
+
+            const isDisabled = disabled || (ctx.authUser && !ctx.authUser.canEdit);
 
             const handleBlur = () => { setFocused(false); if (val !== (value || '')) onChange(val, value); };
 
@@ -290,18 +297,20 @@
 
             return (
                 <div className={`w-full h-full ${tooltipClass}`} data-original-val={originalValue === "" ? "【消去】" : originalValue} data-original-meta={metaStr}>
-                    <textarea value={val} onChange={e => setVal(e.target.value)} onFocus={() => setFocused(true)} onBlur={handleBlur} rows={isCompact ? 1 : 2} disabled={ctx.authUser && !ctx.authUser.canEdit} className={`w-full text-xs px-1 border-none bg-transparent outline-none whitespace-normal break-all resize-y focus:bg-indigo-50 ${isCompact ? 'h-[22px] min-h-[22px] leading-[20px] py-0 overflow-hidden' : 'py-1 min-h-[36px]'} ${className} ${changedClass}`}/>
+                    <textarea value={val} onChange={e => setVal(e.target.value)} onFocus={() => setFocused(true)} onBlur={handleBlur} rows={isCompact ? 1 : 2} disabled={isDisabled} className={`w-full text-xs px-1 border-none bg-transparent outline-none whitespace-normal break-all resize-y focus:bg-indigo-50 ${isCompact ? 'h-[22px] min-h-[22px] leading-[20px] py-0 overflow-hidden' : 'py-1 min-h-[36px]'} ${className} ${changedClass}`}/>
                 </div>
             );
         };
 
         // UIコンポーネント: DynamicSelect
-        const DynamicSelect = ({ value, onChange, category, options, className="", dataGridId, onGridKeyDown, onFocusTrigger, autoDefaultValue, autoFocus, onAutoFocused, originalValue, originalMeta }) => {
+        const DynamicSelect = ({ value, onChange, category, options, className="", dataGridId, onGridKeyDown, onFocusTrigger, autoDefaultValue, autoFocus, onAutoFocused, originalValue, originalMeta, disabled=false }) => {
             const ctx = useContext(AppContext);
             const [val, setVal] = useState(value || '');
             const selectRef = useRef(null);
 
             useEffect(() => { setVal(value || ''); }, [value]);
+
+            const isDisabled = disabled || (ctx.authUser && !ctx.authUser.canEdit);
 
             const handleChange = (e) => {
                 const newVal = e.target.value;
@@ -319,10 +328,10 @@
 
             return (
                 <div className={`w-full h-full ${tooltipClass}`} data-original-val={originalValue === "" ? "【消去】" : originalValue} data-original-meta={metaStr}>
-                    <select ref={selectRef} value={val} onChange={handleChange} disabled={ctx.authUser && !ctx.authUser.canEdit} className={`cell-input text-center ${className} px-0 ${changedClass}`}>
+                    <select ref={selectRef} value={val} onChange={handleChange} disabled={isDisabled} className={`cell-input text-center ${isDisabled ? 'border-none bg-transparent appearance-none' : ''} ${className} px-0 ${changedClass}`}>
                         <option value=""></option>
                         {(options || []).map((opt, i) => <option key={i} value={opt}>{opt}</option>)}
-                        <option value="__ADD_NEW__" className="font-bold text-blue-600">+ 新規追加</option>
+                        {!isDisabled && <option value="__ADD_NEW__" className="font-bold text-blue-600">+ 新規追加</option>}
                     </select>
                 </div>
             );
@@ -380,7 +389,7 @@
                         <div className="p-4 bg-indigo-900 text-white flex justify-between items-center">
                             <div className="flex items-center gap-3">
                                 <h3 className="font-bold text-base flex items-center gap-2">⚙ システム管理ログ・接続履歴</h3>
-                                <span className="bg-amber-400 text-slate-900 text-[10px] font-extrabold px-2 py-0.5 rounded font-mono">WebVer. 113</span>
+                                <span className="bg-amber-400 text-slate-900 text-[10px] font-extrabold px-2 py-0.5 rounded font-mono">WebVer. 114</span>
                             </div>
                             <button onClick={onClose} className="text-2xl font-bold hover:text-gray-300 leading-none">×</button>
                         </div>
@@ -547,7 +556,7 @@
                     <div className="bg-white rounded-xl shadow-2xl border border-slate-200 max-w-sm w-full p-6 space-y-5">
                         <div className="text-center space-y-1">
                             <h2 className="text-lg font-bold text-slate-800">吉井電気 製品出荷管理システム</h2>
-                            <p className="text-xs text-indigo-600 font-mono font-bold">権限認証ログイン (WebVer. 113)</p>
+                            <p className="text-xs text-indigo-600 font-mono font-bold">権限認証ログイン (WebVer. 114)</p>
                         </div>
                         {errorMsg && <div className="bg-red-50 border border-red-200 text-red-600 text-xs p-2.5 rounded text-center font-bold">{errorMsg}</div>}
                         <form onSubmit={handleSubmit} className="space-y-4">
@@ -567,8 +576,10 @@
         };
 
         const App = () => {
-            const shipScrollPosRef = useRef(0);
-            const drayScrollPosRef = useRef(0);
+            // スクロール状態の永続保持Ref (コンポーネント再マウント時にもクリアされない上位State)
+            const shipScrollPosRef = useRef(null);
+            const drayScrollPosRef = useRef(null);
+
             const [appReady, setAppReady] = useState(false);
             const [isLoggedIn, setIsLoggedIn] = useState(false);
             const [authUser, setAuthUser] = useState(null);
@@ -630,7 +641,7 @@
                 const now = new Date();
                 const timestampStr = `${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
                 try {
-                    await db.collection('operation_logs').add({ timestamp: timestampStr, createdAt: now.toISOString(), operator: operatorName || '未設定', appVersion: 'WebVer. 113', sheetName, action, detail });
+                    await db.collection('operation_logs').add({ timestamp: timestampStr, createdAt: now.toISOString(), operator: operatorName || '未設定', appVersion: 'WebVer. 114', sheetName, action, detail });
                 } catch (e) { console.error("Log Error:", e); }
             };
 
@@ -767,7 +778,7 @@
                         <header className="h-[44px] bg-indigo-700 text-white flex items-center justify-between px-4 shadow no-print flex-shrink-0">
                             <div className="flex items-center gap-4 min-w-[220px]">
                                 <a href="shipping.html" className="hover:bg-indigo-600 px-2 py-1 border rounded text-sm transition">ホーム</a>
-                                <h1 className="text-lg font-bold hidden md:block">吉井電気<span className="text-sm font-bold bg-indigo-900/80 px-2 py-0.5 rounded text-amber-300 font-mono text-xs ml-2">WebVer. 113</span></h1>
+                                <h1 className="text-lg font-bold hidden md:block">吉井電気<span className="text-sm font-bold bg-indigo-900/80 px-2 py-0.5 rounded text-amber-300 font-mono text-xs ml-2">WebVer. 114</span></h1>
                             </div>
                             
                             <div className="flex items-center justify-center gap-3 flex-1">
@@ -833,8 +844,8 @@
         root.render(<App />);
     </script>
 
-    <!-- 分割コンポーネントおよびビューモジュールの読み込み (WebVer. 113 キャッシュ破棄タグ) -->
-    <script type="text/babel" src="shipping_views_plan.js?v=113"></script>
-    <script type="text/babel" src="shipping_views_ship.js?v=113"></script>
+    <!-- 分割コンポーネントおよびビューモジュールの読み込み (WebVer. 114 キャッシュ破棄タグ) -->
+    <script type="text/babel" src="shipping_views_plan.js?v=114"></script>
+    <script type="text/babel" src="shipping_views_ship.js?v=114"></script>
 </body>
 </html>

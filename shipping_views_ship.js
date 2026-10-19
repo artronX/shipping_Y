@@ -1,5 +1,5 @@
 // =========================================================
-// shipping_views_ship.js - 出荷日程・ドレージ画面モジュール (WebVer. 113 完全復元版)
+// shipping_views_ship.js - 出荷日程・ドレージ画面モジュール (WebVer. 114 業務フロー・スクロール完全修復版)
 // =========================================================
 
 // 【出荷日程画面ビュー】
@@ -91,13 +91,23 @@ const YoshiiShipView = () => {
         groupedRows.push(c);
     });
 
-    // 他画面から戻った時のスクロール位置復元 & 画面を離れる時の位置保持
+    // 他画面移動後のスクロール位置保持・復元 & 初回ロード時当月移動の厳格制御
     React.useEffect(() => {
         const container = ctx.tableContainerRef.current;
         if (!container) return;
 
-        if (ctx.shipScrollPosRef.current > 0) {
+        // 過去のスクロール記憶があれば復元、無ければ初回のみ当月（2026-10）へスクロール
+        if (ctx.shipScrollPosRef.current !== null && ctx.shipScrollPosRef.current > 0) {
             container.scrollTop = ctx.shipScrollPosRef.current;
+        } else if (filterMode === 'all') {
+            const timer = setTimeout(() => {
+                const targetEl = container.querySelector(`[data-month="${ctx.currentMonthStr}"]`);
+                if (targetEl) {
+                    targetEl.scrollIntoView({ behavior: 'auto', block: 'start' });
+                    ctx.shipScrollPosRef.current = container.scrollTop;
+                }
+            }, 100);
+            return () => clearTimeout(timer);
         }
 
         const handleScroll = () => {
@@ -113,7 +123,7 @@ const YoshiiShipView = () => {
                 container.removeEventListener('scroll', handleScroll);
             }
         };
-    }, []);
+    }, [filterMode, ctx.currentMonthStr, displayContainers.length]);
 
     const handleExecuteExport = () => {
         if (exportModal.type === 'print') {
@@ -245,10 +255,13 @@ const YoshiiShipView = () => {
                             if (modelKeys.length === 0) {
                                 return (
                                     <tr key={container.id || idx} className="hover:bg-gray-50 border-b h-[24px]">
-                                        <td className="border font-bold bg-white">{container.managementNo || '-'}</td>
-                                        <td className="border bg-white">
+                                        {/* 出荷日程：固定表示項目（グレー背景） */}
+                                        <td className="border font-bold readonly-cell">{container.managementNo || '-'}</td>
+                                        <td className="border readonly-cell">
                                             <DynamicSelect value={container.status || '手配中'} originalValue={(container.originals || {}).status} originalMeta={(container.originalMetas || {}).status} onChange={(val, cat, orig) => ctx.handleSelectChange(container.id, 'status', true, 'yoshii', true, '進行状況')(val, cat, orig)} category="statuses" options={ctx.masterData.common.statuses} isCommon className="w-full text-center border-none bg-transparent"/>
                                         </td>
+
+                                        {/* 出荷日程：編集可能項目（白背景） */}
                                         <td className="border bg-white">
                                             <LocalInput value={container.containerNo || ''} originalValue={(container.originals || {}).containerNo} originalMeta={(container.originalMetas || {}).containerNo} onChange={(v, orig) => ctx.updateContainer(container.id, { containerNo: v }, container.deliveryMonth, 'yoshii', 'コンテナNO')} className="w-full text-center font-mono border-none bg-transparent"/>
                                         </td>
@@ -256,8 +269,12 @@ const YoshiiShipView = () => {
                                         <td className="border text-gray-400 bg-white">0</td>
                                         <td className="border text-gray-400 bg-white">0</td>
                                         <td className="border text-gray-400 bg-white">0</td>
-                                        <td className="border font-bold bg-white">0</td>
+
+                                        {/* 割振数・総数量（固定表示） */}
+                                        <td className="border font-bold readonly-cell">0</td>
                                         <td className="border font-extrabold bg-emerald-100 text-emerald-900 font-mono">0</td>
+
+                                        {/* 出荷日程：海外便手配調整のため編集可能（白背景） */}
                                         <td className="border bg-white">
                                             <DynamicSelect value={container.port || ''} originalValue={(container.originals || {}).port} originalMeta={(container.originalMetas || {}).port} onChange={(val, cat, orig) => ctx.handleSelectChange(container.id, 'port', true, 'yoshii', false, '到着港')(val, cat, orig)} category="ports" options={ctx.masterData.yoshii.ports} className="w-full text-center border-none bg-transparent"/>
                                         </td>
@@ -288,8 +305,8 @@ const YoshiiShipView = () => {
                                     <tr key={`${container.id || idx}-${m}`} className="hover:bg-gray-50 border-b h-[24px]">
                                         {mIdx === 0 && (
                                             <>
-                                                <td rowSpan={rowSpan} className="border font-bold bg-white align-middle">{container.managementNo || '-'}</td>
-                                                <td rowSpan={rowSpan} className="border bg-white align-middle">
+                                                <td rowSpan={rowSpan} className="border font-bold readonly-cell align-middle">{container.managementNo || '-'}</td>
+                                                <td rowSpan={rowSpan} className="border readonly-cell align-middle">
                                                     <DynamicSelect value={container.status || '手配中'} originalValue={(container.originals || {}).status} originalMeta={(container.originalMetas || {}).status} onChange={(val, cat, orig) => ctx.handleSelectChange(container.id, 'status', true, 'yoshii', true, '進行状況')(val, cat, orig)} category="statuses" options={ctx.masterData.common.statuses} isCommon className="w-full text-center border-none bg-transparent"/>
                                                 </td>
                                                 <td rowSpan={rowSpan} className="border bg-white align-middle">
@@ -355,7 +372,7 @@ const YoshiiShipView = () => {
     );
 };
 
-// 【ドレージ手配画面ビュー - 月区分バー復元 & スクロール位置保持復元版】
+// 【ドレージ手配画面ビュー - 業務フロー依存ロック・永続スクロール完全復元版】
 const YoshiiDrayageView = () => {
     const ctx = React.useContext(AppContext);
     const [exportModal, setExportModal] = React.useState({ isOpen: false, type: 'excel' });
@@ -444,13 +461,23 @@ const YoshiiDrayageView = () => {
         groupedRows.push(c);
     });
 
-    // 他画面から戻った時のスクロール位置復元 & 画面を離れる時の位置保持
+    // 他画面移動後のスクロール位置保持・復元 & 初回ロード時当月移動の厳格制御
     React.useEffect(() => {
         const container = ctx.tableContainerRef.current;
         if (!container) return;
 
-        if (ctx.drayScrollPosRef.current > 0) {
+        // 過去のスクロール記憶があれば復元、無ければ初回のみ当月（2026-10）へスクロール
+        if (ctx.drayScrollPosRef.current !== null && ctx.drayScrollPosRef.current > 0) {
             container.scrollTop = ctx.drayScrollPosRef.current;
+        } else if (filterMode === 'all') {
+            const timer = setTimeout(() => {
+                const targetEl = container.querySelector(`[data-month="${ctx.currentMonthStr}"]`);
+                if (targetEl) {
+                    targetEl.scrollIntoView({ behavior: 'auto', block: 'start' });
+                    ctx.drayScrollPosRef.current = container.scrollTop;
+                }
+            }, 100);
+            return () => clearTimeout(timer);
         }
 
         const handleScroll = () => {
@@ -466,7 +493,7 @@ const YoshiiDrayageView = () => {
                 container.removeEventListener('scroll', handleScroll);
             }
         };
-    }, []);
+    }, [filterMode, ctx.currentMonthStr, displayContainers.length]);
 
     const handleExecuteExport = () => {
         if (exportModal.type === 'print') {
@@ -608,10 +635,13 @@ const YoshiiDrayageView = () => {
                             if (modelKeys.length === 0) {
                                 return (
                                     <tr key={container.id || idx} className="hover:bg-gray-50 border-b h-[24px]">
-                                        <td className="border font-bold bg-white">{container.managementNo || '-'}</td>
-                                        <td className="border bg-white">
+                                        {/* ドレージ：固定表示項目（グレー背景） */}
+                                        <td className="border font-bold readonly-cell">{container.managementNo || '-'}</td>
+                                        <td className="border readonly-cell">
                                             <DynamicSelect value={container.status || '手配中'} originalValue={(container.originals || {}).status} originalMeta={(container.originalMetas || {}).status} onChange={(val, cat, orig) => ctx.handleSelectChange(container.id, 'status', true, 'yoshii', true, '進行状況')(val, cat, orig)} category="statuses" options={ctx.masterData.common.statuses} isCommon className="w-full text-center border-none bg-transparent"/>
                                         </td>
+
+                                        {/* ドレージ：編集可能項目（白背景） */}
                                         <td className="border bg-white">
                                             <LocalInput value={container.containerNo || ''} originalValue={(container.originals || {}).containerNo} originalMeta={(container.originalMetas || {}).containerNo} onChange={(v, orig) => ctx.updateContainer(container.id, { containerNo: v }, container.deliveryMonth, 'yoshii', 'コンテナNO')} className="w-full text-center font-mono border-none bg-transparent"/>
                                         </td>
@@ -619,11 +649,17 @@ const YoshiiDrayageView = () => {
                                         <td className="border text-gray-400 bg-white">0</td>
                                         <td className="border text-gray-400 bg-white">0</td>
                                         <td className="border text-gray-400 bg-white">0</td>
-                                        <td className="border font-bold bg-white">0</td>
+
+                                        {/* 割振数・総数量（固定表示） */}
+                                        <td className="border font-bold readonly-cell">0</td>
                                         <td className="border font-extrabold bg-emerald-100 text-emerald-900 font-mono">0</td>
-                                        <td className="border bg-white">{container.port || '-'}</td>
-                                        <td className="border bg-white">{container.etd || '-'}</td>
-                                        <td className="border bg-white">{container.eta || '-'}</td>
+
+                                        {/* ドレージ：本船確定済みのため完全編集不可・閲覧専用（グレー背景） */}
+                                        <td className="border readonly-cell">{container.port || '-'}</td>
+                                        <td className="border readonly-cell">{container.etd || '-'}</td>
+                                        <td className="border readonly-cell">{container.eta || '-'}</td>
+
+                                        {/* ドレージ：国内陸送手配の編集可能項目（白背景） */}
                                         <td className="border bg-white">
                                             <LocalInput type="date" value={container.freeTime || ''} originalValue={(container.originals || {}).freeTime} originalMeta={(container.originalMetas || {}).freeTime} onChange={(v, orig) => ctx.updateContainer(container.id, { freeTime: v }, container.deliveryMonth, 'yoshii', 'フリータイム')} className="w-full text-center border-none bg-transparent"/>
                                         </td>
@@ -639,8 +675,10 @@ const YoshiiDrayageView = () => {
                                         <td className="border bg-white">
                                             <LocalTextArea value={container.drayageNotes || ''} originalValue={(container.originals || {}).drayageNotes} originalMeta={(container.originalMetas || {}).drayageNotes} onChange={(v, orig) => ctx.updateContainer(container.id, { drayageNotes: v }, container.deliveryMonth, 'yoshii', '備考')}/>
                                         </td>
-                                        <td className="border bg-white">{container.containerSize || container.size || '-'}</td>
-                                        <td className="border bg-white">{container.vessel || '-'}</td>
+
+                                        {/* ドレージ：本船確定済みのため完全編集不可・閲覧専用（グレー背景） */}
+                                        <td className="border readonly-cell">{container.containerSize || container.size || '-'}</td>
+                                        <td className="border readonly-cell">{container.vessel || '-'}</td>
                                     </tr>
                                 );
                             }
@@ -653,8 +691,8 @@ const YoshiiDrayageView = () => {
                                     <tr key={`${container.id || idx}-${m}`} className="hover:bg-gray-50 border-b h-[24px]">
                                         {mIdx === 0 && (
                                             <>
-                                                <td rowSpan={rowSpan} className="border font-bold bg-white align-middle">{container.managementNo || '-'}</td>
-                                                <td rowSpan={rowSpan} className="border bg-white align-middle">
+                                                <td rowSpan={rowSpan} className="border font-bold readonly-cell align-middle">{container.managementNo || '-'}</td>
+                                                <td rowSpan={rowSpan} className="border readonly-cell align-middle">
                                                     <DynamicSelect value={container.status || '手配中'} originalValue={(container.originals || {}).status} originalMeta={(container.originalMetas || {}).status} onChange={(val, cat, orig) => ctx.handleSelectChange(container.id, 'status', true, 'yoshii', true, '進行状況')(val, cat, orig)} category="statuses" options={ctx.masterData.common.statuses} isCommon className="w-full text-center border-none bg-transparent"/>
                                                 </td>
                                                 <td rowSpan={rowSpan} className="border bg-white align-middle">
@@ -687,9 +725,13 @@ const YoshiiDrayageView = () => {
                                         {mIdx === 0 && (
                                             <>
                                                 <td rowSpan={rowSpan} className="border font-extrabold bg-emerald-100 text-emerald-900 text-right pr-1 align-middle font-mono">{totalQty.toLocaleString()}</td>
-                                                <td rowSpan={rowSpan} className="border bg-white align-middle">{container.port || '-'}</td>
-                                                <td rowSpan={rowSpan} className="border bg-white align-middle">{container.etd || '-'}</td>
-                                                <td rowSpan={rowSpan} className="border bg-white align-middle">{container.eta || '-'}</td>
+                                                
+                                                {/* ドレージ：本船確定済みのため完全編集不可・閲覧専用（グレー背景） */}
+                                                <td rowSpan={rowSpan} className="border readonly-cell align-middle">{container.port || '-'}</td>
+                                                <td rowSpan={rowSpan} className="border readonly-cell align-middle">{container.etd || '-'}</td>
+                                                <td rowSpan={rowSpan} className="border readonly-cell align-middle">{container.eta || '-'}</td>
+
+                                                {/* ドレージ：国内陸送手配の編集可能項目（白背景） */}
                                                 <td rowSpan={rowSpan} className="border bg-white align-middle">
                                                     <LocalInput type="date" value={container.freeTime || ''} originalValue={(container.originals || {}).freeTime} originalMeta={(container.originalMetas || {}).freeTime} onChange={(v, orig) => ctx.updateContainer(container.id, { freeTime: v }, container.deliveryMonth, 'yoshii', 'フリータイム')} className="w-full text-center border-none bg-transparent"/>
                                                 </td>
@@ -705,8 +747,10 @@ const YoshiiDrayageView = () => {
                                                 <td rowSpan={rowSpan} className="border bg-white align-middle">
                                                     <LocalTextArea value={container.drayageNotes || ''} originalValue={(container.originals || {}).drayageNotes} originalMeta={(container.originalMetas || {}).drayageNotes} onChange={(v, orig) => ctx.updateContainer(container.id, { drayageNotes: v }, container.deliveryMonth, 'yoshii', '備考')}/>
                                                 </td>
-                                                <td rowSpan={rowSpan} className="border bg-white align-middle">{container.containerSize || container.size || '-'}</td>
-                                                <td rowSpan={rowSpan} className="border bg-white align-middle">{container.vessel || '-'}</td>
+
+                                                {/* ドレージ：本船確定済みのため完全編集不可・閲覧専用（グレー背景） */}
+                                                <td rowSpan={rowSpan} className="border readonly-cell align-middle">{container.containerSize || container.size || '-'}</td>
+                                                <td rowSpan={rowSpan} className="border readonly-cell align-middle">{container.vessel || '-'}</td>
                                             </>
                                         )}
                                     </tr>
