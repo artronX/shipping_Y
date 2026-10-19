@@ -59,7 +59,6 @@ const YoshiiPlanView = () => {
 
     const [categoryFilter, setCategoryFilter] = React.useState('全体');
     const [showHistory, setShowHistory] = React.useState(false);
-    const [onlyCheckedFilter, setOnlyCheckedFilter] = React.useState(false);
 
     const [rangeMode, setRangeMode] = React.useState('year');
     const [selectedYear, setSelectedYear] = React.useState(2026);
@@ -75,16 +74,6 @@ const YoshiiPlanView = () => {
 
     const [draggedModel, setDraggedModel] = React.useState(null);
     const [dragOverModel, setDragOverModel] = React.useState(null);
-
-    const [checkedModels, setCheckedModels] = React.useState(() => {
-        return ctx.masterData.yoshii?.checkedModels || {};
-    });
-
-    React.useEffect(() => {
-        if (ctx.masterData.yoshii?.checkedModels) {
-            setCheckedModels(ctx.masterData.yoshii.checkedModels);
-        }
-    }, [ctx.masterData.yoshii?.checkedModels]);
 
     const generateMonths = () => {
         const months = [];
@@ -137,34 +126,7 @@ const YoshiiPlanView = () => {
         });
     }
 
-    const visibleModels = onlyCheckedFilter 
-        ? allModels.filter(m => checkedModels[m] !== false) 
-        : allModels;
-
-    const isAllChecked = visibleModels.every(m => checkedModels[m] !== false);
-
-    const handleToggleAllChecked = async () => {
-        const nextState = !isAllChecked;
-        const newChecked = { ...checkedModels };
-        visibleModels.forEach(m => { newChecked[m] = nextState; });
-        setCheckedModels(newChecked);
-        const newMaster = {
-            ...ctx.masterData,
-            yoshii: { ...ctx.masterData.yoshii, checkedModels: newChecked }
-        };
-        await firebase.firestore().collection('shipping_settings').doc('master_data_v5').set(newMaster, { merge: true });
-    };
-
-    const handleToggleSingleChecked = async (model) => {
-        const nextVal = !(checkedModels[model] !== false);
-        const newChecked = { ...checkedModels, [model]: nextVal };
-        setCheckedModels(newChecked);
-        const newMaster = {
-            ...ctx.masterData,
-            yoshii: { ...ctx.masterData.yoshii, checkedModels: newChecked }
-        };
-        await firebase.firestore().collection('shipping_settings').doc('master_data_v5').set(newMaster, { merge: true });
-    };
+    const visibleModels = allModels;
 
     const handleModelDragStart = (e, model) => {
         setDraggedModel(model);
@@ -367,11 +329,6 @@ const YoshiiPlanView = () => {
 
                 <div className="flex items-center gap-2 text-xs font-bold">
                     <label className="flex items-center gap-1 text-gray-700 cursor-pointer bg-gray-100 px-2 py-1 rounded border hover:bg-gray-200 transition">
-                        <input type="checkbox" checked={onlyCheckedFilter} onChange={e => setOnlyCheckedFilter(e.target.checked)} className="w-3.5 h-3.5 text-emerald-600 rounded"/>
-                        <span>☑ 選択行のみ表示・印刷</span>
-                    </label>
-
-                    <label className="flex items-center gap-1 text-gray-700 cursor-pointer bg-gray-100 px-2 py-1 rounded border hover:bg-gray-200 transition">
                         <input type="checkbox" checked={showHistory} onChange={e => setShowHistory(e.target.checked)} className="w-3.5 h-3.5 text-emerald-600 rounded"/>
                         <span>変更履歴を表示</span>
                     </label>
@@ -432,52 +389,58 @@ const YoshiiPlanView = () => {
                 </div>
             </div>
 
+            {/* テーブル本体：「表示」列削除・型式ドロップダウン復元・納入月固定幅・品名JAN文字切れ防止 */}
             <div className="table-container flex-grow border rounded shadow-inner overflow-x-auto overflow-y-auto" ref={ctx.tableContainerRef}>
                 <table className="w-full text-center border-collapse text-[11px]">
                     <thead className="sticky top-0 z-30 bg-gray-200 font-bold">
                         <tr>
-                            <th className="p-0.5 border w-6 sticky left-0 bg-gray-200 z-40 text-[10px] no-print">順</th>
-                            <th className="p-0.5 border w-6 sticky left-[24px] bg-gray-200 z-40 text-[9px] leading-tight no-print">
-                                表示<br/>
-                                <input type="checkbox" checked={isAllChecked} onChange={handleToggleAllChecked} className="w-3 h-3 text-emerald-600 rounded cursor-pointer"/>
-                            </th>
-                            <th className="p-0.5 border w-[42px] min-w-[42px] sticky left-[48px] bg-gray-200 z-40 text-[10px] text-center align-middle">
+                            <th className="p-0.5 border w-6 min-w-[24px] max-w-[24px] sticky left-0 bg-gray-200 z-40 text-[10px] no-print">順</th>
+                            <th className="p-0.5 border w-[42px] min-w-[42px] max-w-[42px] sticky left-[24px] bg-gray-200 z-40 text-[10px] text-center align-middle">
                                 <div className="relative flex items-center justify-center w-full h-full">
-                                    <div className="flex items-center justify-center gap-0.5 w-full cursor-pointer hover:text-emerald-700">
+                                    <div className="flex items-center justify-center gap-0.5 w-full">
                                         <span className="font-bold text-gray-800 truncate">
                                             {ctx.selectedVendorFilter === 'ALL' ? '仕入先' : ctx.selectedVendorFilter}
                                         </span>
                                     </div>
                                 </div>
                             </th>
-                            <th className="p-0.5 border w-[90px] min-w-[90px] sticky left-[90px] bg-gray-200 z-40 text-[11px] font-bold">型式</th>
-                            <th className="p-0.5 border min-w-[140px] text-[11px] font-bold">品名</th>
-                            <th className="p-0.5 border w-[85px] min-w-[80px] text-[11px] font-bold">JANコード</th>
-                            <th className="p-0.5 border w-[46px] min-w-[46px] bg-emerald-100 text-[11px] font-bold text-emerald-900">合計</th>
+
+                            {/* 復元：型式ドロップダウンフィルタ付きヘッダー */}
+                            <th className="p-0.5 border min-w-[100px] sticky left-[66px] bg-gray-200 z-40 text-[11px] font-bold">
+                                <div className="flex items-center justify-center gap-1">
+                                    <span>型式</span>
+                                </div>
+                            </th>
+
+                            {/* 文字切れ防止の十分な幅設定 */}
+                            <th className="p-0.5 border min-w-[220px] text-[11px] font-bold">品名</th>
+                            <th className="p-0.5 border w-[110px] min-w-[110px] max-w-[110px] text-[11px] font-bold">JANコード</th>
+                            <th className="p-0.5 border w-[46px] min-w-[46px] max-w-[46px] bg-emerald-100 text-[11px] font-bold text-emerald-900">合計</th>
+
+                            {/* 納入月の完全固定幅指定 (w-[42px] min-w-[42px] max-w-[42px]) */}
                             {displayMonths.map(mo => {
                                 const yr = mo.split('-')[0].slice(-2);
                                 const m = mo.split('-')[1];
                                 return (
-                                    <th key={mo} className="p-0.5 border w-[46px] min-w-[46px] text-[11px] font-bold bg-gray-200 text-center">
+                                    <th key={mo} className="p-0.5 border w-[42px] min-w-[42px] max-w-[42px] text-[11px] font-bold bg-gray-200 text-center">
                                         {yr}/{m}
                                     </th>
                                 );
                             })}
-                            <th className="p-0.5 border min-w-[100px] text-[11px] font-bold bg-gray-200">備考 / 出荷調整状況</th>
+                            <th className="p-0.5 border min-w-[120px] text-[11px] font-bold bg-gray-200">備考 / 出荷調整状況</th>
                         </tr>
 
                         <tr className="bg-emerald-50 font-bold text-[11px] text-emerald-900 border-b-2 border-emerald-300">
                             <td className="p-0.5 border sticky left-0 bg-emerald-100 z-40 text-center no-print">-</td>
-                            <td className="p-0.5 border sticky left-[24px] bg-emerald-100 z-40 text-center no-print">-</td>
-                            <td className="p-0.5 border sticky left-[48px] bg-emerald-100 z-40 text-center">-</td>
-                            <td className="p-0.5 border sticky left-[90px] bg-emerald-100 z-40 text-center font-bold">月間合計</td>
+                            <td className="p-0.5 border sticky left-[24px] bg-emerald-100 z-40 text-center">-</td>
+                            <td className="p-0.5 border sticky left-[66px] bg-emerald-100 z-40 text-center font-bold">月間合計</td>
                             <td className="p-0.5 border text-center">-</td>
                             <td className="p-0.5 border text-center">-</td>
                             <td className="p-0.5 border text-right pr-1 font-extrabold text-emerald-800 bg-emerald-200">{totalGrandTotal.toLocaleString()}</td>
                             {displayMonths.map(mo => {
                                 const colTot = calculateColTotal(mo);
                                 return (
-                                    <td key={`tot-${mo}`} className="p-0.5 border text-right pr-0.5 font-bold text-[10px] w-[46px] min-w-[46px]">
+                                    <td key={`tot-${mo}`} className="p-0.5 border text-right pr-0.5 font-bold text-[10px] w-[42px] min-w-[42px] max-w-[42px]">
                                         {colTot > 0 ? colTot.toLocaleString() : ''}
                                     </td>
                                 );
@@ -496,26 +459,22 @@ const YoshiiPlanView = () => {
                             const currentVendorCode = matchModelDetails.vendorCode !== undefined ? matchModelDetails.vendorCode : (matchPlanInfo?.vendorCode || '');
                             const currentNotes = matchModelDetails.notes !== undefined ? matchModelDetails.notes : (matchPlanInfo?.notes || '');
 
-                            const isRowChecked = checkedModels[model] !== false;
                             const rowTot = calculateRowTotal(model);
 
                             return (
                                 <tr key={model} onDragOver={e => handleModelDragOver(e, model)} onDrop={e => handleModelDrop(e, model)} className={`hover:bg-emerald-50 border-b ${dragOverModel === model ? 'border-t-2 border-t-emerald-600 bg-emerald-100' : ''}`}>
                                     <td draggable onDragStart={e => handleModelDragStart(e, model)} className={`border text-xs sticky left-0 bg-white z-10 text-center drag-handle text-gray-400 hover:text-emerald-600 cursor-grab active:cursor-grabbing ${rowPaddingClass}`}>≡</td>
-                                    <td className={`border sticky left-[24px] bg-white z-10 text-center ${rowPaddingClass}`}>
-                                        <input type="checkbox" checked={isRowChecked} onChange={() => handleToggleSingleChecked(model)} className="w-3 h-3 text-emerald-600 rounded cursor-pointer"/>
-                                    </td>
-                                    <td className={`border text-[11px] text-center sticky left-[48px] bg-white z-10 w-[42px] min-w-[42px] ${rowPaddingClass}`}>
+                                    <td className={`border text-[11px] text-center sticky left-[24px] bg-white z-10 w-[42px] min-w-[42px] max-w-[42px] ${rowPaddingClass}`}>
                                         <LocalInput value={currentVendorCode} originalValue={(matchModelDetails.originals || {}).vendorCode} originalMeta={(matchModelDetails.originalMetas || {}).vendorCode} onChange={(v, orig) => handleModelDetailChange(model, 'vendorCode', v)} className="w-full text-[11px] text-center font-mono border-none bg-transparent h-[20px] font-normal"/>
                                     </td>
-                                    <td className={`border text-[11px] sticky left-[90px] bg-white z-10 text-left pl-1 font-normal ${rowPaddingClass}`}>{model}</td>
-                                    <td className={`border text-[11px] text-left min-w-[140px] font-normal ${rowPaddingClass}`}>
+                                    <td className={`border text-[11px] sticky left-[66px] bg-white z-10 text-left pl-1 font-normal min-w-[100px] ${rowPaddingClass}`}>{model}</td>
+                                    <td className={`border text-[11px] text-left min-w-[220px] font-normal ${rowPaddingClass}`}>
                                         <LocalInput value={currentProdName} originalValue={(matchModelDetails.originals || {}).productName} originalMeta={(matchModelDetails.originalMetas || {}).productName} onChange={(v, orig) => handleModelDetailChange(model, 'productName', v)} listId="auto_yoshii_productNames" className="w-full text-[11px] text-left px-0.5 border-none bg-transparent h-[20px] font-normal"/>
                                     </td>
-                                    <td className={`border text-[11px] text-center w-[85px] min-w-[80px] font-normal ${rowPaddingClass}`}>
+                                    <td className={`border text-[11px] text-center w-[110px] min-w-[110px] max-w-[110px] font-normal ${rowPaddingClass}`}>
                                         <LocalInput value={currentJanCode} originalValue={(matchModelDetails.originals || {}).janCode} originalMeta={(matchModelDetails.originalMetas || {}).janCode} onChange={(v, orig) => handleModelDetailChange(model, 'janCode', v)} className="w-full text-[11px] text-center font-mono border-none bg-transparent h-[20px] font-normal"/>
                                     </td>
-                                    <td className={`border text-[11px] text-right pr-0.5 bg-emerald-50 text-emerald-800 font-medium ${rowPaddingClass}`}>{rowTot > 0 ? rowTot.toLocaleString() : '0'}</td>
+                                    <td className={`border text-[11px] text-right pr-0.5 bg-emerald-50 text-emerald-800 font-medium w-[46px] min-w-[46px] max-w-[46px] ${rowPaddingClass}`}>{rowTot > 0 ? rowTot.toLocaleString() : '0'}</td>
                                     
                                     {displayMonths.map((mo, colIdx) => {
                                         const plan = getPlanData(model, mo);
@@ -523,7 +482,7 @@ const YoshiiPlanView = () => {
                                         const historyList = plan?.qtyHistory || [];
 
                                         return (
-                                            <td key={mo} className="matrix-td align-top p-0 w-[46px] min-w-[46px]">
+                                            <td key={mo} className="matrix-td align-top p-0 w-[42px] min-w-[42px] max-w-[42px]">
                                                 <LocalInput type="number" value={currentQty} originalValue={plan?.originalVal} originalMeta={plan?.originalMeta} onChange={(v, orig) => handleQuantityChange(model, mo, v, orig)} className="matrix-input text-right font-normal pr-0.5 text-[10px] h-[20px]" dataGridId={`y-matrix-plan-${rowIdx}-${colIdx}`} onGridKeyDown={handleGridNav}/>
                                                 {showHistory && historyList.length > 0 && (
                                                     <div className="relative group/hist no-print">
@@ -548,7 +507,7 @@ const YoshiiPlanView = () => {
                                         );
                                     })}
 
-                                    <td className={`border text-[11px] text-left min-w-[100px] font-normal ${rowPaddingClass}`}>
+                                    <td className={`border text-[11px] text-left min-w-[120px] font-normal ${rowPaddingClass}`}>
                                         <LocalTextArea value={currentNotes} originalValue={(matchModelDetails.originals || {}).notes} originalMeta={(matchModelDetails.originalMetas || {}).notes} onChange={(v, orig) => handleModelDetailChange(model, 'notes', v)} isCompact={!showHistory}/>
                                     </td>
                                 </tr>

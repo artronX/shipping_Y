@@ -24,7 +24,8 @@
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background-color: #f8fafc; color: #1e293b; }
         
-        .table-container { overflow-x: auto; overflow-y: auto; max-height: calc(100vh - 180px); }
+        /* テーブルコンテナ指定 */
+        .table-container { overflow-x: auto; overflow-y: auto; max-height: calc(100vh - 150px); }
         .cell-input { width: 100%; height: 100%; border: none; background: transparent; outline: none; font-size: 0.75rem; }
         .cell-input:focus { background-color: #e0e7ff; }
 
@@ -393,6 +394,10 @@
 
             const canEditCurrentView = authUser && authUser.editableViews && authUser.editableViews.includes(currentView);
 
+            // ベンダー制限処理（LDS等の制限時は他社やALLを選ばせない）
+            const isVendorRestricted = authUser && !!authUser.vendorRestriction;
+            const effectiveVendorFilter = isVendorRestricted ? authUser.vendorRestriction : selectedVendorFilter;
+
             const contextValue = {
                 authUser: {
                     ...authUser,
@@ -402,7 +407,10 @@
                 currentView, setCurrentView,
                 currentMonthStr, setCurrentMonthStr,
                 yoshiiAllocMonth, setYoshiiAllocMonth,
-                selectedVendorFilter, setSelectedVendorFilter,
+                selectedVendorFilter: effectiveVendorFilter, 
+                setSelectedVendorFilter: (val) => {
+                    if (!isVendorRestricted) setSelectedVendorFilter(val);
+                },
                 plans, containers, masterData,
                 tableContainerRef, shipScrollPosRef, drayScrollPosRef,
                 isChangeTrackingMode, handleStartTracking, handleClearTracking,
@@ -467,25 +475,26 @@
             return (
                 <AppContext.Provider value={contextValue}>
                     <div className="h-full flex flex-col">
-                        <header className="bg-indigo-900 text-white p-3 flex justify-between items-center shadow-md flex-shrink-0 no-print">
-                            <div className="flex items-center gap-4">
+                        {/* V83原本の1行目レイアウト（青背景・白枠ホームボタン・ドロップダウン・テキストリンク調ログアウト） */}
+                        <header className="bg-indigo-900 text-white px-3 py-2 flex justify-between items-center shadow-md flex-shrink-0 no-print">
+                            <div className="flex items-center gap-3">
                                 <div className="flex items-center gap-2">
-                                    <span className="bg-amber-400 text-slate-900 text-xs font-extrabold px-2 py-0.5 rounded font-mono">
+                                    <span className="border border-white/50 text-white text-xs font-bold px-3 py-1 rounded bg-indigo-800/60 hover:bg-indigo-700 cursor-pointer transition">
                                         ホーム
                                     </span>
-                                    <h1 className="text-base font-extrabold hidden md:block">
-                                        吉井電気 
-                                        <span className="ml-2 text-xs font-mono font-bold bg-indigo-950 px-2 py-0.5 rounded text-amber-300 border border-indigo-700">
+                                    <h1 className="text-base font-extrabold flex items-center gap-2">
+                                        吉井電気
+                                        <span className="text-[11px] font-mono font-bold bg-amber-400 text-slate-900 px-1.5 py-0.5 rounded">
                                             {APP_VERSION}
                                         </span>
                                     </h1>
                                 </div>
 
-                                <nav className="flex items-center gap-1 bg-indigo-950 p-1 rounded-lg border border-indigo-800 text-xs font-bold">
+                                <nav className="flex items-center gap-0.5 bg-indigo-950 p-0.5 rounded border border-indigo-800 text-xs font-bold ml-2">
                                     {authUser.allowedViews.includes('yoshii_plan') && (
                                         <button 
                                             onClick={() => setCurrentView('yoshii_plan')}
-                                            className={`px-3 py-1.5 rounded-md transition ${currentView === 'yoshii_plan' ? 'bg-emerald-600 text-white shadow' : 'text-slate-300 hover:text-white'}`}
+                                            className={`px-3 py-1.5 rounded transition ${currentView === 'yoshii_plan' ? 'bg-emerald-600 text-white font-bold shadow' : 'text-slate-300 hover:text-white'}`}
                                         >
                                             計画
                                         </button>
@@ -493,7 +502,7 @@
                                     {authUser.allowedViews.includes('yoshii_alloc') && (
                                         <button 
                                             onClick={() => setCurrentView('yoshii_alloc')}
-                                            className={`px-3 py-1.5 rounded-md transition ${currentView === 'yoshii_alloc' ? 'bg-emerald-600 text-white shadow' : 'text-slate-300 hover:text-white'}`}
+                                            className={`px-3 py-1.5 rounded transition ${currentView === 'yoshii_alloc' ? 'bg-emerald-600 text-white font-bold shadow' : 'text-slate-300 hover:text-white'}`}
                                         >
                                             割振り
                                         </button>
@@ -501,7 +510,7 @@
                                     {authUser.allowedViews.includes('yoshii_ship') && (
                                         <button 
                                             onClick={() => setCurrentView('yoshii_ship')}
-                                            className={`px-3 py-1.5 rounded-md transition ${currentView === 'yoshii_ship' ? 'bg-emerald-600 text-white shadow' : 'text-slate-300 hover:text-white'}`}
+                                            className={`px-3 py-1.5 rounded transition ${currentView === 'yoshii_ship' ? 'bg-emerald-600 text-white font-bold shadow' : 'text-slate-300 hover:text-white'}`}
                                         >
                                             出荷日程
                                         </button>
@@ -509,45 +518,50 @@
                                     {authUser.allowedViews.includes('yoshii_drayage') && (
                                         <button 
                                             onClick={() => setCurrentView('yoshii_drayage')}
-                                            className={`px-3 py-1.5 rounded-md transition ${currentView === 'yoshii_drayage' ? 'bg-emerald-600 text-white shadow' : 'text-slate-300 hover:text-white'}`}
+                                            className={`px-3 py-1.5 rounded transition ${currentView === 'yoshii_drayage' ? 'bg-emerald-600 text-white font-bold shadow' : 'text-slate-300 hover:text-white'}`}
                                         >
                                             ドレージ
                                         </button>
                                     )}
                                 </nav>
 
+                                {/* ベンダー制御用仕入先ドロップダウン（LDS制限時はLDS固定） */}
                                 <div className="ml-2">
                                     <select 
-                                        value={selectedVendorFilter} 
+                                        value={effectiveVendorFilter} 
                                         onChange={e => setSelectedVendorFilter(e.target.value)}
-                                        className="bg-white text-gray-900 text-xs font-bold border border-gray-300 rounded px-2.5 py-1 outline-none shadow-sm cursor-pointer"
+                                        disabled={isVendorRestricted}
+                                        className={`text-xs font-bold border border-gray-300 rounded px-2 py-1 outline-none shadow-sm ${isVendorRestricted ? 'bg-gray-200 text-gray-700 cursor-not-allowed' : 'bg-white text-gray-900 cursor-pointer'}`}
                                     >
-                                        <option value="ALL">全体 (全表示)</option>
-                                        {Array.from(new Set(['JP', 'GM', 'LDS', 'SLT', 'YO', ...(masterData.yoshii?.vendors || [])])).map(v => (
-                                            <option key={v} value={v}>{v}</option>
-                                        ))}
+                                        {!isVendorRestricted && <option value="ALL">全体 (全表示)</option>}
+                                        {Array.from(new Set(['JP', 'GM', 'LDS', 'SLT', 'YO', ...(masterData.yoshii?.vendors || [])]))
+                                            .filter(v => !isVendorRestricted || v === authUser.vendorRestriction)
+                                            .map(v => (
+                                                <option key={v} value={v}>{v}</option>
+                                            ))
+                                        }
                                     </select>
                                 </div>
                             </div>
 
-                            <div className="flex items-center gap-3 text-xs font-bold">
+                            <div className="flex items-center gap-3 text-xs">
                                 {authUser.canViewLogs && (
                                     <button 
                                         onClick={() => setIsLogModalOpen(true)}
                                         className="text-slate-300 hover:text-amber-300 p-1 text-sm font-bold transition" 
-                                        title="システム管理・操作履歴モーダルを開く"
+                                        title="システム管理・操作履歴"
                                     >
                                         ⚙
                                     </button>
                                 )}
 
-                                <div className="bg-indigo-950 px-2.5 py-1 rounded border border-indigo-800 text-slate-200">
-                                    作業者: <span className="text-white font-extrabold">{operatorName}</span>
+                                <div className="text-slate-200 text-xs">
+                                    作業者: <span className="bg-white text-slate-900 font-bold px-2 py-0.5 rounded border border-slate-300 ml-1">{operatorName}</span>
                                 </div>
 
                                 <button 
                                     onClick={handleLogout}
-                                    className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded font-bold shadow transition"
+                                    className="text-white hover:underline text-xs font-bold ml-1"
                                 >
                                     ログアウト
                                 </button>
