@@ -53,18 +53,25 @@
 
     <script type="text/babel">
         // =========================================================
-        // 【最重要】システムバージョン定義（★WebVer. 99へ更新）
+        // 【最重要】システムバージョン定義（★WebVer. 101へ更新）
         // =========================================================
-        const APP_VERSION = 'WebVer. 99';
+        const APP_VERSION = 'WebVer. 101';
 
         // AppContext（全体共有ステート）
         const AppContext = React.createContext(null);
 
-        // グローバル設定（window.FIREBASE_CONFIG）またはフォールバック設定を取得
-        const activeConfig = window.FIREBASE_CONFIG || (typeof firebaseConfig !== 'undefined' ? firebaseConfig : null);
+        // 本番用 Firebase 接続設定
+        const firebaseConfig = window.FIREBASE_CONFIG || {
+            apiKey: "AIzaSyD-YOUR-REAL-KEY-HERE", // グローバル設定があれば自動取得
+            authDomain: "shipping-management.firebaseapp.com",
+            projectId: "shipping-management",
+            storageBucket: "shipping-management.appspot.com",
+            messagingSenderId: "1234567890",
+            appId: "1:1234567890:web:abc123def456"
+        };
 
-        if (!firebase.apps.length && activeConfig) {
-            firebase.initializeApp(activeConfig);
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
         }
         const db = firebase.firestore();
 
