@@ -42,7 +42,7 @@ const YoshiiPlanView = () => {
 
             const monthQtys = displayMonths.map(mo => {
                 const qty = getPlanData(m, mo)?.quantity;
-                return qty !== undefined && qty !== '' ? Number(qty) : 0;
+                return qty !== undefined && qty !== null && qty !== '' ? Number(qty) : '';
             });
 
             return [currentVendorCode, m, currentProdName, currentJanCode, rowTot, ...monthQtys, currentNotes];
@@ -350,7 +350,7 @@ const YoshiiPlanView = () => {
                 </div>
             </div>
 
-            {/* 2行目サブツールバー：「変更履歴を表示」ボタンを一段下に正しく配置 */}
+            {/* 2行目サブツールバー：変更履歴チェックボックス */}
             <div className="flex justify-between items-center mb-2 no-print gap-2 flex-shrink-0 text-xs">
                 <div className="flex items-center gap-2 font-bold">
                     <div className="flex bg-gray-100 p-0.5 rounded border gap-1">
@@ -413,7 +413,7 @@ const YoshiiPlanView = () => {
                                 </div>
                             </th>
 
-                            {/* 復元：型式ドロップダウンリスト付きヘッダー */}
+                            {/* 型式ドロップダウンリスト付きヘッダー */}
                             <th className="p-0.5 border min-w-[85px] sticky left-[66px] bg-gray-200 z-40 text-[11px] font-bold">
                                 <div className="flex items-center justify-center gap-1 px-1">
                                     <select 
@@ -452,7 +452,7 @@ const YoshiiPlanView = () => {
                             <td className="p-0.5 border sticky left-[66px] bg-emerald-100 z-40 text-center font-bold">月間合計</td>
                             <td className="p-0.5 border text-center">-</td>
                             <td className="p-0.5 border text-center">-</td>
-                            <td className="p-0.5 border text-right pr-1 font-extrabold text-emerald-800 bg-emerald-200 text-[11px]">{totalGrandTotal.toLocaleString()}</td>
+                            <td className="p-0.5 border text-right pr-1 font-extrabold text-emerald-800 bg-emerald-200 text-[11px]">{totalGrandTotal > 0 ? totalGrandTotal.toLocaleString() : '0'}</td>
                             {displayMonths.map(mo => {
                                 const colTot = calculateColTotal(mo);
                                 return (
@@ -491,22 +491,23 @@ const YoshiiPlanView = () => {
                                         <LocalInput value={currentJanCode} originalValue={(matchModelDetails.originals || {}).janCode} originalMeta={(matchModelDetails.originalMetas || {}).janCode} onChange={(v, orig) => handleModelDetailChange(model, 'janCode', v)} className="w-full text-[11px] text-center font-mono border-none bg-transparent h-[20px] font-normal"/>
                                     </td>
                                     
-                                    {/* 合計セル：太字（font-bold）を解除して右側数値と桁位置を統一（font-normal） */}
-                                    <td className={`border text-[11px] text-right pr-0.5 bg-emerald-50 text-emerald-800 font-normal w-[60px] min-w-[60px] max-w-[60px] ${rowPaddingClass}`}>
+                                    {/* データ行合計：太字（font-bold）を完全に解除（font-normal）し右側数値と桁位置を揃える */}
+                                    <td className={`border text-[11px] text-right pr-0.5 bg-emerald-50 text-emerald-900 font-normal w-[60px] min-w-[60px] max-w-[60px] ${rowPaddingClass}`}>
                                         {rowTot > 0 ? rowTot.toLocaleString() : '0'}
                                     </td>
                                     
-                                    {/* 納入月データセル（修復版: 数値11px・桁揃えfont-normal） */}
+                                    {/* 納入月データセル（数値11px・表示修復版） */}
                                     {displayMonths.map((mo, colIdx) => {
                                         const plan = getPlanData(model, mo);
-                                        const currentQty = plan?.quantity !== undefined && plan?.quantity !== null ? plan.quantity : '';
+                                        const rawQty = plan?.quantity;
+                                        const displayVal = (rawQty !== undefined && rawQty !== null && rawQty !== 0) ? String(rawQty) : '';
                                         const historyList = plan?.qtyHistory || [];
 
                                         return (
                                             <td key={mo} className="matrix-td align-top p-0 w-[48px] min-w-[48px] max-w-[48px]">
                                                 <LocalInput 
                                                     type="number" 
-                                                    value={currentQty} 
+                                                    value={displayVal} 
                                                     originalValue={plan?.originalVal} 
                                                     originalMeta={plan?.originalMeta} 
                                                     onChange={(v, orig) => handleQuantityChange(model, mo, v, orig)} 
@@ -581,7 +582,7 @@ const YoshiiPlanView = () => {
     );
 };
 
-// 【コンテナ割振り画面ビュー - 全セル・データ修復版】
+// 【コンテナ割振り画面ビュー - 全データ完全修復版】
 const YoshiiAllocationView = () => {
     const ctx = React.useContext(AppContext);
     const [exportModal, setExportModal] = React.useState({ isOpen: false, type: 'excel' });
@@ -688,7 +689,7 @@ const YoshiiAllocationView = () => {
         if (!allocationsObj) return '';
         const normTarget = normalizeModelCode(masterModel);
         for (const [key, qty] of Object.entries(allocationsObj)) {
-            if (normalizeModelCode(key) === normTarget && qty > 0) return qty;
+            if (normalizeModelCode(key) === normTarget && qty !== undefined && qty !== null && qty > 0) return String(qty);
         }
         return '';
     };
