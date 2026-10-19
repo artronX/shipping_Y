@@ -53,27 +53,17 @@
 
     <script type="text/babel">
         // =========================================================
-        // システムバージョン定義 (WebVer. 98)
+        // 【最重要】システムバージョン定義（★WebVer. 99へ更新）
         // =========================================================
-        const APP_VERSION = 'WebVer. 98';
+        const APP_VERSION = 'WebVer. 99';
 
         // AppContext（全体共有ステート）
         const AppContext = React.createContext(null);
 
-        // 原本（V95）より抽出した本番用 Firebase 設定
-        const firebaseConfig = {
-            apiKey: "AIzaSyD-YOUR-REAL-KEY-HERE",
-            authDomain: "shipping-management.firebaseapp.com",
-            projectId: "shipping-management",
-            storageBucket: "shipping-management.appspot.com",
-            messagingSenderId: "1234567890",
-            appId: "1:1234567890:web:abc123def456"
-        };
+        // グローバル設定（window.FIREBASE_CONFIG）またはフォールバック設定を取得
+        const activeConfig = window.FIREBASE_CONFIG || (typeof firebaseConfig !== 'undefined' ? firebaseConfig : null);
 
-        // グローバル設定オブジェクトがあれば上書き適用
-        const activeConfig = window.FIREBASE_CONFIG || firebaseConfig;
-
-        if (!firebase.apps.length) {
+        if (!firebase.apps.length && activeConfig) {
             firebase.initializeApp(activeConfig);
         }
         const db = firebase.firestore();
@@ -83,7 +73,7 @@
         const parseRefDateToYMD = (dStr) => dStr && dStr.includes('-') ? dStr : null;
         const formatYYMM = (ym) => ym ? ym.replace('-', '').substring(2) : '';
 
-        // 権限一覧表に基づく厳格な判定テーブル
+        // 【権限一覧表に基づく厳格な判定テーブル】
         const AUTH_TABLE = [
             {
                 passwords: ['Zall@0617'],
