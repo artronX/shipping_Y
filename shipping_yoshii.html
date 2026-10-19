@@ -24,12 +24,10 @@
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background-color: #f8fafc; color: #1e293b; }
         
-        /* スクロールバー・テーブル基本スタイル */
         .table-container { overflow-x: auto; overflow-y: auto; max-height: calc(100vh - 180px); }
         .cell-input { width: 100%; height: 100%; border: none; background: transparent; outline: none; font-size: 0.75rem; }
         .cell-input:focus { background-color: #e0e7ff; }
 
-        /* 変更点強調表示用 */
         .is-changed-cell { background-color: #fef08a !important; font-weight: bold; }
         .has-original-tooltip { position: relative; }
         .has-original-tooltip:hover::after {
@@ -40,7 +38,6 @@
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         }
 
-        /* 印刷スタイル定義 */
         @media print {
             .no-print { display: none !important; }
             body { background: white; color: black; font-size: 10pt; }
@@ -54,14 +51,12 @@
 
     <script type="text/babel">
         // =========================================================
-        // 【最重要】システムバージョン定義（★WebVer. 105へ更新）
+        // 【最重要】システムバージョン定義（★WebVer. 106へ更新）
         // =========================================================
-        const APP_VERSION = 'WebVer. 105';
+        const APP_VERSION = 'WebVer. 106';
 
-        // AppContext（全体共有ステート）
         const AppContext = React.createContext(null);
 
-        // V83原本より抽出した本番用 Firebase 接続設定
         const firebaseConfig = {
             apiKey: "AIzaSyDcnf0S5M0OsbCOR9yO7OC4eMKwrXmTbFc",
             authDomain: "scedulex.firebaseapp.com",
@@ -75,12 +70,10 @@
         const db = firebase.firestore();
         const auth = firebase.auth();
 
-        // 共通コード正規化ユーティリティ
         const normalizeModelCode = (m) => m ? String(m).replace(/[\s\-\_]/g, '').toUpperCase() : '';
         const parseRefDateToYMD = (dStr) => dStr && dStr.includes('-') ? dStr : null;
         const formatYYMM = (ym) => ym ? ym.replace('-', '').substring(2) : '';
 
-        // 【権限一覧表に基づく厳格な判定テーブル】
         const AUTH_TABLE = [
             {
                 passwords: ['Zall@0617'],
@@ -147,7 +140,6 @@
             }
         ];
 
-        // メインアプリケーションコンポーネント
         const App = () => {
             const [authUser, setAuthUser] = React.useState(null);
             const [loginPassword, setLoginPassword] = React.useState('');
@@ -244,7 +236,6 @@
                 setLoginPassword('');
             };
 
-            // Firebase 匿名認証（signInAnonymously）を実行した後に Firestore リアルタイム取得（onSnapshot）を開始
             React.useEffect(() => {
                 if (!authUser) return;
 
@@ -258,29 +249,27 @@
                     unsubPlans = db.collection('shipments').onSnapshot(snapshot => {
                         const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                         setPlans(list);
-                    }, err => console.error("Plans snapshot error:", err));
+                    }, err => console.error("Plans error:", err));
 
                     unsubContainers = db.collection('containers').onSnapshot(snapshot => {
                         const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                         setContainers(list);
-                    }, err => console.error("Containers snapshot error:", err));
+                    }, err => console.error("Containers error:", err));
 
                     unsubMaster = db.collection('shipping_settings').doc('master_data_v5').onSnapshot(doc => {
                         if (doc.exists) setMasterData(doc.data());
-                    }, err => console.error("Master snapshot error:", err));
+                    }, err => console.error("Master error:", err));
 
                     unsubLogs = db.collection('operation_logs').orderBy('timestamp', 'desc').limit(100).onSnapshot(snapshot => {
                         const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                         setLogs(list);
-                    }, err => console.error("Logs snapshot error:", err));
+                    }, err => console.error("Logs error:", err));
 
                     unsubSessions = db.collection('user_sessions').orderBy('createdAt', 'desc').limit(50).onSnapshot(snapshot => {
                         const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                         setSessions(list);
-                    }, err => console.error("Sessions snapshot error:", err));
-                }).catch(err => {
-                    console.error("Firebase Auth Error:", err);
-                });
+                    }, err => console.error("Sessions error:", err));
+                }).catch(err => console.error("Auth error:", err));
 
                 return () => {
                     unsubPlans(); unsubContainers(); unsubMaster(); unsubLogs(); unsubSessions();
@@ -526,6 +515,20 @@
                                         </button>
                                     )}
                                 </nav>
+
+                                <!-- ★V95通り復元: 取引先コード（仕入先）選択ドロップダウン -->
+                                <div className="ml-2">
+                                    <select 
+                                        value={selectedVendorFilter} 
+                                        onChange={e => setSelectedVendorFilter(e.target.value)}
+                                        className="bg-white text-gray-900 text-xs font-bold border border-gray-300 rounded px-2.5 py-1 outline-none shadow-sm cursor-pointer"
+                                    >
+                                        <option value="ALL">全体 (全表示)</option>
+                                        {Array.from(new Set(['JP', 'GM', 'LDS', 'SLT', 'YO', ...(masterData.yoshii?.vendors || [])])).map(v => (
+                                            <option key={v} value={v}>{v}</option>
+                                        ))}
+                                    </select>
+                                </div>
                             </div>
 
                             <div className="flex items-center gap-3 text-xs font-bold">
