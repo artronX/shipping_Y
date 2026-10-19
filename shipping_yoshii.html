@@ -16,8 +16,9 @@
     <!-- ExcelJS (Excel出力用 CDN) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
 
-    <!-- Firebase 8.x (Compat SDK) -->
+    <!-- Firebase 8.x Compat SDK (Auth & Firestore) -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 
     <style>
@@ -53,9 +54,9 @@
 
     <script type="text/babel">
         // =========================================================
-        // 【最重要】システムバージョン定義（★WebVer. 102へ更新）
+        // 【最重要】システムバージョン定義（★WebVer. 103へ更新）
         // =========================================================
-        const APP_VERSION = 'WebVer. 102';
+        const APP_VERSION = 'WebVer. 103';
 
         // AppContext（全体共有ステート）
         const AppContext = React.createContext(null);
@@ -72,6 +73,7 @@
             firebase.initializeApp(firebaseConfig);
         }
         const db = firebase.firestore();
+        const auth = firebase.auth();
 
         // 共通コード正規化ユーティリティ
         const normalizeModelCode = (m) => m ? String(m).replace(/[\s\-\_]/g, '').toUpperCase() : '';
@@ -242,31 +244,42 @@
                 setLoginPassword('');
             };
 
+            // Firebase 匿名認証を行った後に Firestore リスナーを開始
             React.useEffect(() => {
                 if (!authUser) return;
 
-                const unsubPlans = db.collection('shipments').onSnapshot(snapshot => {
-                    const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    setPlans(list);
-                });
+                let unsubPlans = () => {};
+                let unsubContainers = () => {};
+                let unsubMaster = () => {};
+                let unsubLogs = () => {};
+                let unsubSessions = () => {};
 
-                const unsubContainers = db.collection('containers').onSnapshot(snapshot => {
-                    const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    setContainers(list);
-                });
+                auth.signInAnonymously().then(() => {
+                    unsubPlans = db.collection('shipments').onSnapshot(snapshot => {
+                        const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                        setPlans(list);
+                    }, err => console.error("Plans snapshot error:", err));
 
-                const unsubMaster = db.collection('shipping_settings').doc('master_data_v5').onSnapshot(doc => {
-                    if (doc.exists) setMasterData(doc.data());
-                });
+                    unsubContainers = db.collection('containers').onSnapshot(snapshot => {
+                        const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                        setContainers(list);
+                    }, err => console.error("Containers snapshot error:", err));
 
-                const unsubLogs = db.collection('operation_logs').orderBy('timestamp', 'desc').limit(100).onSnapshot(snapshot => {
-                    const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    setLogs(list);
-                });
+                    unsubMaster = db.collection('shipping_settings').doc('master_data_v5').onSnapshot(doc => {
+                        if (doc.exists) setMasterData(doc.data());
+                    }, err => console.error("Master snapshot error:", err));
 
-                const unsubSessions = db.collection('user_sessions').orderBy('createdAt', 'desc').limit(50).onSnapshot(snapshot => {
-                    const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    setSessions(list);
+                    unsubLogs = db.collection('operation_logs').orderBy('timestamp', 'desc').limit(100).onSnapshot(snapshot => {
+                        const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                        setLogs(list);
+                    }, err => console.error("Logs snapshot error:", err));
+
+                    unsubSessions = db.collection('user_sessions').orderBy('createdAt', 'desc').limit(50).onSnapshot(snapshot => {
+                        const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                        setSessions(list);
+                    }, err => console.error("Sessions snapshot error:", err));
+                }).catch(err => {
+                    console.error("Firebase Auth Error:", err);
                 });
 
                 return () => {
