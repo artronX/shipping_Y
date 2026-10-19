@@ -52,9 +52,9 @@
 
     <script type="text/babel">
         // =========================================================
-        // システムバージョン定義 (WebVer. 107)
+        // システムバージョン定義 (WebVer. 108)
         // =========================================================
-        const APP_VERSION = 'WebVer. 107';
+        const APP_VERSION = 'WebVer. 108';
 
         const AppContext = React.createContext(null);
 
@@ -394,7 +394,7 @@
 
             const canEditCurrentView = authUser && authUser.editableViews && authUser.editableViews.includes(currentView);
 
-            // ベンダー制限処理（LDS等の制限時は他社やALLを選ばせない）
+            // ベンダー制限処理（LDS制限時はLDS固定）
             const isVendorRestricted = authUser && !!authUser.vendorRestriction;
             const effectiveVendorFilter = isVendorRestricted ? authUser.vendorRestriction : selectedVendorFilter;
 
@@ -475,22 +475,24 @@
             return (
                 <AppContext.Provider value={contextValue}>
                     <div className="h-full flex flex-col">
-                        {/* V83原本の1行目レイアウト（青背景・白枠ホームボタン・ドロップダウン・テキストリンク調ログアウト） */}
+                        {/* ヘッダーバー：中央要素（ナビボタン＋ドロップダウン）を完全中央配置（flex-1 justify-center）に修正 */}
                         <header className="bg-indigo-900 text-white px-3 py-2 flex justify-between items-center shadow-md flex-shrink-0 no-print">
-                            <div className="flex items-center gap-3">
-                                <div className="flex items-center gap-2">
-                                    <span className="border border-white/50 text-white text-xs font-bold px-3 py-1 rounded bg-indigo-800/60 hover:bg-indigo-700 cursor-pointer transition">
-                                        ホーム
+                            {/* 左側：ロゴ・ホームボタン */}
+                            <div className="flex items-center gap-2 min-w-[240px]">
+                                <span className="border border-white/50 text-white text-xs font-bold px-3 py-1 rounded bg-indigo-800/60 hover:bg-indigo-700 cursor-pointer transition">
+                                    ホーム
+                                </span>
+                                <h1 className="text-base font-extrabold flex items-center gap-2">
+                                    吉井電気
+                                    <span className="text-[11px] font-mono font-bold bg-amber-400 text-slate-900 px-1.5 py-0.5 rounded">
+                                        {APP_VERSION}
                                     </span>
-                                    <h1 className="text-base font-extrabold flex items-center gap-2">
-                                        吉井電気
-                                        <span className="text-[11px] font-mono font-bold bg-amber-400 text-slate-900 px-1.5 py-0.5 rounded">
-                                            {APP_VERSION}
-                                        </span>
-                                    </h1>
-                                </div>
+                                </h1>
+                            </div>
 
-                                <nav className="flex items-center gap-0.5 bg-indigo-950 p-0.5 rounded border border-indigo-800 text-xs font-bold ml-2">
+                            {/* 中央：画面切替ナビボタン ＋ 仕入先ドロップダウン（画面完全中央配置） */}
+                            <div className="flex-1 flex justify-center items-center gap-3">
+                                <nav className="flex items-center gap-0.5 bg-indigo-950 p-0.5 rounded border border-indigo-800 text-xs font-bold">
                                     {authUser.allowedViews.includes('yoshii_plan') && (
                                         <button 
                                             onClick={() => setCurrentView('yoshii_plan')}
@@ -525,8 +527,8 @@
                                     )}
                                 </nav>
 
-                                {/* ベンダー制御用仕入先ドロップダウン（LDS制限時はLDS固定） */}
-                                <div className="ml-2">
+                                {/* ベンダー制御用仕入先ドロップダウン */}
+                                <div>
                                     <select 
                                         value={effectiveVendorFilter} 
                                         onChange={e => setSelectedVendorFilter(e.target.value)}
@@ -544,7 +546,8 @@
                                 </div>
                             </div>
 
-                            <div className="flex items-center gap-3 text-xs">
+                            {/* 右側：設定・作業者名・ログアウト */}
+                            <div className="flex items-center justify-end gap-3 text-xs min-w-[240px]">
                                 {authUser.canViewLogs && (
                                     <button 
                                         onClick={() => setIsLogModalOpen(true)}
