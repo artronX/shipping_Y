@@ -58,6 +58,7 @@ const YoshiiPlanView = () => {
     };
 
     const [categoryFilter, setCategoryFilter] = React.useState('全体');
+    const [selectedModelFilter, setSelectedModelFilter] = React.useState('ALL');
     const [showHistory, setShowHistory] = React.useState(false);
 
     const [rangeMode, setRangeMode] = React.useState('year');
@@ -124,6 +125,12 @@ const YoshiiPlanView = () => {
             const vCode = matchModelDetails.vendorCode !== undefined ? matchModelDetails.vendorCode : (matchPlanInfo?.vendorCode || '');
             return vCode === ctx.selectedVendorFilter;
         });
+    }
+
+    const selectableModelsList = [...allModels];
+
+    if (selectedModelFilter !== 'ALL') {
+        allModels = allModels.filter(m => m === selectedModelFilter);
     }
 
     const visibleModels = allModels;
@@ -328,11 +335,6 @@ const YoshiiPlanView = () => {
                 </div>
 
                 <div className="flex items-center gap-2 text-xs font-bold">
-                    <label className="flex items-center gap-1 text-gray-700 cursor-pointer bg-gray-100 px-2 py-1 rounded border hover:bg-gray-200 transition">
-                        <input type="checkbox" checked={showHistory} onChange={e => setShowHistory(e.target.checked)} className="w-3.5 h-3.5 text-emerald-600 rounded"/>
-                        <span>変更履歴を表示</span>
-                    </label>
-
                     <button onClick={() => setExportModal({ isOpen: true, type: 'excel' })} className="px-2 py-1 text-xs font-bold rounded bg-emerald-700 hover:bg-emerald-800 text-white shadow transition flex items-center gap-1">
                         📊 Excel出力
                     </button>
@@ -348,6 +350,7 @@ const YoshiiPlanView = () => {
                 </div>
             </div>
 
+            {/* 2行目サブツールバー：「変更履歴を表示」ボタンを一段下に正しく配置 */}
             <div className="flex justify-between items-center mb-2 no-print gap-2 flex-shrink-0 text-xs">
                 <div className="flex items-center gap-2 font-bold">
                     <div className="flex bg-gray-100 p-0.5 rounded border gap-1">
@@ -387,47 +390,60 @@ const YoshiiPlanView = () => {
                         ✏ 型式編集
                     </button>
                 </div>
+
+                <div className="flex items-center gap-2 font-bold">
+                    <label className="flex items-center gap-1 text-gray-700 cursor-pointer bg-gray-100 px-2 py-1 rounded border hover:bg-gray-200 transition">
+                        <input type="checkbox" checked={showHistory} onChange={e => setShowHistory(e.target.checked)} className="w-3.5 h-3.5 text-emerald-600 rounded"/>
+                        <span>変更履歴を表示</span>
+                    </label>
+                </div>
             </div>
 
-            {/* テーブル本体：「表示」列削除・型式ドロップダウン復元・納入月固定幅・品名JAN文字切れ防止 */}
+            {/* テーブル本体 */}
             <div className="table-container flex-grow border rounded shadow-inner overflow-x-auto overflow-y-auto" ref={ctx.tableContainerRef}>
                 <table className="w-full text-center border-collapse text-[11px]">
                     <thead className="sticky top-0 z-30 bg-gray-200 font-bold">
                         <tr>
                             <th className="p-0.5 border w-6 min-w-[24px] max-w-[24px] sticky left-0 bg-gray-200 z-40 text-[10px] no-print">順</th>
                             <th className="p-0.5 border w-[42px] min-w-[42px] max-w-[42px] sticky left-[24px] bg-gray-200 z-40 text-[10px] text-center align-middle">
-                                <div className="relative flex items-center justify-center w-full h-full">
-                                    <div className="flex items-center justify-center gap-0.5 w-full">
-                                        <span className="font-bold text-gray-800 truncate">
-                                            {ctx.selectedVendorFilter === 'ALL' ? '仕入先' : ctx.selectedVendorFilter}
-                                        </span>
-                                    </div>
+                                <div className="flex items-center justify-center w-full h-full">
+                                    <span className="font-bold text-gray-800 truncate">
+                                        {ctx.selectedVendorFilter === 'ALL' ? '仕入先' : ctx.selectedVendorFilter}
+                                    </span>
                                 </div>
                             </th>
 
-                            {/* 復元：型式ドロップダウンフィルタ付きヘッダー */}
-                            <th className="p-0.5 border min-w-[100px] sticky left-[66px] bg-gray-200 z-40 text-[11px] font-bold">
-                                <div className="flex items-center justify-center gap-1">
-                                    <span>型式</span>
+                            {/* 復元：型式ドロップダウンリスト付きヘッダー */}
+                            <th className="p-0.5 border min-w-[85px] sticky left-[66px] bg-gray-200 z-40 text-[11px] font-bold">
+                                <div className="flex items-center justify-center gap-1 px-1">
+                                    <select 
+                                        value={selectedModelFilter} 
+                                        onChange={e => setSelectedModelFilter(e.target.value)}
+                                        className="font-bold text-[11px] bg-white border border-gray-400 rounded px-1 py-0.5 outline-none shadow-sm cursor-pointer hover:border-emerald-600 max-w-[110px]"
+                                    >
+                                        <option value="ALL">型式 (全表示)</option>
+                                        {selectableModelsList.map(m => (
+                                            <option key={m} value={m}>{m}</option>
+                                        ))}
+                                    </select>
                                 </div>
                             </th>
 
-                            {/* 文字切れ防止の十分な幅設定 */}
-                            <th className="p-0.5 border min-w-[220px] text-[11px] font-bold">品名</th>
-                            <th className="p-0.5 border w-[110px] min-w-[110px] max-w-[110px] text-[11px] font-bold">JANコード</th>
-                            <th className="p-0.5 border w-[46px] min-w-[46px] max-w-[46px] bg-emerald-100 text-[11px] font-bold text-emerald-900">合計</th>
+                            <th className="p-0.5 border min-w-[170px] text-[11px] font-bold">品名</th>
+                            <th className="p-0.5 border w-[100px] min-w-[100px] max-w-[100px] text-[11px] font-bold">JANコード</th>
+                            <th className="p-0.5 border w-[60px] min-w-[60px] max-w-[60px] bg-emerald-100 text-[11px] font-bold text-emerald-900">合計</th>
 
-                            {/* 納入月の完全固定幅指定 (w-[42px] min-w-[42px] max-w-[42px]) */}
+                            {/* 納入月の固定幅指定 (w-[48px] min-w-[48px] max-w-[48px]) */}
                             {displayMonths.map(mo => {
                                 const yr = mo.split('-')[0].slice(-2);
                                 const m = mo.split('-')[1];
                                 return (
-                                    <th key={mo} className="p-0.5 border w-[42px] min-w-[42px] max-w-[42px] text-[11px] font-bold bg-gray-200 text-center">
+                                    <th key={mo} className="p-0.5 border w-[48px] min-w-[48px] max-w-[48px] text-[11px] font-bold bg-gray-200 text-center">
                                         {yr}/{m}
                                     </th>
                                 );
                             })}
-                            <th className="p-0.5 border min-w-[120px] text-[11px] font-bold bg-gray-200">備考 / 出荷調整状況</th>
+                            <th className="p-0.5 border min-w-[60px] text-[11px] font-bold bg-gray-200">備考 / 出荷調整状況</th>
                         </tr>
 
                         <tr className="bg-emerald-50 font-bold text-[11px] text-emerald-900 border-b-2 border-emerald-300">
@@ -436,11 +452,11 @@ const YoshiiPlanView = () => {
                             <td className="p-0.5 border sticky left-[66px] bg-emerald-100 z-40 text-center font-bold">月間合計</td>
                             <td className="p-0.5 border text-center">-</td>
                             <td className="p-0.5 border text-center">-</td>
-                            <td className="p-0.5 border text-right pr-1 font-extrabold text-emerald-800 bg-emerald-200">{totalGrandTotal.toLocaleString()}</td>
+                            <td className="p-0.5 border text-right pr-1 font-extrabold text-emerald-800 bg-emerald-200 text-[11px]">{totalGrandTotal.toLocaleString()}</td>
                             {displayMonths.map(mo => {
                                 const colTot = calculateColTotal(mo);
                                 return (
-                                    <td key={`tot-${mo}`} className="p-0.5 border text-right pr-0.5 font-bold text-[10px] w-[42px] min-w-[42px] max-w-[42px]">
+                                    <td key={`tot-${mo}`} className="p-0.5 border text-right pr-0.5 font-bold text-[11px] w-[48px] min-w-[48px] max-w-[48px]">
                                         {colTot > 0 ? colTot.toLocaleString() : ''}
                                     </td>
                                 );
@@ -467,23 +483,37 @@ const YoshiiPlanView = () => {
                                     <td className={`border text-[11px] text-center sticky left-[24px] bg-white z-10 w-[42px] min-w-[42px] max-w-[42px] ${rowPaddingClass}`}>
                                         <LocalInput value={currentVendorCode} originalValue={(matchModelDetails.originals || {}).vendorCode} originalMeta={(matchModelDetails.originalMetas || {}).vendorCode} onChange={(v, orig) => handleModelDetailChange(model, 'vendorCode', v)} className="w-full text-[11px] text-center font-mono border-none bg-transparent h-[20px] font-normal"/>
                                     </td>
-                                    <td className={`border text-[11px] sticky left-[66px] bg-white z-10 text-left pl-1 font-normal min-w-[100px] ${rowPaddingClass}`}>{model}</td>
-                                    <td className={`border text-[11px] text-left min-w-[220px] font-normal ${rowPaddingClass}`}>
+                                    <td className={`border text-[11px] sticky left-[66px] bg-white z-10 text-left pl-1 font-normal min-w-[85px] ${rowPaddingClass}`}>{model}</td>
+                                    <td className={`border text-[11px] text-left min-w-[170px] font-normal ${rowPaddingClass}`}>
                                         <LocalInput value={currentProdName} originalValue={(matchModelDetails.originals || {}).productName} originalMeta={(matchModelDetails.originalMetas || {}).productName} onChange={(v, orig) => handleModelDetailChange(model, 'productName', v)} listId="auto_yoshii_productNames" className="w-full text-[11px] text-left px-0.5 border-none bg-transparent h-[20px] font-normal"/>
                                     </td>
-                                    <td className={`border text-[11px] text-center w-[110px] min-w-[110px] max-w-[110px] font-normal ${rowPaddingClass}`}>
+                                    <td className={`border text-[11px] text-center w-[100px] min-w-[100px] max-w-[100px] font-normal ${rowPaddingClass}`}>
                                         <LocalInput value={currentJanCode} originalValue={(matchModelDetails.originals || {}).janCode} originalMeta={(matchModelDetails.originalMetas || {}).janCode} onChange={(v, orig) => handleModelDetailChange(model, 'janCode', v)} className="w-full text-[11px] text-center font-mono border-none bg-transparent h-[20px] font-normal"/>
                                     </td>
-                                    <td className={`border text-[11px] text-right pr-0.5 bg-emerald-50 text-emerald-800 font-medium w-[46px] min-w-[46px] max-w-[46px] ${rowPaddingClass}`}>{rowTot > 0 ? rowTot.toLocaleString() : '0'}</td>
                                     
+                                    {/* 合計セル：太字（font-bold）を解除して右側数値と桁位置を統一（font-normal） */}
+                                    <td className={`border text-[11px] text-right pr-0.5 bg-emerald-50 text-emerald-800 font-normal w-[60px] min-w-[60px] max-w-[60px] ${rowPaddingClass}`}>
+                                        {rowTot > 0 ? rowTot.toLocaleString() : '0'}
+                                    </td>
+                                    
+                                    {/* 納入月データセル（修復版: 数値11px・桁揃えfont-normal） */}
                                     {displayMonths.map((mo, colIdx) => {
                                         const plan = getPlanData(model, mo);
-                                        const currentQty = plan?.quantity || '';
+                                        const currentQty = plan?.quantity !== undefined && plan?.quantity !== null ? plan.quantity : '';
                                         const historyList = plan?.qtyHistory || [];
 
                                         return (
-                                            <td key={mo} className="matrix-td align-top p-0 w-[42px] min-w-[42px] max-w-[42px]">
-                                                <LocalInput type="number" value={currentQty} originalValue={plan?.originalVal} originalMeta={plan?.originalMeta} onChange={(v, orig) => handleQuantityChange(model, mo, v, orig)} className="matrix-input text-right font-normal pr-0.5 text-[10px] h-[20px]" dataGridId={`y-matrix-plan-${rowIdx}-${colIdx}`} onGridKeyDown={handleGridNav}/>
+                                            <td key={mo} className="matrix-td align-top p-0 w-[48px] min-w-[48px] max-w-[48px]">
+                                                <LocalInput 
+                                                    type="number" 
+                                                    value={currentQty} 
+                                                    originalValue={plan?.originalVal} 
+                                                    originalMeta={plan?.originalMeta} 
+                                                    onChange={(v, orig) => handleQuantityChange(model, mo, v, orig)} 
+                                                    className="matrix-input text-right font-normal pr-0.5 text-[11px] h-[20px]" 
+                                                    dataGridId={`y-matrix-plan-${rowIdx}-${colIdx}`} 
+                                                    onGridKeyDown={handleGridNav}
+                                                />
                                                 {showHistory && historyList.length > 0 && (
                                                     <div className="relative group/hist no-print">
                                                         <span className="absolute -top-4 right-0.5 text-[8px] bg-amber-100 text-amber-800 border border-amber-300 px-0.5 rounded cursor-pointer font-bold z-10 shadow-sm">📜{historyList.length}</span>
@@ -507,7 +537,7 @@ const YoshiiPlanView = () => {
                                         );
                                     })}
 
-                                    <td className={`border text-[11px] text-left min-w-[120px] font-normal ${rowPaddingClass}`}>
+                                    <td className={`border text-[11px] text-left min-w-[60px] font-normal ${rowPaddingClass}`}>
                                         <LocalTextArea value={currentNotes} originalValue={(matchModelDetails.originals || {}).notes} originalMeta={(matchModelDetails.originalMetas || {}).notes} onChange={(v, orig) => handleModelDetailChange(model, 'notes', v)} isCompact={!showHistory}/>
                                     </td>
                                 </tr>
@@ -551,7 +581,7 @@ const YoshiiPlanView = () => {
     );
 };
 
-// 【コンテナ割振り画面ビュー】
+// 【コンテナ割振り画面ビュー - 全セル・データ修復版】
 const YoshiiAllocationView = () => {
     const ctx = React.useContext(AppContext);
     const [exportModal, setExportModal] = React.useState({ isOpen: false, type: 'excel' });
@@ -768,7 +798,7 @@ const YoshiiAllocationView = () => {
             </div>
             <div className="flex justify-between items-center mb-2 no-print flex-shrink-0">
                 <div className="flex gap-4 items-center bg-gray-50 p-1.5 rounded border">
-                    <h2 className="text-base font-bold">吉井電気 コンテナ割振り</h2>
+                    <h2 className="text-base font-bold text-emerald-900">吉井電気 コンテナ割振り</h2>
                     <label className="font-bold text-xs ml-2">対象年月:</label>
                     <input type="month" value={ctx.yoshiiAllocMonth} onChange={e => ctx.setYoshiiAllocMonth(e.target.value)} className="border p-0.5 rounded text-xs text-center font-bold" />
                     <label className="font-bold text-xs ml-2">コンテナ枠数:</label>
@@ -837,21 +867,18 @@ const YoshiiAllocationView = () => {
                                 return (
                                     <tr 
                                         key={container.id || `new-${idx}`}
-                                        onDragOver={(e) => ctx.handleDragOver(e, container.id)}
-                                        onDrop={(e) => ctx.handleDrop(e, container.id, monthContainers)}
-                                        onDragEnd={ctx.handleDragEnd}
-                                        className={`hover:bg-emerald-50 ${ctx.dragOverRowId === container.id ? (ctx.dragDirection === 'top' ? 'drag-over-top' : 'drag-over-bottom') : ''} ${ctx.draggedRowId === container.id ? 'dragging-row' : ''}`}
+                                        className="hover:bg-emerald-50 h-[22px]"
                                     >
                                         <td draggable={!!container.id && (ctx.authUser ? ctx.authUser.canEdit : true)} onDragStart={(e) => ctx.handleDragStart(e, container.id, 'containers')} className="p-0.5 border bg-white sticky left-0 z-20 text-center drag-handle text-gray-400 hover:text-emerald-600 text-sm cursor-grab active:cursor-grabbing no-print font-normal">≡</td>
                                         <td className="p-0.5 border bg-white sticky left-[32px] z-20 text-[10px] font-normal whitespace-nowrap">コンテナ {idx + 1}</td>
                                         
                                         <td className="matrix-td px-0 sticky left-[88px] bg-white z-20">
                                             <LocalInput 
-                                                value={container.managementNo} 
+                                                value={container.managementNo || ''} 
                                                 originalValue={(container.originals || {}).managementNo}
                                                 originalMeta={(container.originalMetas || {}).managementNo}
                                                 onChange={(v, orig) => ctx.updateContainer(container.id, { managementNo: v, originals: { ...(container.originals || {}), managementNo: container.originals?.managementNo !== undefined ? container.originals.managementNo : orig }, originalMetas: { ...(container.originalMetas || {}), managementNo: container.originalMetas?.managementNo !== undefined ? container.originalMetas.managementNo : `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}` } }, ctx.yoshiiAllocMonth, 'yoshii', '管理番号')} 
-                                                className="matrix-input text-center text-[11px] font-normal" 
+                                                className="matrix-input text-center text-[11px] font-normal h-[20px]" 
                                                 dataGridId={`y-alloc-${idx}-0`} 
                                                 onGridKeyDown={handleGridNav} 
                                             />
@@ -859,7 +886,7 @@ const YoshiiAllocationView = () => {
 
                                         <td className="matrix-td px-0 sticky left-[173px] bg-white z-20">
                                             <DynamicSelect 
-                                                value={container.port} 
+                                                value={container.port || ''} 
                                                 originalValue={(container.originals || {}).port}
                                                 originalMeta={(container.originalMetas || {}).port}
                                                 onChange={(val, cat, orig) => ctx.handleSelectChange(container.id, 'port', true, 'yoshii', false, '到着港')(val, cat, orig)} 
@@ -876,14 +903,14 @@ const YoshiiAllocationView = () => {
                                         {models.map((m, mIdx) => {
                                             const cellValue = getContainerAllocationQty(container.allocations, m);
                                             return (
-                                                <td key={m} className="matrix-td px-0.5 w-[62px] min-w-[62px]">
+                                                <td key={m} className="matrix-td px-0 w-[62px] min-w-[62px] h-[22px]">
                                                     <LocalInput 
                                                         type="number" 
                                                         value={cellValue} 
                                                         originalValue={(container.originals?.allocations || {})[m]}
                                                         originalMeta={(container.originalMetas || {})[m]}
                                                         onChange={(v, orig) => handleAllocationValueChange(container, m, v, orig)} 
-                                                        className="matrix-input text-emerald-800 pr-0.5 text-right text-[11px] font-normal" 
+                                                        className="matrix-input text-emerald-800 pr-0.5 text-right text-[11px] font-normal h-[20px]" 
                                                         dataGridId={`y-alloc-${idx}-${mIdx + 2}`} 
                                                         onGridKeyDown={handleGridNav} 
                                                     />
