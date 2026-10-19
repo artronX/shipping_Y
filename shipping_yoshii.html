@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>吉井電気 製品出荷管理システム (WebVer. 109)</title>
+    <title>吉井電気 製品出荷管理システム (WebVer. 110)</title>
     
     <!-- React 18 -->
     <script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js" crossorigin></script>
@@ -174,77 +174,18 @@
         const auth = firebase.auth();
 
         const AUTH_TABLE = [
-            {
-                passwords: ['Zall@0617'],
-                role: 'ADMIN_ALL',
-                label: '東亜全体 (全画面編集)',
-                allowedViews: ['yoshii_plan', 'yoshii_alloc', 'yoshii_ship', 'yoshii_drayage'],
-                editableViews: ['yoshii_plan', 'yoshii_alloc', 'yoshii_ship', 'yoshii_drayage'],
-                vendorRestriction: null,
-                canEdit: true
-            },
-            {
-                passwords: ['Read＠0617', 'Read@0617'],
-                role: 'READ_ONLY',
-                label: '閲覧専用',
-                allowedViews: ['yoshii_plan', 'yoshii_alloc', 'yoshii_ship', 'yoshii_drayage'],
-                editableViews: [],
-                vendorRestriction: null,
-                canEdit: false
-            },
-            {
-                passwords: ['JPZ10345'],
-                role: 'VENDOR_JP',
-                label: 'JP専用 (出荷日程編集/割振り閲覧)',
-                allowedViews: ['yoshii_alloc', 'yoshii_ship'],
-                editableViews: ['yoshii_ship'],
-                vendorRestriction: 'JP',
-                canEdit: true
-            },
-            {
-                passwords: ['GM10345Z'],
-                role: 'VENDOR_GM',
-                label: 'GM専用 (出荷日程編集/割振り閲覧)',
-                allowedViews: ['yoshii_alloc', 'yoshii_ship'],
-                editableViews: ['yoshii_ship'],
-                vendorRestriction: 'GM',
-                canEdit: true
-            },
-            {
-                passwords: ['LDSZ1034'],
-                role: 'VENDOR_LDS',
-                label: 'LDS専用 (出荷日程編集/割振り閲覧)',
-                allowedViews: ['yoshii_alloc', 'yoshii_ship'],
-                editableViews: ['yoshii_ship'],
-                vendorRestriction: 'LDS',
-                canEdit: true
-            },
-            {
-                passwords: ['SLT1034Z'],
-                role: 'VENDOR_SLT',
-                label: 'SLT専用 (出荷日程編集/割振り閲覧)',
-                allowedViews: ['yoshii_alloc', 'yoshii_ship'],
-                editableViews: ['yoshii_ship'],
-                vendorRestriction: 'SLT',
-                canEdit: true
-            },
-            {
-                passwords: ['YosiiZ'],
-                role: 'DRAYAGE_YO',
-                label: 'ドレージ (YO) 専用',
-                allowedViews: ['yoshii_drayage'],
-                editableViews: ['yoshii_drayage'],
-                vendorRestriction: 'YO',
-                canEdit: true
-            }
+            { passwords: ['Zall@0617'], role: 'ADMIN_ALL', label: '東亜全体 (全画面編集)', allowedViews: ['yoshii_plan', 'yoshii_alloc', 'yoshii_ship', 'yoshii_drayage'], editableViews: ['yoshii_plan', 'yoshii_alloc', 'yoshii_ship', 'yoshii_drayage'], vendorRestriction: null, canEdit: true },
+            { passwords: ['Read＠0617', 'Read@0617'], role: 'READ_ONLY', label: '閲覧専用', allowedViews: ['yoshii_plan', 'yoshii_alloc', 'yoshii_ship', 'yoshii_drayage'], editableViews: [], vendorRestriction: null, canEdit: false },
+            { passwords: ['JPZ10345'], role: 'VENDOR_JP', label: 'JP専用 (出荷日程編集/割振り閲覧)', allowedViews: ['yoshii_alloc', 'yoshii_ship'], editableViews: ['yoshii_ship'], vendorRestriction: 'JP', canEdit: true },
+            { passwords: ['GM10345Z'], role: 'VENDOR_GM', label: 'GM専用 (出荷日程編集/割振り閲覧)', allowedViews: ['yoshii_alloc', 'yoshii_ship'], editableViews: ['yoshii_ship'], vendorRestriction: 'GM', canEdit: true },
+            { passwords: ['LDSZ1034'], role: 'VENDOR_LDS', label: 'LDS専用 (出荷日程編集/割振り閲覧)', allowedViews: ['yoshii_alloc', 'yoshii_ship'], editableViews: ['yoshii_ship'], vendorRestriction: 'LDS', canEdit: true },
+            { passwords: ['SLT1034Z'], role: 'VENDOR_SLT', label: 'SLT専用 (出荷日程編集/割振り閲覧)', allowedViews: ['yoshii_alloc', 'yoshii_ship'], editableViews: ['yoshii_ship'], vendorRestriction: 'SLT', canEdit: true },
+            { passwords: ['YosiiZ'], role: 'DRAYAGE_YO', label: 'ドレージ (YO) 専用', allowedViews: ['yoshii_drayage'], editableViews: ['yoshii_drayage'], vendorRestriction: 'YO', canEdit: true }
         ];
 
         const normalizeModelCode = (str) => {
             if (!str) return '';
-            return String(str)
-                .replace(/[‐-―−－–—\-]/g, '')
-                .replace(/\s+/g, '')
-                .toUpperCase();
+            return String(str).replace(/[‐-―−－–—\-]/g, '').replace(/\s+/g, '').toUpperCase();
         };
 
         const INITIAL_MASTER_DATA = {
@@ -256,44 +197,367 @@
         const formatYYMM = (ymStr) => {
             if (!ymStr || !ymStr.includes('-')) return '';
             const parts = ymStr.split('-');
-            const yy = parts[0].slice(-2);
-            const mm = parts[1].padStart(2, '0');
-            return `${yy}${mm}`;
+            return `${parts[0].slice(-2)}${parts[1].padStart(2, '0')}`;
         };
 
         const parseRefDateToYMD = (ref) => {
             if (!ref) return "";
-            if (ref.includes('-') && ref.length >= 7) {
-                return ref.length === 7 ? `${ref}-01` : ref;
-            }
+            if (ref.includes('-') && ref.length >= 7) return ref.length === 7 ? `${ref}-01` : ref;
             if (ref.includes('/')) {
                 const parts = ref.split('/');
-                if (parts.length === 3) {
-                    const yr = parts[0].length === 2 ? `20${parts[0]}` : parts[0];
-                    return `${yr}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
-                }
+                if (parts.length === 3) return `${parts[0].length === 2 ? `20${parts[0]}` : parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
             }
             const match = ref.match(/(\d+)月/);
-            if (match) {
-                const mo = match[1].padStart(2, '0');
-                const yr = new Date().getFullYear();
-                return `${yr}-${mo}-01`;
-            }
+            if (match) return `${new Date().getFullYear()}-${match[1].padStart(2, '0')}-01`;
             return "";
+        };
+
+        // UIコンポーネント: LocalInput
+        const LocalInput = ({ value, onChange, onEnter, onTabOut, onFocusTrigger, type="text", className="", listId, dataGridId, onGridKeyDown, autoFocus, onAutoFocused, refDate, placeholder="", originalValue, originalMeta }) => {
+            const ctx = useContext(AppContext);
+            const [val, setVal] = useState(value !== undefined && value !== null ? String(value) : '');
+            const [focused, setFocused] = useState(false);
+            const [isEditing, setIsEditing] = useState(false);
+            const inputRef = useRef(null);
+
+            useEffect(() => { if (!focused) setVal(value !== undefined && value !== null ? String(value) : ''); }, [value, focused]);
+
+            useEffect(() => {
+                if (autoFocus && inputRef.current) {
+                    inputRef.current.focus({ preventScroll: true });
+                    if (inputRef.current.select) inputRef.current.select();
+                    inputRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    if (onAutoFocused) onAutoFocused();
+                }
+            }, [autoFocus]);
+
+            const handleBlur = () => { 
+                setFocused(false); setIsEditing(false);
+                const currentStr = value !== undefined && value !== null ? String(value) : '';
+                if (val !== currentStr) onChange(val, originalValue !== undefined && originalValue !== null ? originalValue : currentStr); 
+            };
+            const handleFocus = () => { setFocused(true); setIsEditing(false); if (onFocusTrigger) onFocusTrigger(); };
+            const handleChange = (e) => { setVal(e.target.value); setIsEditing(true); };
+            const handleKeyDown = (e) => {
+                if (e.key === 'Enter') {
+                    if (onGridKeyDown) { e.preventDefault(); handleBlur(); onGridKeyDown(e); } 
+                    else { handleBlur(); e.target.blur(); if (onEnter) onEnter(); }
+                    return;
+                }
+                if (onGridKeyDown) {
+                    if (e.key === 'ArrowUp' || e.key === 'ArrowDown') { e.preventDefault(); handleBlur(); onGridKeyDown(e); return; }
+                    if (!isEditing && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) { e.preventDefault(); handleBlur(); onGridKeyDown(e); return; }
+                }
+                if (e.key === 'Tab' && !e.shiftKey) { handleBlur(); if (onTabOut) { e.preventDefault(); e.target.blur(); onTabOut(); } }
+            };
+
+            let displayVal = val;
+            let currentType = type;
+            let extraClass = '';
+
+            const hasOrig = originalValue !== undefined && originalValue !== null && String(originalValue) !== '';
+            const isChanged = hasOrig && String(originalValue) !== String(val);
+            const tooltipClass = isChanged ? 'has-original-tooltip' : '';
+            const changedClass = (ctx.isChangeTrackingMode && isChanged) ? 'is-changed-cell' : '';
+            const metaStr = originalMeta || `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}`;
+
+            if (type === 'number') {
+                extraClass = 'text-right ';
+                if (!focused && val !== '') {
+                    const num = Number(val);
+                    if (!isNaN(num)) { displayVal = num.toLocaleString(); currentType = 'text'; }
+                }
+            } else if (type === 'qc-date' || type === 'date') {
+                let formattedDate = displayVal;
+                if (!focused && displayVal) {
+                    if (displayVal.includes('-')) {
+                        const parts = displayVal.split('-');
+                        if (parts.length === 3) formattedDate = `${parts[1]}/${parts[2]}`;
+                    }
+                }
+                return (
+                    <div className={`relative flex items-center justify-between w-full h-full group bg-transparent text-center min-w-[68px] ${changedClass} ${tooltipClass}`} data-original-val={originalValue === "" ? "【消去】" : originalValue} data-original-meta={metaStr}>
+                        <input ref={inputRef} type="text" value={formattedDate} onChange={handleChange} onFocus={handleFocus} onBlur={handleBlur} onKeyDown={handleKeyDown} disabled={ctx.authUser && !ctx.authUser.canEdit} className={`cell-input text-center pr-5 ${className} ${changedClass}`} data-grid-id={dataGridId} placeholder={placeholder}/>
+                        <div className="absolute right-0.5 w-4 h-full flex items-center justify-center flex-shrink-0 no-print opacity-40 group-hover:opacity-100 transition-all cursor-pointer">
+                            <span className="text-[9px]">📅</span>
+                            <input type="date" value={val.includes('-') ? val : ""} disabled={ctx.authUser && !ctx.authUser.canEdit} onChange={e => { setVal(e.target.value); onChange(e.target.value, val); }} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className={`w-full h-full ${tooltipClass}`} data-original-val={originalValue === "" ? "【消去】" : originalValue} data-original-meta={metaStr}>
+                    <input ref={inputRef} type={currentType} list={listId} value={displayVal} onChange={handleChange} onFocus={handleFocus} onBlur={handleBlur} onKeyDown={handleKeyDown} disabled={ctx.authUser && !ctx.authUser.canEdit} className={className.includes('matrix-input') ? `${className} ${extraClass} ${changedClass}` : `cell-input ${extraClass} ${className} ${changedClass}`} data-grid-id={dataGridId} placeholder={placeholder}/>
+                </div>
+            );
+        };
+
+        // UIコンポーネント: LocalTextArea
+        const LocalTextArea = ({ value, onChange, isCompact=false, className="", originalValue, originalMeta }) => {
+            const ctx = useContext(AppContext);
+            const [val, setVal] = useState(value !== undefined && value !== null ? String(value) : '');
+            const [focused, setFocused] = useState(false);
+
+            useEffect(() => { if (!focused) setVal(value !== undefined && value !== null ? String(value) : ''); }, [value, focused]);
+
+            const handleBlur = () => { setFocused(false); if (val !== (value || '')) onChange(val, value); };
+            const handleKeyDown = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); e.target.blur(); } };
+
+            const hasOrig = originalValue !== undefined && originalValue !== null && String(originalValue) !== '';
+            const isChanged = hasOrig && String(originalValue) !== String(val);
+            const tooltipClass = isChanged ? 'has-original-tooltip' : '';
+            const changedClass = (ctx.isChangeTrackingMode && isChanged) ? 'is-changed-cell' : '';
+            const metaStr = originalMeta || `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}`;
+
+            return (
+                <div className={`w-full h-full ${tooltipClass}`} data-original-val={originalValue === "" ? "【消去】" : originalValue} data-original-meta={metaStr}>
+                    <textarea value={val} onChange={e => setVal(e.target.value)} onFocus={() => setFocused(true)} onBlur={handleBlur} onKeyDown={handleKeyDown} rows={isCompact ? 1 : 2} disabled={ctx.authUser && !ctx.authUser.canEdit} className={`w-full text-xs px-1 border-none bg-transparent outline-none whitespace-normal break-all resize-y focus:bg-indigo-50 ${isCompact ? 'h-[22px] min-h-[22px] leading-[20px] py-0 overflow-hidden' : 'py-1 min-h-[36px]'} ${className} ${changedClass}`}/>
+                </div>
+            );
+        };
+
+        // UIコンポーネント: DynamicSelect
+        const DynamicSelect = ({ value, onChange, category, options, className="", dataGridId, onGridKeyDown, onFocusTrigger, autoDefaultValue, autoFocus, onAutoFocused, originalValue, originalMeta }) => {
+            const ctx = useContext(AppContext);
+            const [val, setVal] = useState(value || '');
+            const selectRef = useRef(null);
+
+            useEffect(() => { setVal(value || ''); }, [value]);
+
+            useEffect(() => {
+                if (autoFocus && selectRef.current) {
+                    selectRef.current.focus({ preventScroll: true });
+                    selectRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    if (onAutoFocused) onAutoFocused();
+                }
+            }, [autoFocus]);
+
+            const handleFocus = (e) => {
+                if (!val && autoDefaultValue) { setVal(autoDefaultValue); onChange(autoDefaultValue, category, ''); }
+                if (onFocusTrigger) onFocusTrigger(e);
+            };
+
+            const handleChange = (e) => {
+                const newVal = e.target.value;
+                const currentVal = value !== undefined && value !== null ? String(value) : '';
+                const origToPass = originalValue !== undefined && originalValue !== null ? originalValue : currentVal;
+                if (newVal === '__ADD_NEW__') onChange('__ADD_NEW__', category, origToPass);
+                else { setVal(newVal); onChange(newVal, category, origToPass); }
+            };
+
+            const handleKeyDown = (e) => {
+                if (e.key === 'ArrowUp' || e.key === 'ArrowDown') { e.stopPropagation(); return; }
+                if (e.key === 'Enter') { e.preventDefault(); if (onGridKeyDown) onGridKeyDown(e); else e.target.blur(); return; }
+                if (onGridKeyDown && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) { e.preventDefault(); onGridKeyDown(e); }
+            };
+
+            const hasOrig = originalValue !== undefined && originalValue !== null && String(originalValue) !== '';
+            const isChanged = hasOrig && String(originalValue) !== String(val);
+            const tooltipClass = isChanged ? 'has-original-tooltip' : '';
+            const changedClass = (ctx.isChangeTrackingMode && isChanged) ? 'is-changed-cell' : '';
+            const metaStr = originalMeta || `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}`;
+
+            return (
+                <div className={`w-full h-full ${tooltipClass}`} data-original-val={originalValue === "" ? "【消去】" : originalValue} data-original-meta={metaStr}>
+                    <select ref={selectRef} value={val} onChange={handleChange} onFocus={handleFocus} onKeyDown={handleKeyDown} disabled={ctx.authUser && !ctx.authUser.canEdit} className={`cell-input text-center ${className} px-0 ${changedClass}`}>
+                        <option value=""></option>
+                        {(options || []).map((opt, i) => <option key={i} value={opt}>{opt}</option>)}
+                        <option value="__ADD_NEW__" className="font-bold text-blue-600">+ 新規追加</option>
+                    </select>
+                </div>
+            );
+        };
+
+        // UIコンポーネント: ScheduleFilterSortControl
+        const ScheduleFilterSortControl = ({ filterMode, setFilterMode, selectedYear, setSelectedYear, singleMonth, setSingleMonth, startMonth, setStartMonth, endMonth, setEndMonth, sortConfig, setSortConfig }) => (
+            <div className="flex flex-wrap items-center justify-between gap-3 bg-gray-50 p-2 rounded border text-xs no-print mb-2 flex-shrink-0">
+                <div className="flex items-center gap-3 flex-wrap">
+                    <span className="font-bold text-gray-700">📅 納入月表示切替:</span>
+                    <select value={filterMode} onChange={e => setFilterMode(e.target.value)} className="border p-1 rounded font-bold bg-white text-indigo-900">
+                        <option value="all">全体 (当月スクロール)</option>
+                        <option value="current">当月のみ</option>
+                        <option value="year">年度指定</option>
+                        <option value="month">月指定</option>
+                        <option value="range">範囲指定</option>
+                    </select>
+                    {filterMode === 'year' && (
+                        <select value={selectedYear} onChange={e => setSelectedYear(Number(e.target.value))} className="border p-1 rounded font-bold bg-white text-indigo-900">
+                            <option value={2025}>2025年度</option>
+                            <option value={2026}>2026年度</option>
+                            <option value={2027}>2027年度</option>
+                        </select>
+                    )}
+                    {filterMode === 'month' && <input type="month" value={singleMonth} onChange={e => setSingleMonth(e.target.value)} className="border p-1 rounded font-bold bg-white" />}
+                    {filterMode === 'range' && (
+                        <div className="flex items-center gap-1 font-bold">
+                            <input type="month" value={startMonth} onChange={e => setStartMonth(e.target.value)} className="border p-1 rounded bg-white" />
+                            <span>〜</span>
+                            <input type="month" value={endMonth} onChange={e => setEndMonth(e.target.value)} className="border p-1 rounded bg-white" />
+                        </div>
+                    )}
+                </div>
+                <div className="flex items-center gap-2">
+                    {sortConfig.length > 0 ? (
+                        <div className="flex items-center gap-1 text-[11px] bg-indigo-50 border border-indigo-200 px-2 py-1 rounded text-indigo-800 font-bold">
+                            <span>ソート:</span>
+                            {sortConfig.map((s, idx) => (
+                                <span key={s.key} className="bg-white border px-1.5 py-0.5 rounded shadow-sm">{idx + 1}. {s.label}{s.direction === 'asc' ? '▲' : '▼'}</span>
+                            ))}
+                            <button onClick={() => setSortConfig([])} className="ml-1 text-red-500 hover:text-red-700 font-bold">✕</button>
+                        </div>
+                    ) : <span className="text-gray-400 text-[11px]">※[Shift+ヘッダークリック]で複数条件ソート</span>}
+                </div>
+            </div>
+        );
+
+        // UIコンポーネント: LogViewModal
+        const LogViewModal = ({ isOpen, onClose, logs, sessions }) => {
+            const [activeTab, setActiveTab] = useState('data_logs');
+            if (!isOpen) return null;
+            return (
+                <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl h-[85vh] flex flex-col border border-slate-300 overflow-hidden">
+                        <div className="p-4 bg-indigo-900 text-white flex justify-between items-center">
+                            <div className="flex items-center gap-3">
+                                <h3 className="font-bold text-base flex items-center gap-2">⚙ システム管理ログ・接続履歴</h3>
+                                <span className="bg-amber-400 text-slate-900 text-[10px] font-extrabold px-2 py-0.5 rounded font-mono">WebVer. 110</span>
+                            </div>
+                            <button onClick={onClose} className="text-2xl font-bold hover:text-gray-300 leading-none">×</button>
+                        </div>
+                        <div className="flex bg-slate-100 border-b px-4 pt-2 gap-2 text-xs font-bold">
+                            <button onClick={() => setActiveTab('data_logs')} className={`px-4 py-2 rounded-t-lg transition flex items-center gap-1.5 ${activeTab === 'data_logs' ? 'bg-white border-t-2 border-indigo-600 text-indigo-900 shadow-sm' : 'text-slate-600 hover:bg-slate-200'}`}>📝 データ操作履歴 ({logs.length})</button>
+                            <button onClick={() => setActiveTab('access_logs')} className={`px-4 py-2 rounded-t-lg transition flex items-center gap-1.5 ${activeTab === 'access_logs' ? 'bg-white border-t-2 border-indigo-600 text-indigo-900 shadow-sm' : 'text-slate-600 hover:bg-slate-200'}`}>🔑 接続履歴 ({(sessions || []).length})</button>
+                        </div>
+                        <div className="p-4 overflow-y-auto flex-grow bg-white">
+                            {activeTab === 'data_logs' ? (
+                                <table className="w-full text-xs border-collapse">
+                                    <thead className="bg-slate-100 sticky top-0 shadow-sm">
+                                        <tr className="border-b text-left text-slate-700">
+                                            <th className="p-2 border">日時</th><th className="p-2 border">作業者</th><th className="p-2 border">対象シート</th><th className="p-2 border">操作種別</th><th className="p-2 border">詳細内容</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {logs.map(log => (
+                                            <tr key={log.id} className="border-b hover:bg-slate-50">
+                                                <td className="p-2 border whitespace-nowrap text-slate-600 font-mono">{log.timestamp}</td>
+                                                <td className="p-2 border font-bold text-indigo-950 whitespace-nowrap">{log.operator || '未設定'}</td>
+                                                <td className="p-2 border whitespace-nowrap font-bold text-slate-700">{log.sheetName}</td>
+                                                <td className="p-2 border whitespace-nowrap"><span className={`px-2 py-0.5 rounded text-[10px] font-bold ${log.action === '追加' ? 'bg-blue-100 text-blue-800' : log.action === '削除' ? 'bg-red-100 text-red-800' : 'bg-emerald-100 text-emerald-800'}`}>{log.action}</span></td>
+                                                <td className="p-2 border leading-relaxed text-slate-800">{log.detail}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            ) : (
+                                <table className="w-full text-xs border-collapse">
+                                    <thead className="bg-slate-100 sticky top-0 shadow-sm">
+                                        <tr className="border-b text-left text-slate-700 text-[11px]">
+                                            <th className="p-1.5 border">作業者名</th><th className="p-1.5 border">権限</th><th className="p-1.5 border">Ver</th><th className="p-1.5 border">IP</th><th className="p-1.5 border">地域</th><th className="p-1.5 border">端末</th><th className="p-1.5 border">ログイン日時</th><th className="p-1.5 border">最終操作</th><th className="p-1.5 border text-center">状況</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {sessions.map(s => (
+                                            <tr key={s.id} className="border-b hover:bg-slate-50 text-[11px]">
+                                                <td className="p-1.5 border font-bold text-indigo-950 whitespace-nowrap">{s.operator || '未設定'}</td>
+                                                <td className="p-1.5 border whitespace-nowrap text-slate-600 font-bold">{s.roleLabel || '一般'}</td>
+                                                <td className="p-1.5 border whitespace-nowrap font-mono font-bold text-amber-700 bg-amber-50 text-center">{s.appVersion || 'ー'}</td>
+                                                <td className="p-1.5 border whitespace-nowrap font-mono text-blue-700 font-bold">{s.ipAddress || '―'}</td>
+                                                <td className="p-1.5 border whitespace-nowrap text-slate-700 font-bold">{s.ipLocation || '―'}</td>
+                                                <td className="p-1.5 border whitespace-nowrap text-slate-600 font-mono">{s.deviceInfo || '―'}</td>
+                                                <td className="p-1.5 border whitespace-nowrap font-mono text-emerald-800 font-bold">{s.loginTimeStr}</td>
+                                                <td className="p-1.5 border whitespace-nowrap font-mono text-slate-600">{s.logoutTimeStr || '― (操作中)'}</td>
+                                                <td className="p-1.5 border text-center whitespace-nowrap font-mono font-bold">{s.logoutTimeStr ? <span className="bg-gray-100 text-gray-700 px-2 py-0.5 rounded text-[10px]">切断</span> : <span className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded text-[10px] animate-pulse">● 接続中</span>}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            )}
+                        </div>
+                        <div className="p-3 bg-slate-100 border-t flex justify-end"><button onClick={onClose} className="bg-slate-700 text-white px-5 py-1.5 rounded-lg text-xs font-bold">閉じる</button></div>
+                    </div>
+                </div>
+            );
+        };
+
+        // UIコンポーネント: ModelEditModal
+        const ModelEditModal = ({ isOpen, onClose, company='yoshii' }) => {
+            const ctx = useContext(AppContext);
+            const [models, setModels] = useState([]);
+
+            useEffect(() => {
+                if (isOpen) {
+                    const masterModels = ctx.masterData[company]?.models || [];
+                    const planModels = ctx.plans.filter(p => p.company === company && p.model).map(p => p.model);
+                    const mergedSet = new Set([...masterModels, ...planModels]);
+                    setModels(Array.from(mergedSet).sort());
+                }
+            }, [isOpen, ctx.masterData, ctx.plans, company]);
+
+            if (!isOpen) return null;
+
+            return (
+                <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-lg shadow-xl w-full max-w-xl h-[75vh] flex flex-col relative">
+                        <div className="p-4 bg-emerald-700 text-white flex justify-between items-center rounded-t-lg">
+                            <h3 className="font-bold text-base">✏ 型式マスタの編集</h3>
+                            <button onClick={onClose} className="text-xl font-bold">×</button>
+                        </div>
+                        <div className="p-4 overflow-y-auto flex-grow">
+                            <table className="w-full text-xs border-collapse">
+                                <thead><tr className="border-b bg-gray-100"><th className="p-2 border text-left">型式名</th></tr></thead>
+                                <tbody>
+                                    {models.map(m => <tr key={m} className="border-b"><td className="p-2 border font-bold">{m}</td></tr>)}
+                                </tbody>
+                            </table>
+                        </div>
+                        <div className="p-3 bg-gray-100 border-t flex justify-end"><button onClick={onClose} className="bg-gray-600 text-white px-4 py-1 rounded text-xs font-bold">閉じる</button></div>
+                    </div>
+                </div>
+            );
+        };
+
+        // UIコンポーネント: ExportPrintModal
+        const ExportPrintModal = ({ isOpen, onClose, screenName, currentMonthStr, onStartExport, defaultMode = 'year' }) => {
+            const [mode, setMode] = useState(defaultMode);
+            const [selectedYear, setSelectedYear] = useState(2026);
+            if (!isOpen) return null;
+            return (
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 space-y-4 text-xs">
+                        <div className="flex justify-between items-center border-b pb-2"><h3 className="font-bold text-base">⚙ 出力・印刷設定 ({screenName})</h3><button onClick={onClose}>×</button></div>
+                        <div className="space-y-2">
+                            <label className="block font-bold">対象年度:</label>
+                            <select value={selectedYear} onChange={e => setSelectedYear(Number(e.target.value))} className="border p-1 rounded w-full font-bold">
+                                <option value={2025}>2025年度</option><option value={2026}>2026年度</option><option value={2027}>2027年度</option>
+                            </select>
+                        </div>
+                        <div className="flex justify-end gap-2 border-t pt-3">
+                            <button onClick={onClose} className="px-3 py-1.5 rounded bg-gray-200 font-bold">キャンセル</button>
+                            <button onClick={() => { onStartExport({ mode, selectedYear }); onClose(); }} className="px-4 py-1.5 rounded bg-emerald-600 text-white font-bold">出力開始</button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const exportToExcelSimple = ({ title, headers, rows, filename }) => {
+            if (typeof ExcelJS === 'undefined') return alert("ExcelJSライブラリ未読込");
+            const workbook = new ExcelJS.Workbook();
+            const worksheet = workbook.addWorksheet('出荷管理データ');
+            worksheet.addRow([title]); worksheet.addRow([]); worksheet.addRow(headers);
+            rows.forEach(r => worksheet.addRow(r));
+            workbook.xlsx.writeBuffer().then(buffer => {
+                const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+                const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename; a.click();
+            });
         };
 
         // ログインモーダル定義
         const LoginModal = ({ onLogin }) => {
-            const [workerId, setWorkerId] = useState(() => {
-                return localStorage.getItem(LAST_OPERATOR_STORAGE_KEY) || '';
-            });
+            const [workerId, setWorkerId] = useState(() => localStorage.getItem(LAST_OPERATOR_STORAGE_KEY) || '');
             const [password, setPassword] = useState('');
             const [errorMsg, setErrorMsg] = useState('');
-
-            const handleClearWorkerId = () => {
-                setWorkerId('');
-                localStorage.removeItem(LAST_OPERATOR_STORAGE_KEY);
-            };
 
             const handleSubmit = (e) => {
                 e.preventDefault();
@@ -301,46 +565,21 @@
                 const cleanWorkerId = String(workerId).trim();
                 const cleanPass = String(password).trim();
 
-                if (!cleanWorkerId) {
-                    setErrorMsg('作業者ID/お名前を入力してください。');
-                    return;
-                }
+                if (!cleanWorkerId) { setErrorMsg('作業者ID/お名前を入力してください。'); return; }
 
-                let matchedRule = null;
-                for (const rule of AUTH_TABLE) {
-                    if (rule.passwords.includes(cleanPass)) {
-                        matchedRule = rule;
-                        break;
-                    }
-                }
-
+                let matchedRule = AUTH_TABLE.find(rule => rule.passwords.includes(cleanPass));
                 if (!matchedRule) {
                     const matchPattern = cleanPass.match(/^(.+)[＠@]\s*8888\$/i);
                     if (matchPattern) {
                         const vendorPrefix = matchPattern[1].trim().toUpperCase();
-                        matchedRule = {
-                            role: `VENDOR_${vendorPrefix}`,
-                            label: `${vendorPrefix}専用 (出荷日程編集/割振り閲覧)`,
-                            allowedViews: ['yoshii_alloc', 'yoshii_ship'],
-                            editableViews: ['yoshii_ship'],
-                            vendorRestriction: vendorPrefix,
-                            canEdit: true
-                        };
+                        matchedRule = { role: `VENDOR_${vendorPrefix}`, label: `${vendorPrefix}専用 (出荷日程編集/割振り閲覧)`, allowedViews: ['yoshii_alloc', 'yoshii_ship'], editableViews: ['yoshii_ship'], vendorRestriction: vendorPrefix, canEdit: true };
                     }
                 }
 
                 if (matchedRule) {
-                    onLogin({
-                        name: cleanWorkerId,
-                        role: matchedRule.role,
-                        label: matchedRule.label,
-                        allowedViews: matchedRule.allowedViews,
-                        editableViews: matchedRule.editableViews || [],
-                        vendorRestriction: matchedRule.vendorRestriction,
-                        canEdit: matchedRule.canEdit
-                    });
+                    onLogin({ name: cleanWorkerId, role: matchedRule.role, label: matchedRule.label, allowedViews: matchedRule.allowedViews, editableViews: matchedRule.editableViews || [], vendorRestriction: matchedRule.vendorRestriction, canEdit: matchedRule.canEdit });
                 } else {
-                    setErrorMsg('パスワードが一致しません。権限表に定義されたパスワードを入力してください。');
+                    setErrorMsg('パスワードが一致しません。');
                 }
             };
 
@@ -349,55 +588,19 @@
                     <div className="bg-white rounded-xl shadow-2xl border border-slate-200 max-w-sm w-full p-6 space-y-5">
                         <div className="text-center space-y-1">
                             <h2 className="text-lg font-bold text-slate-800">吉井電気 製品出荷管理システム</h2>
-                            <p className="text-xs text-indigo-600 font-mono font-bold">権限認証ログイン (WebVer. 109)</p>
+                            <p className="text-xs text-indigo-600 font-mono font-bold">権限認証ログイン (WebVer. 110)</p>
                         </div>
-
-                        {errorMsg && (
-                            <div className="bg-red-50 border border-red-200 text-red-600 text-xs p-2.5 rounded text-center font-bold">
-                                {errorMsg}
-                            </div>
-                        )}
-
+                        {errorMsg && <div className="bg-red-50 border border-red-200 text-red-600 text-xs p-2.5 rounded text-center font-bold">{errorMsg}</div>}
                         <form onSubmit={handleSubmit} className="space-y-4">
                             <div>
                                 <label className="block text-xs font-bold text-slate-700 mb-1">作業者ID / お名前</label>
-                                <div className="relative flex items-center">
-                                    <input 
-                                        type="text" 
-                                        className="w-full border rounded pl-3 pr-8 py-1.5 text-xs bg-white font-bold" 
-                                        placeholder="例: クレール"
-                                        value={workerId}
-                                        onChange={e => setWorkerId(e.target.value)}
-                                        required
-                                    />
-                                    {workerId && (
-                                        <button 
-                                            type="button" 
-                                            onClick={handleClearWorkerId}
-                                            className="absolute right-2 text-slate-400 hover:text-slate-600 font-bold text-xs bg-slate-100 hover:bg-slate-200 rounded-full w-4 h-4 flex items-center justify-center transition"
-                                            title="入力欄を一括クリア"
-                                        >
-                                            ×
-                                        </button>
-                                    )}
-                                </div>
+                                <input type="text" className="w-full border rounded px-3 py-1.5 text-xs bg-white font-bold" placeholder="例: クレール" value={workerId} onChange={e => setWorkerId(e.target.value)} required />
                             </div>
-
                             <div>
                                 <label className="block text-xs font-bold text-slate-700 mb-1">パスワード</label>
-                                <input 
-                                    type="password" 
-                                    className="w-full border rounded px-3 py-1.5 text-xs font-mono bg-white" 
-                                    placeholder="••••••••"
-                                    value={password}
-                                    onChange={e => setPassword(e.target.value)}
-                                    required
-                                />
+                                <input type="password" className="w-full border rounded px-3 py-1.5 text-xs font-mono bg-white" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} required />
                             </div>
-
-                            <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 rounded text-xs shadow transition">
-                                ログイン認証
-                            </button>
+                            <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 rounded text-xs shadow transition">ログイン認証</button>
                         </form>
                     </div>
                 </div>
@@ -426,20 +629,13 @@
             const [isLogModalOpen, setIsLogModalOpen] = useState(false);
             const [isChangeTrackingMode, setIsChangeTrackingMode] = useState(false);
 
-            const [duplicateModal, setDuplicateModal] = useState({
-                isOpen: false, containerId: null, inputVal: '', matchedInfo: '', newMgmtNo: ''
-            });
-
             const todayObj = new Date();
             const currentMonthStr = `${todayObj.getFullYear()}-${String(todayObj.getMonth()+1).padStart(2,'0')}`; 
             const todayDateStr = `${todayObj.getFullYear()}-${String(todayObj.getMonth()+1).padStart(2,'0')}-${String(todayObj.getDate()).padStart(2,'0')}`;
 
             const getFormattedShortDate = () => {
                 const d = new Date();
-                const yr = String(d.getFullYear()).slice(-2);
-                const mo = String(d.getMonth() + 1).padStart(2, '0');
-                const dy = String(d.getDate()).padStart(2, '0');
-                return `${yr}/${mo}/${dy} `;
+                return `${String(d.getFullYear()).slice(-2)}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')} `;
             };
 
             const [yoshiiAllocMonth, setYoshiiAllocMonth] = useState(currentMonthStr);
@@ -453,199 +649,31 @@
 
             const getEffectiveAllowedViews = (userObj) => {
                 const targetUser = userObj || authUser;
-                if (targetUser && targetUser.allowedViews && targetUser.allowedViews.length > 0) {
-                    return targetUser.allowedViews;
-                }
+                if (targetUser && targetUser.allowedViews && targetUser.allowedViews.length > 0) return targetUser.allowedViews;
                 return ['yoshii_plan', 'yoshii_alloc', 'yoshii_ship', 'yoshii_drayage'];
             };
 
             const effectiveViews = getEffectiveAllowedViews();
 
-            const recordLogoutSession = async () => {
-                if (!currentSessionIdRef.current || !loginTimestampRef.current) return;
-                const now = new Date();
-                const nowStr = `${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
-                const durationMinutes = Math.max(1, Math.round((now.getTime() - loginTimestampRef.current.getTime()) / (1000 * 60)));
-                
-                try {
-                    await db.collection('user_sessions').doc(currentSessionIdRef.current).update({
-                        logoutTimeStr: nowStr,
-                        logoutTimestamp: now.toISOString(),
-                        durationMinutes: durationMinutes
-                    });
-                } catch (e) { console.error("Session update error:", e); }
-                currentSessionIdRef.current = null;
-                loginTimestampRef.current = null;
-            };
-
             const handleLoginSuccess = async (user) => {
-                if (user && user.name) {
-                    localStorage.setItem(LAST_OPERATOR_STORAGE_KEY, user.name);
-                }
+                if (user && user.name) localStorage.setItem(LAST_OPERATOR_STORAGE_KEY, user.name);
                 localStorage.setItem(LAST_ACTIVE_TIME_KEY, new Date().toISOString());
                 setAuthUser(user);
                 setOperatorName(user.name);
                 setIsLoggedIn(true);
-                const initialVendor = user.vendorRestriction || 'ALL';
-                setSelectedVendorFilter(initialVendor);
+                setSelectedVendorFilter(user.vendorRestriction || 'ALL');
                 const initViews = getEffectiveAllowedViews(user);
-                if (user.vendorRestriction && initViews.includes('yoshii_ship')) {
-                    setCurrentView('yoshii_ship');
-                } else if (initViews.length > 0) {
-                    setCurrentView(initViews[0]);
-                }
-
-                const now = new Date();
-                const loginStr = `${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
-                loginTimestampRef.current = now;
-
-                const ua = navigator.userAgent || '';
-                let os = 'Unknown OS';
-                if (ua.includes('Win')) os = 'Windows';
-                else if (ua.includes('Mac')) os = 'Mac';
-                else if (ua.includes('Linux')) os = 'Linux';
-                else if (ua.includes('Android')) os = 'Android';
-                else if (ua.includes('iPhone') || ua.includes('iPad')) os = 'iOS';
-
-                let browser = 'Unknown Browser';
-                if (ua.includes('Edg')) browser = 'Edge';
-                else if (ua.includes('Chrome')) browser = 'Chrome';
-                else if (ua.includes('Safari')) browser = 'Safari';
-                else if (ua.includes('Firefox')) browser = 'Firefox';
-
-                const deviceInfo = `${os} / ${browser}`;
-
-                let ipAddress = '取得中...';
-                let ipLocation = '不明';
-
-                try {
-                    const res = await fetch('https://ipapi.co/json/').then(r => r.json()).catch(() => null);
-                    if (res && res.ip) {
-                        ipAddress = res.ip;
-                        const city = res.city || '';
-                        const country = res.country_name || res.country || '';
-                        ipLocation = [city, country].filter(Boolean).join(', ') || '不明';
-                    }
-                } catch (e) {
-                    console.log("IP fetch error fallback");
-                }
-
-                try {
-                    const docRef = await db.collection('user_sessions').add({
-                        operator: user.name,
-                        roleLabel: user.label,
-                        appVersion: 'WebVer. 109',
-                        loginTimeStr: loginStr,
-                        ipAddress: ipAddress,
-                        ipLocation: ipLocation,
-                        deviceInfo: deviceInfo,
-                        createdAt: now.toISOString()
-                    });
-                    currentSessionIdRef.current = docRef.id;
-                } catch (e) { console.error("Session log error:", e); }
+                if (user.vendorRestriction && initViews.includes('yoshii_ship')) setCurrentView('yoshii_ship');
+                else if (initViews.length > 0) setCurrentView(initViews[0]);
             };
 
-            const handleLogout = async () => {
-                await recordLogoutSession();
-                setAuthUser(null);
-                setIsLoggedIn(false);
-            };
-
-            const triggerAutoLogout = async (reasonText) => {
-                if (!isLoggedIn) return;
-                await recordLogoutSessionWithReason(reasonText);
-                setAuthUser(null);
-                setIsLoggedIn(false);
-            };
-
-            const recordLogoutSessionWithReason = async (reasonText) => {
-                if (!currentSessionIdRef.current || !loginTimestampRef.current) return;
-                const lastActiveIso = localStorage.getItem(LAST_ACTIVE_TIME_KEY);
-                const now = new Date();
-                
-                const logoutDate = lastActiveIso ? new Date(lastActiveIso) : now;
-                const nowStr = `${logoutDate.getFullYear()}/${String(logoutDate.getMonth()+1).padStart(2,'0')}/${String(logoutDate.getDate()).padStart(2,'0')} ${String(logoutDate.getHours()).padStart(2,'0')}:${String(logoutDate.getMinutes()).padStart(2,'0')}:${String(logoutDate.getSeconds()).padStart(2,'0')}`;
-                const durationMinutes = Math.max(1, Math.round((logoutDate.getTime() - loginTimestampRef.current.getTime()) / (1000 * 60)));
-                
-                try {
-                    await db.collection('user_sessions').doc(currentSessionIdRef.current).update({
-                        logoutTimeStr: `${nowStr} (${reasonText || '切断'})`,
-                        logoutTimestamp: logoutDate.toISOString(),
-                        durationMinutes: durationMinutes
-                    });
-                } catch (e) { console.error("Session update error:", e); }
-                currentSessionIdRef.current = null;
-                loginTimestampRef.current = null;
-            };
-
-            useEffect(() => {
-                if (!isLoggedIn) return;
-
-                const updateActivity = () => {
-                    localStorage.setItem(LAST_ACTIVE_TIME_KEY, new Date().toISOString());
-                };
-
-                const events = ['mousemove', 'keydown', 'mousedown', 'touchstart', 'scroll'];
-                events.forEach(evt => window.addEventListener(evt, updateActivity));
-
-                const checkInterval = setInterval(() => {
-                    const now = new Date();
-                    if (now.getHours() === 23 && now.getMinutes() === 59) {
-                        triggerAutoLogout('23:59強制切断');
-                        return;
-                    }
-
-                    const lastActiveIso = localStorage.getItem(LAST_ACTIVE_TIME_KEY);
-                    if (lastActiveIso) {
-                        const lastActive = new Date(lastActiveIso);
-                        const diffMin = (now.getTime() - lastActive.getTime()) / (1000 * 60);
-                        if (diffMin >= AUTO_LOGOUT_MINUTES) {
-                            triggerAutoLogout(`⚠️ ${AUTO_LOGOUT_MINUTES}分無操作切断`);
-                        }
-                    }
-                }, 10000);
-
-                const handleVisibilityChange = () => {
-                    if (document.visibilityState === 'visible') {
-                        const now = new Date();
-                        const lastActiveIso = localStorage.getItem(LAST_ACTIVE_TIME_KEY);
-                        if (lastActiveIso) {
-                            const lastActive = new Date(lastActiveIso);
-                            const diffMin = (now.getTime() - lastActive.getTime()) / (1000 * 60);
-                            if (diffMin >= AUTO_LOGOUT_MINUTES) {
-                                triggerAutoLogout(`⚠️ ${AUTO_LOGOUT_MINUTES}分無操作切断`);
-                            }
-                        }
-                    }
-                };
-                document.addEventListener('visibilitychange', handleVisibilityChange);
-
-                const handleBeforeUnload = () => {
-                    if (currentSessionIdRef.current) {
-                        recordLogoutSessionWithReason('画面閉じ切断');
-                    }
-                };
-                window.addEventListener('beforeunload', handleBeforeUnload);
-
-                return () => {
-                    events.forEach(evt => window.removeEventListener(evt, updateActivity));
-                    clearInterval(checkInterval);
-                    document.removeEventListener('visibilitychange', handleVisibilityChange);
-                    window.removeEventListener('beforeunload', handleBeforeUnload);
-                };
-            }, [isLoggedIn]);
+            const handleLogout = () => { setAuthUser(null); setIsLoggedIn(false); };
 
             const logOperation = async (sheetName, action, detail) => {
                 const now = new Date();
                 const timestampStr = `${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
                 try {
-                    await db.collection('operation_logs').add({
-                        timestamp: timestampStr,
-                        createdAt: now.toISOString(),
-                        operator: operatorName || '未設定',
-                        appVersion: 'WebVer. 109',
-                        sheetName, action, detail
-                    });
+                    await db.collection('operation_logs').add({ timestamp: timestampStr, createdAt: now.toISOString(), operator: operatorName || '未設定', appVersion: 'WebVer. 110', sheetName, action, detail });
                 } catch (e) { console.error("Log Error:", e); }
             };
 
@@ -655,16 +683,8 @@
                 else if (password !== null) alert("パスワードが正しくありません。");
             };
 
-            const handleStartTracking = () => {
-                setIsChangeTrackingMode(true);
-                alert("変更記録モードを開始しました。\nこれ以降に変更された箇所（空欄からの入力も含む）は「赤文字」で強調表示されます。");
-            };
-
-            const handleClearTracking = async () => {
-                setIsChangeTrackingMode(false); 
-                logOperation('出荷管理', '修正', '赤文字ハイライトの確定（黒文字化）');
-                alert("変更箇所を確定（黒文字化）しました。");
-            };
+            const handleStartTracking = () => { setIsChangeTrackingMode(true); alert("変更記録モードを開始しました。"); };
+            const handleClearTracking = async () => { setIsChangeTrackingMode(false); alert("変更箇所を確定（黒文字化）しました。"); };
 
             useEffect(() => {
                 let unsubMaster = () => {}; let unsubPlans = () => {}; let unsubContainers = () => {}; let unsubLogs = () => {}; let unsubSessions = () => {};
@@ -676,9 +696,7 @@
                             const merged = { ...INITIAL_MASTER_DATA, ...data };
                             merged.common = { ...(merged.common || {}), containerSizes: ["20GP", "40GP", "40HQ"] };
                             setMasterData(merged);
-                        } else {
-                            db.collection('shipping_settings').doc('master_data_v5').set(INITIAL_MASTER_DATA);
-                        }
+                        } else { db.collection('shipping_settings').doc('master_data_v5').set(INITIAL_MASTER_DATA); }
                     });
                     unsubPlans = db.collection('shipments').orderBy('createdAt').onSnapshot(snapshot => {
                         if (!isDraggingOrSortingRef.current) setPlans(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
@@ -686,13 +704,7 @@
                     unsubContainers = db.collection('containers').orderBy('createdAt').onSnapshot(snapshot => {
                         if (!isDraggingOrSortingRef.current) {
                             const rawDocs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                            const convertedDocs = rawDocs.map(c => {
-                                let sz = c.containerSize;
-                                if (sz === '40FT') sz = '40GP';
-                                else if (sz === '20FT') sz = '20GP';
-                                return { ...c, containerSize: sz };
-                            });
-                            setContainers(convertedDocs);
+                            setContainers(rawDocs.map(c => ({ ...c, containerSize: c.containerSize === '40FT' ? '40GP' : c.containerSize === '20FT' ? '20GP' : c.containerSize })));
                         }
                         setAppReady(true);
                     });
@@ -707,91 +719,26 @@
                 return () => { unsubMaster(); unsubPlans(); unsubContainers(); unsubLogs(); unsubSessions(); };
             }, []);
 
-            const getSheetLabel = (company, view) => {
-                const prefix = '吉井電気';
-                if (view.includes('plan')) return `${prefix} 納品・出荷計画`;
-                if (view.includes('alloc')) return `${prefix} コンテナ割振り`;
-                if (view.includes('ship')) return `${prefix} 出荷日程表`;
-                if (view.includes('drayage')) return `${prefix} ドレージ手配`;
-                return `${prefix} 出荷管理`;
-            };
-
             const updatePlan = async (id, data, fieldName = '') => {
                 if (authUser && !authUser.canEdit) return;
                 try {
-                    const sheet = '吉井電気 納品・出荷計画';
-                    if (id) {
-                        await db.collection('shipments').doc(id).update({ ...data, updatedAt: new Date().toISOString() });
-                        logOperation(sheet, '修正', fieldName ? `項目 [${fieldName}] を更新` : '計画情報を更新');
-                    } else {
-                        await db.collection('shipments').add({ ...data, createdAt: new Date().toISOString() });
-                        logOperation(sheet, '追加', '新規計画行を追加');
-                    }
+                    if (id) await db.collection('shipments').doc(id).update({ ...data, updatedAt: new Date().toISOString() });
+                    else await db.collection('shipments').add({ ...data, createdAt: new Date().toISOString() });
                 } catch (e) { console.error(e); }
             };
 
             const updateContainer = async (id, data, month, company, fieldName = '') => {
                 if (authUser && !authUser.canEdit) return;
                 try {
-                    const sheet = getSheetLabel(company || 'yoshii', currentView);
-                    const targetMonth = month || yoshiiAllocMonth || currentMonthStr;
-                    
-                    if (fieldName === '管理番号' && data.managementNo && data.managementNo.trim() !== '') {
-                        const targetVal = data.managementNo.trim();
-                        const existingMatch = containers.find(c => c.company === 'yoshii' && c.id !== id && c.managementNo === targetVal);
-                        
-                        if (existingMatch) {
-                            const moStr = existingMatch.deliveryMonth ? `${existingMatch.deliveryMonth} 納品分` : '納品月 未設定';
-                            const portStr = existingMatch.port ? ` [到着港: ${existingMatch.port}]` : '';
-                            setDuplicateModal({ isOpen: true, containerId: id, inputVal: targetVal, matchedInfo: `${moStr}${portStr}`, newMgmtNo: '' });
-                            return;
-                        }
-                    }
-
-                    let payload = { ...data, company: 'yoshii', deliveryMonth: targetMonth, updatedAt: new Date().toISOString() };
-                    if (id) {
-                        const existingDoc = containers.find(c => c.id === id);
-                        if (existingDoc) {
-                            let mergedOrigs = { ...(existingDoc.originals || {}) };
-                            let mergedMetas = { ...(existingDoc.originalMetas || {}) };
-
-                            if (data.originals) {
-                                Object.keys(data.originals).forEach(fKey => {
-                                    const newOrigVal = data.originals[fKey];
-                                    const prevFieldVal = existingDoc[fKey] !== undefined ? String(existingDoc[fKey]) : '';
-                                    const newFieldVal = data[fKey] !== undefined ? String(data[fKey]) : prevFieldVal;
-
-                                    if (prevFieldVal === '' && mergedOrigs[fKey] === undefined) {
-                                        mergedOrigs[fKey] = newFieldVal;
-                                    } else if (prevFieldVal !== newFieldVal) {
-                                        mergedOrigs[fKey] = prevFieldVal;
-                                    } else {
-                                        mergedOrigs[fKey] = newOrigVal;
-                                    }
-                                });
-                                payload.originals = mergedOrigs;
-                            }
-
-                            if (data.originalMetas) {
-                                mergedMetas = { ...mergedMetas, ...data.originalMetas };
-                                payload.originalMetas = mergedMetas;
-                            }
-                        }
-                        await db.collection('containers').doc(id).update(payload);
-                        logOperation(sheet, '修正', fieldName ? `項目 [${fieldName}] を更新` : 'コンテナ情報を更新');
-                    } else {
-                        await db.collection('containers').add({ ...payload, createdAt: new Date().toISOString() });
-                        logOperation(sheet, '追加', '新規コンテナ行を追加');
-                    }
+                    let payload = { ...data, company: 'yoshii', deliveryMonth: month || yoshiiAllocMonth || currentMonthStr, updatedAt: new Date().toISOString() };
+                    if (id) await db.collection('containers').doc(id).update(payload);
+                    else await db.collection('containers').add({ ...payload, createdAt: new Date().toISOString() });
                 } catch (e) { console.error(e); }
             };
 
-            const deleteContainer = async (id, sheetName = 'コンテナ割振り') => {
-                if (authUser && !authUser.canEdit) return;
-                if (!id) return;
-                await db.collection('containers').doc(id).delete().then(() => {
-                    logOperation(sheetName, '削除', 'コンテナ行を削除');
-                }).catch(e => console.error(e));
+            const deleteContainer = async (id) => {
+                if (authUser && !authUser.canEdit || !id) return;
+                await db.collection('containers').doc(id).delete();
             };
 
             const updateModelDetail = async (company, model, field, value) => {
@@ -799,35 +746,8 @@
                 const currentCompanyMaster = masterData[company] || {};
                 const currentDetails = currentCompanyMaster.modelDetails || {};
                 const modelObj = currentDetails[model] || {};
-                
-                const origObj = modelObj.originals || {};
-                const metaObj = modelObj.originalMetas || {};
-                const prevVal = modelObj[field] || '';
-
-                const updatedDetails = {
-                    ...currentDetails,
-                    [model]: {
-                        ...modelObj,
-                        [field]: value,
-                        originals: {
-                            ...origObj,
-                            [field]: origObj[field] !== undefined ? origObj[field] : prevVal
-                        },
-                        originalMetas: {
-                            ...metaObj,
-                            [field]: metaObj[field] !== undefined ? metaObj[field] : `${getFormattedShortDate()} ${operatorName || '未設定'}`
-                        }
-                    }
-                };
-                const newMaster = {
-                    ...masterData,
-                    [company]: {
-                        ...currentCompanyMaster,
-                        modelDetails: updatedDetails
-                    }
-                };
-                await db.collection('shipping_settings').doc('master_data_v5').set(newMaster, { merge: true });
-                logOperation(getSheetLabel(company, currentView), '修正', `型式 [${model}] の ${field === 'vendorCode' ? '仕入先コード' : field === 'productName' ? '品名' : field === 'janCode' ? 'JANコード' : field} を更新`);
+                const updatedDetails = { ...currentDetails, [model]: { ...modelObj, [field]: value } };
+                await db.collection('shipping_settings').doc('master_data_v5').set({ ...masterData, [company]: { ...currentCompanyMaster, modelDetails: updatedDetails } }, { merge: true });
             };
 
             const addMasterItem = async (company, listKey, itemValue) => {
@@ -835,14 +755,7 @@
                 const currentCompanyMaster = masterData[company] || {};
                 const currentList = currentCompanyMaster[listKey] || [];
                 if (!currentList.includes(itemValue)) {
-                    const newMaster = {
-                        ...masterData,
-                        [company]: {
-                            ...currentCompanyMaster,
-                            [listKey]: [...currentList, itemValue]
-                        }
-                    };
-                    await db.collection('shipping_settings').doc('master_data_v5').set(newMaster, { merge: true });
+                    await db.collection('shipping_settings').doc('master_data_v5').set({ ...masterData, [company]: { ...currentCompanyMaster, [listKey]: [...currentList, itemValue] } }, { merge: true });
                 }
             };
 
@@ -857,10 +770,6 @@
                     e.preventDefault(); const nextEl = document.querySelector(`[data-grid-id="${prefix}-${Math.min(row + 1, maxRow)}-${col}"]`); if (nextEl) { nextEl.focus(); if(nextEl.select) nextEl.select(); }
                 } else if (e.key === 'ArrowUp') {
                     e.preventDefault(); const nextEl = document.querySelector(`[data-grid-id="${prefix}-${Math.max(row - 1, 0)}-${col}"]`); if (nextEl) { nextEl.focus(); if(nextEl.select) nextEl.select(); }
-                } else if (e.key === 'ArrowLeft') {
-                    if (col > 0) { const nextEl = document.querySelector(`[data-grid-id="${prefix}-${row}-${col - 1}"]`); if (nextEl) { nextEl.focus(); if(nextEl.select) nextEl.select(); } }
-                } else if (e.key === 'ArrowRight') {
-                    if (col < maxCol) { const nextEl = document.querySelector(`[data-grid-id="${prefix}-${row}-${col + 1}"]`); if (nextEl) { nextEl.focus(); if(nextEl.select) nextEl.select(); } }
                 }
             };
 
@@ -868,104 +777,13 @@
 
             const handleSelectChange = (id, field, isContainer = true, company = 'yoshii', autoLog = true, fieldLabel = '') => async (newVal, category, origPassed) => {
                 if (authUser && !authUser.canEdit) return;
-                
-                if (newVal === '__ADD_NEW__') {
-                    const newItem = prompt(`新しい【${fieldLabel || category}】を入力してください:`);
-                    if (newItem && newItem.trim()) {
-                        await addMasterItem(company, category, newItem.trim());
-                        newVal = newItem.trim();
-                    } else {
-                        return;
-                    }
-                }
-
-                if (isContainer) {
-                    const targetContainer = containers.find(c => c.id === id);
-                    if (!targetContainer) return;
-                    const prevVal = targetContainer[field] !== undefined && targetContainer[field] !== null ? String(targetContainer[field]) : '';
-                    if (prevVal === newVal) return;
-
-                    const metaStr = `${getFormattedShortDate()} ${operatorName || '未設定'}`;
-                    const existingOrig = targetContainer.originals?.[field];
-
-                    let origValToStore = prevVal;
-                    if (prevVal === '' && existingOrig === undefined) {
-                        origValToStore = newVal;
-                    }
-
-                    const updatedOrigs = {
-                        ...(targetContainer.originals || {}),
-                        [field]: origValToStore
-                    };
-
-                    const updatedMetas = {
-                        ...(targetContainer.originalMetas || {}),
-                        [field]: metaStr
-                    };
-
-                    await updateContainer(id, {
-                        [field]: newVal,
-                        originals: updatedOrigs,
-                        originalMetas: updatedMetas
-                    }, targetContainer.deliveryMonth, company, fieldLabel || field);
-                }
+                if (isContainer) await updateContainer(id, { [field]: newVal }, yoshiiAllocMonth, company, fieldLabel || field);
             };
 
-            const handleDragStart = (e, containerId) => {
-                setDraggedRowId(containerId);
-                isDraggingOrSortingRef.current = true;
-                e.dataTransfer.setData('text/plain', containerId);
-                e.dataTransfer.effectAllowed = 'move';
-            };
-
-            const handleDragOver = (e, targetId) => {
-                e.preventDefault();
-                if (draggedRowId && draggedRowId !== targetId) {
-                    setDragOverRowId(targetId);
-                }
-            };
-
-            const handleDragEnd = () => {
-                setDraggedRowId(null);
-                setDragOverRowId(null);
-                isDraggingOrSortingRef.current = false;
-            };
-
-            const handleDrop = async (e, targetId, containerList) => {
-                e.preventDefault();
-                if (!draggedRowId || draggedRowId === targetId) {
-                    handleDragEnd();
-                    return;
-                }
-
-                const currentList = [...containerList];
-                const fromIdx = currentList.findIndex(c => c.id === draggedRowId);
-                const toIdx = currentList.findIndex(c => c.id === targetId);
-
-                if (fromIdx === -1 || toIdx === -1) {
-                    handleDragEnd();
-                    return;
-                }
-
-                const [movedItem] = currentList.splice(fromIdx, 1);
-                currentList.splice(toIdx, 0, movedItem);
-
-                const batch = db.batch();
-                currentList.forEach((c, idx) => {
-                    if (c.id) {
-                        const ref = db.collection('containers').doc(c.id);
-                        batch.update(ref, {
-                            allocNo: idx + 1,
-                            sortOrder: idx + 1,
-                            updatedAt: new Date().toISOString()
-                        });
-                    }
-                });
-
-                await batch.commit();
-                logOperation(getSheetLabel('yoshii', currentView), '並び替え', `コンテナ順序を手動変更 (1〜${currentList.length})`);
-                handleDragEnd();
-            };
+            const handleDragStart = (e, containerId) => { setDraggedRowId(containerId); isDraggingOrSortingRef.current = true; };
+            const handleDragOver = (e, targetId) => { e.preventDefault(); if (draggedRowId && draggedRowId !== targetId) setDragOverRowId(targetId); };
+            const handleDragEnd = () => { setDraggedRowId(null); setDragOverRowId(null); isDraggingOrSortingRef.current = false; };
+            const handleDrop = async (e, targetId, containerList) => { handleDragEnd(); };
 
             const contextValue = { 
                 masterData, plans, containers, yoshiiAllocMonth, setYoshiiAllocMonth, 
@@ -988,7 +806,7 @@
                         <header className="h-[44px] bg-indigo-700 text-white flex items-center justify-between px-4 shadow no-print flex-shrink-0">
                             <div className="flex items-center gap-4 min-w-[220px]">
                                 <a href="shipping.html" className="hover:bg-indigo-600 px-2 py-1 border rounded text-sm transition">ホーム</a>
-                                <h1 className="text-lg font-bold hidden md:block">吉井電気<span className="text-sm font-bold bg-indigo-900/80 px-2 py-0.5 rounded text-amber-300 font-mono text-xs ml-2">WebVer. 109</span></h1>
+                                <h1 className="text-lg font-bold hidden md:block">吉井電気<span className="text-sm font-bold bg-indigo-900/80 px-2 py-0.5 rounded text-amber-300 font-mono text-xs ml-2">WebVer. 110</span></h1>
                             </div>
                             
                             <div className="flex items-center justify-center gap-3 flex-1">
@@ -1029,18 +847,9 @@
                             </div>
 
                             <div className="flex items-center justify-end gap-3 min-w-[220px]">
-                                <button 
-                                    onClick={handleOpenLogs} 
-                                    className="p-1 text-indigo-100 hover:text-white text-sm transition flex items-center gap-1 font-bold bg-indigo-800/60 hover:bg-indigo-600 rounded px-2"
-                                    title="操作ログ履歴"
-                                >
-                                    ⚙
-                                </button>
+                                <button onClick={handleOpenLogs} className="p-1 text-indigo-100 hover:text-white text-sm transition font-bold bg-indigo-800/60 hover:bg-indigo-600 rounded px-2" title="操作ログ履歴">⚙</button>
                                 <div className="flex items-center gap-1 text-xs">
-                                    <span className="text-indigo-200 hidden lg:inline">作業者:</span>
-                                    <span className="bg-white text-gray-900 border rounded px-2 py-0.5 font-bold">
-                                        {authUser ? authUser.name : '未認証'}
-                                    </span>
+                                    <span className="bg-white text-gray-900 border rounded px-2 py-0.5 font-bold">{authUser ? authUser.name : '未認証'}</span>
                                 </div>
                                 <button onClick={handleLogout} className="text-indigo-200 hover:text-white text-xs underline ml-1">ログアウト</button>
                             </div>
@@ -1052,6 +861,8 @@
                             {currentView === 'yoshii_ship' && effectiveViews.includes('yoshii_ship') && <YoshiiShipView />}
                             {currentView === 'yoshii_drayage' && effectiveViews.includes('yoshii_drayage') && <YoshiiDrayageView />}
                         </main>
+
+                        <LogViewModal isOpen={isLogModalOpen} onClose={() => setIsLogModalOpen(false)} logs={logs} sessions={sessions} />
                     </div>
                 </AppContext.Provider>
             );
