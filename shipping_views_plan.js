@@ -1,11 +1,203 @@
 // =========================================================
 // shipping_views_plan.js - 出荷計画・割振り画面モジュール
-// ★ JSファイル固有バージョン: _js002 (割振り画面 & 計画編集機能 完全復元版)
+// ★ WebVer. 94 完全レイアウト・ロジック忠実移植版
+// ★ JSファイル固有バージョン: _js003
 // =========================================================
 
-const JS_PLAN_VERSION = '_js002';
+const JS_PLAN_VERSION = '_js003';
 
-// 【1. 吉井電気 年間出荷計画ビュー】
+// 【型式編集・削除モーダル (V94完全移植)】
+const ModelEditModal = ({ isOpen, onClose, company='yoshii' }) => {
+    const ctx = React.useContext(AppContext);
+    const [models, setModels] = React.useState([]);
+    const [editingModel, setEditingModel] = React.useState(null);
+    const [newModelName, setNewModelName] = React.useState('');
+    const [deleteTarget, setDeleteTarget] = React.useState(null);
+
+    React.useEffect(() => {
+        if (isOpen) {
+            const masterModels = ctx.masterData[company]?.models || [];
+            const planModels = ctx.plans.filter(p => p.company === company && p.model).map(p => p.model);
+            const mergedSet = new Set([...masterModels, ...planModels]);
+            const modelOrders = ctx.masterData[company]?.modelOrder || {};
+            const compiledModels = Array.from(mergedSet).sort((a, b) => {
+                const orderA = modelOrders[a] !== undefined ? modelOrders[a] : 9999;
+                const orderB = modelOrders[b] !== undefined ? modelOrders[b] : 9999;
+                if (orderA !== orderB) return orderA - orderB;
+                return a.localeCompare(b, 'ja');
+            });
+            setModels(compiledModels);
+        }
+    }, [isOpen, ctx.masterData, ctx.plans, company]);
+
+    if (!isOpen) return null;
+
+    const handleStartEdit = (m) => {
+        setEditingModel(m);
+        setNewModelName(m);
+    };
+
+    const handleSaveEdit = async () => {
+        if (!newModelName.trim()) return alert("型式名を入力してください。");
+        const targetOld = editingModel;
+        const targetNew = newModelName.trim();
+
+        if (targetOld === targetNew) {
+            setEditingModel(null);
+            return;
+        }
+
+        const currentMaster = ctx.masterData[company] || {};
+        const updatedModels = Array.from(new Set([...(currentMaster.models || []).map(m => m === targetOld ? targetNew : m), targetNew]));
+        const currentDetails = { ...(currentMaster.modelDetails || {}) };
+        if (currentDetails[targetOld]) {
+            currentDetails[targetNew] = currentDetails[targetOld];
+            delete currentDetails[targetOld];
+        }
+
+        const newMaster = {
+            ...ctx.masterData,
+            [company]: { ...currentMaster, models: updatedModels, modelDetails: currentDetails }
+        };
+
+        await firebase.firestore().collection('shipping_settings').doc('master_data_v5').set(newMaster, { merge: true });
+
+        const normOld = normalizeModelCode(targetOld);
+        const matchingPlans = ctx.plans.filter(p => p.company === company && normalizeModelCode(p.model) === normOld);
+        if (matchingPlans.length > 0) {
+            const batch = firebase.firestore().batch();
+            matchingPlans.forEach(p => {
+                batch.update(firebase.firestore().collection('shipments').doc(p.id), { model: targetNew });
+            });
+            await batch.commit();
+        }
+
+        ctx.logOperation('型式マスタ', '修正', `型式名を [${targetOld}] から [${targetNew}] へ更新`);
+        setEditingModel(null);
+    };
+
+    const promptDeleteConfirm = (modelToDelete) => {
+        const normTarget = normalizeModelCode(modelToDelete);
+        const matchingPlans = ctx.plans.filter(p => p.company === company && normalizeModelCode(p.model) === normTarget);
+        const totalQty = matchingPlans.reduce((sum, p) => sum + Number(p.quantity || 0), 0);
+        setDeleteTarget({ model: modelToDelete, totalQty });
+    };
+
+    const handleExecuteDeleteModel = async () => {
+        if (!deleteTarget) return;
+        const modelToDelete = deleteTarget.model;
+
+        const currentMaster = ctx.masterData[company] || {};
+        const updatedModels = (currentMaster.models || []).filter(m => m !== modelToDelete);
+        const currentDetails = { ...(currentMaster.modelDetails || {}) };
+        delete currentDetails[modelToDelete];
+
+        const newMaster = {
+            ...ctx.masterData,
+            [company]: { ...currentMaster, models: updatedModels, modelDetails: currentDetails }
+        };
+
+        await firebase.firestore().collection('shipping_settings').doc('master_data_v5').set(newMaster, { merge: true });
+
+        const normTarget = normalizeModelCode(modelToDelete);
+        const matchingPlans = ctx.plans.filter(p => p.company === company && normalizeModelCode(p.model) === normTarget);
+        if (matchingPlans.length > 0) {
+            const batch = firebase.firestore().batch();
+            matchingPlans.forEach(p => {
+                batch.delete(firebase.firestore().collection('shipments').doc(p.id));
+            });
+            await batch.commit();
+        }
+
+        ctx.logOperation('型式マスタ', '削除', `型式 [${modelToDelete}] (計画数: ${deleteTarget.totalQty}) を削除`);
+        setDeleteTarget(null);
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-xl h-[75vh] flex flex-col relative">
+                <div className="p-4 bg-emerald-700 text-white flex justify-between items-center rounded-t-lg">
+                    <h3 className="font-bold text-base flex items-center gap-2">✏ 型式マスタの編集・削除 ({company === 'yoshii' ? '吉井電気' : '日立GLS'})</h3>
+                    <button onClick={onClose} className="text-xl font-bold hover:text-gray-300">×</button>
+                </div>
+                <div className="p-4 overflow-y-auto flex-grow">
+                    <table className="w-full text-xs border-collapse">
+                        <thead className="bg-gray-100 sticky top-0">
+                            <tr className="border-b text-left">
+                                <th className="p-2 border">登録型式名</th>
+                                <th className="p-2 border w-24 text-center">編集</th>
+                                <th className="p-2 border w-20 text-center">削除</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {models.length === 0 ? (
+                                <tr><td colSpan="3" className="p-4 text-center text-gray-500">登録型式はありません。</td></tr>
+                            ) : (
+                                models.map(m => (
+                                    <tr key={m} className="border-b hover:bg-gray-50">
+                                        <td className="p-2 border font-bold">
+                                            {editingModel === m ? (
+                                                <input 
+                                                    type="text" 
+                                                    value={newModelName} 
+                                                    onChange={e => setNewModelName(e.target.value)} 
+                                                    className="w-full border p-1 rounded font-bold text-sm bg-yellow-50"
+                                                    autoFocus
+                                                />
+                                            ) : (
+                                                m
+                                            )}
+                                        </td>
+                                        <td className="p-2 border text-center">
+                                            {editingModel === m ? (
+                                                <button onClick={handleSaveEdit} className="bg-blue-600 text-white px-2 py-1 rounded font-bold hover:bg-blue-700">保存</button>
+                                            ) : (
+                                                <button onClick={() => handleStartEdit(m)} className="bg-gray-200 text-gray-800 px-2 py-1 rounded font-bold hover:bg-gray-300">✏ 修正</button>
+                                            )}
+                                        </td>
+                                        <td className="p-2 border text-center">
+                                            <button onClick={() => promptDeleteConfirm(m)} className="bg-red-500 text-white px-2 py-1 rounded font-bold hover:bg-red-600">削除</button>
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+                <div className="p-3 bg-gray-100 border-t flex justify-end">
+                    <button onClick={onClose} className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-1 rounded text-xs font-bold">閉じる</button>
+                </div>
+
+                {deleteTarget && (
+                    <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                        <div className="bg-white rounded-xl shadow-2xl border-2 border-red-500 max-w-md w-full p-6 space-y-4 text-center">
+                            <div className="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto text-2xl font-bold">⚠️</div>
+                            <h3 className="text-base font-bold text-slate-800 border-b pb-2">型式データの完全削除確認</h3>
+                            <div className="bg-red-50 p-4 rounded-lg border border-red-200 text-left space-y-2 text-xs">
+                                <p className="font-bold text-slate-700">以下の型式および関連計画データを削除します。</p>
+                                <div className="flex justify-between items-center bg-white p-2.5 rounded border border-red-300">
+                                    <span className="text-gray-600 font-bold">対象型式名:</span>
+                                    <span className="text-red-600 font-extrabold text-sm font-mono">{deleteTarget.model}</span>
+                                </div>
+                                <div className="flex justify-between items-center bg-white p-2.5 rounded border border-red-300">
+                                    <span className="text-gray-600 font-bold">年間合計計画台数:</span>
+                                    <span className="text-emerald-700 font-extrabold text-sm">{deleteTarget.totalQty.toLocaleString()} 台</span>
+                                </div>
+                            </div>
+                            <p className="text-xs text-red-600 font-bold">※削除するとデータベースから計画数が消去されます。本当に実行しますか？</p>
+                            <div className="flex justify-end gap-3 pt-2">
+                                <button onClick={() => setDeleteTarget(null)} className="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300 font-bold text-xs text-gray-700">キャンセル</button>
+                                <button onClick={handleExecuteDeleteModel} className="px-5 py-2 rounded bg-red-600 hover:bg-red-700 font-bold text-xs text-white shadow">本当に削除する</button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
+// 【1. 吉井電気 納品・出荷計画ビュー (V94完全構造)】
 const YoshiiPlanView = () => {
     const ctx = React.useContext(AppContext);
     const [exportModal, setExportModal] = React.useState({ isOpen: false, type: 'excel' });
@@ -13,145 +205,566 @@ const YoshiiPlanView = () => {
     const baseAppVer = typeof SYSTEM_VERSION !== 'undefined' ? SYSTEM_VERSION : '';
     const displayVer = `${baseAppVer}${JS_PLAN_VERSION}`;
 
-    const handleExecuteExport = ({ selectedYear }) => {
+    const handleExecuteExport = ({ mode, selectedYear: selYr, singleMonth: sgMo, startMonth: sMo, endMonth: eMo }) => {
+        const targetVendor = ctx.selectedVendorFilter || 'ALL';
+        
         if (exportModal.type === 'print') {
             setTimeout(() => window.print(), 300);
             return;
         }
 
-        const headers = [
-            '仕入先コード', '仕入先名', '型番', '品名', 
-            '4月', '5月', '6月', '7月', '8月', '9月', 
-            '10月', '11月', '12月', '1月', '2月', '3月', '年間合計'
-        ];
+        const headers = ['仕入先コード', '型式', '品名', 'JANコード', '合計', ...displayMonths.map(mo => mo.replace('-', '/')), '備考 / 出荷調整状況'];
+        
+        const monthTotals = displayMonths.map(mo => calculateColTotal(mo));
+        const totalRow = ['-', '-', '月間合計', '-', totalGrandTotal, ...monthTotals, '-'];
 
-        const rows = filteredPlans.map(p => {
-            const m = p.months || {};
-            const sum = Object.values(m).reduce((a, b) => a + (Number(b) || 0), 0);
-            return [
-                p.vendorCode || '', p.vendorName || '', p.model || '', p.productName || '',
-                m['04'] || 0, m['05'] || 0, m['06'] || 0, m['07'] || 0, m['08'] || 0, m['09'] || 0,
-                m['10'] || 0, m['11'] || 0, m['12'] || 0, m['01'] || 0, m['02'] || 0, m['03'] || 0,
-                sum
-            ];
+        const dataRows = visibleModels.map(m => {
+            const matchModelDetails = ctx.masterData.yoshii?.modelDetails?.[m] || {};
+            const normTarget = normalizeModelCode(m);
+            const matchPlanInfo = yoshiiPlans.find(p => normalizeModelCode(p.model) === normTarget && (p.productName || p.janCode || p.notes));
+            
+            const currentProdName = matchModelDetails.productName !== undefined ? matchModelDetails.productName : (matchPlanInfo?.productName || '');
+            const currentJanCode = matchModelDetails.janCode !== undefined ? matchModelDetails.janCode : (matchPlanInfo?.janCode || '');
+            const currentVendorCode = matchModelDetails.vendorCode !== undefined ? matchModelDetails.vendorCode : (matchPlanInfo?.vendorCode || '');
+            const currentNotes = matchModelDetails.notes !== undefined ? matchModelDetails.notes : (matchPlanInfo?.notes || '');
+            const rowTot = calculateRowTotal(m);
+
+            const monthQtys = displayMonths.map(mo => {
+                const qty = getPlanData(m, mo)?.quantity;
+                return qty !== undefined && qty !== '' ? Number(qty) : 0;
+            });
+
+            return [currentVendorCode, m, currentProdName, currentJanCode, rowTot, ...monthQtys, currentNotes];
         });
 
-        const filename = `吉井電気_出荷計画表_${selectedYear}年度.xlsx`;
+        const dateTag = mode === 'current' ? formatYYMM(ctx.currentMonthStr) : mode === 'year' ? `${selYr}年度` : mode === 'single' ? formatYYMM(sgMo) : `${formatYYMM(sMo)}_${formatYYMM(eMo)}`;
+        const filename = `${targetVendor}_納品出荷計画_${dateTag}.xlsx`;
+
         exportToExcelSimple({
-            title: `吉井電気 出荷計画表 [対象年度: ${selectedYear}年度]`,
-            headers, rows, filename
+            title: `吉井電気 納品・出荷計画 [仕入先: ${targetVendor}] [期間: ${dateTag}]`,
+            headers, rows: [totalRow, ...dataRows], filename
         });
     };
 
-    let filteredPlans = ctx.plans.filter(p => p.company === 'yoshii' || !p.company);
-    if (ctx.selectedVendorFilter && ctx.selectedVendorFilter !== 'ALL') {
-        filteredPlans = filteredPlans.filter(p => p.vendorCode === ctx.selectedVendorFilter || p.vendorName === ctx.selectedVendorFilter);
+    const [categoryFilter, setCategoryFilter] = React.useState('全体');
+    const [showHistory, setShowHistory] = React.useState(false);
+    const [onlyCheckedFilter, setOnlyCheckedFilter] = React.useState(false);
+
+    const [rangeMode, setRangeMode] = React.useState('year');
+    const [selectedYear, setSelectedYear] = React.useState(2026);
+    const [customStartMonth, setCustomStartMonth] = React.useState('2026-04');
+    const [customEndMonth, setCustomEndMonth] = React.useState('2027-03');
+
+    const [isAddModalOpen, setIsAddModalOpen] = React.useState(false);
+    const [isEditModalOpen, setIsEditModalOpen] = React.useState(false);
+    const [newModel, setNewModel] = React.useState('');
+    const [newProductName, setNewProductName] = React.useState('');
+    const [newJanCode, setNewJanCode] = React.useState('');
+    const [newVendorCode, setNewJanVendorCode] = React.useState('');
+
+    const [draggedModel, setDraggedModel] = React.useState(null);
+    const [dragOverModel, setDragOverModel] = React.useState(null);
+
+    const [checkedModels, setCheckedModels] = React.useState(() => {
+        return ctx.masterData.yoshii?.checkedModels || {};
+    });
+
+    React.useEffect(() => {
+        if (ctx.masterData.yoshii?.checkedModels) {
+            setCheckedModels(ctx.masterData.yoshii.checkedModels);
+        }
+    }, [ctx.masterData.yoshii?.checkedModels]);
+
+    const generateMonths = () => {
+        const months = [];
+        if (rangeMode === 'year') {
+            for (let i = 0; i < 12; i++) {
+                const mo = (i + 3) % 12 + 1;
+                const yr = (i + 3) >= 12 ? Number(selectedYear) + 1 : Number(selectedYear);
+                months.push(`${yr}-${String(mo).padStart(2, '0')}`);
+            }
+        } else {
+            let curr = new Date(`${customStartMonth}-01`);
+            const end = new Date(`${customEndMonth}-01`);
+            while (curr <= end && months.length < 36) {
+                const yr = curr.getFullYear();
+                const mo = String(curr.getMonth() + 1).padStart(2, '0');
+                months.push(`${yr}-${mo}`);
+                curr.setMonth(curr.getMonth() + 1);
+            }
+        }
+        return months;
+    };
+
+    const displayMonths = generateMonths();
+    const yoshiiPlans = ctx.plans.filter(p => p.company === 'yoshii');
+    const modelOrders = ctx.masterData.yoshii?.modelOrder || {};
+
+    let modelsSet = new Set(yoshiiPlans.filter(p => p.model).map(p => p.model));
+    (ctx.masterData.yoshii.models || []).forEach(m => modelsSet.add(m));
+    
+    let allModels = Array.from(modelsSet).sort((a,b) => {
+        const orderA = modelOrders[a] !== undefined ? modelOrders[a] : 9999;
+        const orderB = modelOrders[b] !== undefined ? modelOrders[b] : 9999;
+        if (orderA !== orderB) return orderA - orderB;
+        return a.localeCompare(b, 'ja');
+    });
+
+    if (categoryFilter === 'KS') {
+        allModels = allModels.filter(m => m.toUpperCase().includes('KS'));
+    } else if (categoryFilter === 'ALC') {
+        allModels = allModels.filter(m => m.toUpperCase().includes('ALC'));
+    } else if (categoryFilter === '（Z)CCN' || categoryFilter === '(Z)CCN') {
+        allModels = allModels.filter(m => m.toUpperCase().includes('CCN') || m.toUpperCase().includes('ZCCN'));
+    } else if (categoryFilter === 'その他') {
+        allModels = allModels.filter(m => {
+            const u = m.toUpperCase();
+            return !u.includes('KS') && !u.includes('ALC') && !u.includes('CCN') && !u.includes('ZCCN');
+        });
     }
 
-    const canEdit = ctx.authUser && ctx.authUser.canEdit;
+    if (ctx.selectedVendorFilter && ctx.selectedVendorFilter !== 'ALL') {
+        allModels = allModels.filter(m => {
+            const matchModelDetails = ctx.masterData.yoshii?.modelDetails?.[m] || {};
+            const normTarget = normalizeModelCode(m);
+            const matchPlanInfo = yoshiiPlans.find(p => normalizeModelCode(p.model) === normTarget && p.vendorCode);
+            const vCode = matchModelDetails.vendorCode !== undefined ? matchModelDetails.vendorCode : (matchPlanInfo?.vendorCode || '');
+            return vCode === ctx.selectedVendorFilter;
+        });
+    }
 
-    const handleMonthChange = (planId, moKey, val, currentMonths = {}) => {
-        if (!canEdit) return;
-        const numVal = Number(val) || 0;
-        const updatedMonths = { ...currentMonths, [moKey]: numVal };
-        ctx.updatePlan(planId, { months: updatedMonths }, `計画_${moKey}月`);
+    const visibleModels = onlyCheckedFilter 
+        ? allModels.filter(m => checkedModels[m] !== false) 
+        : allModels;
+
+    const handleModelDragStart = (e, model) => {
+        setDraggedModel(model);
+        e.dataTransfer.setData('text/plain', model);
+        e.dataTransfer.effectAllowed = 'move';
     };
 
+    const handleModelDragOver = (e, model) => {
+        e.preventDefault();
+        if (draggedModel && draggedModel !== model) {
+            setDragOverModel(model);
+        }
+    };
+
+    const handleModelDrop = async (e, targetModel) => {
+        e.preventDefault();
+        if (!draggedModel || draggedModel === targetModel) return;
+
+        const currentList = [...allModels];
+        const fromIdx = currentList.indexOf(draggedModel);
+        const toIdx = currentList.indexOf(targetModel);
+
+        if (fromIdx === -1 || toIdx === -1) return;
+
+        currentList.splice(fromIdx, 1);
+        currentList.splice(toIdx, 0, draggedModel);
+
+        const updatedOrders = { ...modelOrders };
+        currentList.forEach((m, idx) => {
+            updatedOrders[m] = (idx + 1) * 10;
+        });
+
+        const newMaster = {
+            ...ctx.masterData,
+            yoshii: { ...ctx.masterData.yoshii, modelOrder: updatedOrders }
+        };
+
+        await firebase.firestore().collection('shipping_settings').doc('master_data_v5').set(newMaster, { merge: true });
+        setDraggedModel(null);
+        setDragOverModel(null);
+    };
+
+    const getPlanData = (model, month) => {
+        const normTarget = normalizeModelCode(model);
+        return yoshiiPlans.find(p => normalizeModelCode(p.model) === normTarget && p.deliveryMonth === month);
+    };
+
+    const handleModelDetailChange = async (model, field, value) => {
+        if (field === 'vendorCode' && value && value.trim() !== '') {
+            const cleanCode = value.trim().toUpperCase();
+            const knownVendors = ctx.masterData.yoshii?.vendors || ['JP', 'GM', 'LDS', 'SLT', 'YO'];
+            if (!knownVendors.includes(cleanCode)) {
+                const confirmAdd = window.confirm(`未登録の仕入先コード 『${cleanCode}』 が入力されました。\n\n新しい仕入先として登録しますか？`);
+                if (confirmAdd) {
+                    const updatedVendors = Array.from(new Set([...knownVendors, cleanCode]));
+                    const newMaster = {
+                        ...ctx.masterData,
+                        yoshii: { ...(ctx.masterData.yoshii || {}), vendors: updatedVendors }
+                    };
+                    await firebase.firestore().collection('shipping_settings').doc('master_data_v5').set(newMaster, { merge: true });
+                    value = cleanCode;
+                }
+            } else {
+                value = cleanCode;
+            }
+        }
+
+        await ctx.updateModelDetail('yoshii', model, field, value);
+
+        const normTarget = normalizeModelCode(model);
+        const matchingPlans = yoshiiPlans.filter(p => normalizeModelCode(p.model) === normTarget);
+        const batch = firebase.firestore().batch();
+        matchingPlans.forEach(p => {
+            batch.update(firebase.firestore().collection('shipments').doc(p.id), {
+                [field]: value,
+                updatedAt: new Date().toISOString()
+            });
+        });
+        if (matchingPlans.length > 0) {
+            await batch.commit();
+        }
+    };
+
+    const handleAddNewModelSubmit = async (e) => {
+        e.preventDefault();
+        const targetModel = newModel.trim();
+        if (!targetModel) return alert("型式名を入力してください。");
+
+        const normalizedTarget = normalizeModelCode(targetModel);
+        const isDuplicate = allModels.some(m => normalizeModelCode(m) === normalizedTarget);
+
+        if (isDuplicate) {
+            alert("入力された型式 (" + targetModel + ") は既に登録されています。");
+            return;
+        }
+
+        await ctx.addMasterItem('yoshii', 'models', targetModel);
+        if (newProductName.trim()) await ctx.updateModelDetail('yoshii', targetModel, 'productName', newProductName.trim());
+        if (newJanCode.trim()) await ctx.updateModelDetail('yoshii', targetModel, 'janCode', newJanCode.trim());
+        if (newVendorCode.trim()) await ctx.updateModelDetail('yoshii', targetModel, 'vendorCode', newVendorCode.trim());
+
+        setNewModel(''); setNewProductName(''); setNewJanCode(''); setNewJanVendorCode('');
+        setIsAddModalOpen(false);
+    };
+
+    const handleQuantityChange = async (model, month, newQtyStr, originalVal) => {
+        const targetPlan = getPlanData(model, month);
+        const newQty = newQtyStr === '' ? 0 : Number(newQtyStr);
+        const todayYYMMDD = ctx.getFormattedShortDate();
+
+        const matchModelDetails = ctx.masterData.yoshii?.modelDetails?.[model] || {};
+        const normTarget = normalizeModelCode(model);
+        const matchPlan = yoshiiPlans.find(p => normalizeModelCode(p.model) === normTarget && (p.productName || p.janCode));
+
+        const currentProductName = matchModelDetails.productName !== undefined ? matchModelDetails.productName : (matchPlan?.productName || '');
+        const currentJanCode = matchModelDetails.janCode !== undefined ? matchModelDetails.janCode : (matchPlan?.janCode || '');
+        const currentVendorCode = matchModelDetails.vendorCode || '';
+
+        const metaStr = `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}`;
+
+        if (targetPlan) {
+            const currentQty = Number(targetPlan.quantity || 0);
+            if (currentQty === newQty) return;
+
+            const prevHist = targetPlan.qtyHistory || [];
+            const updatedHist = [{ qty: newQty, date: todayYYMMDD }, ...prevHist];
+
+            await ctx.updatePlan(targetPlan.id, { 
+                quantity: newQty, 
+                qtyHistory: updatedHist,
+                productName: currentProductName,
+                janCode: currentJanCode,
+                vendorCode: currentVendorCode,
+                originalVal: originalVal !== undefined && originalVal !== '' ? (targetPlan.originalVal || originalVal) : targetPlan.originalVal,
+                originalMeta: originalVal !== undefined && originalVal !== '' ? (targetPlan.originalMeta || metaStr) : targetPlan.originalMeta
+            }, `型式 [${model}] ${month} 計画数`);
+        } else {
+            if (newQty === 0) return;
+            await ctx.updatePlan(null, {
+                company: 'yoshii',
+                model: model,
+                productName: currentProductName,
+                janCode: currentJanCode,
+                vendorCode: currentVendorCode,
+                deliveryMonth: month,
+                quantity: newQty,
+                qtyHistory: [{ qty: newQty, date: todayYYMMDD }],
+                originalVal: originalVal !== undefined && originalVal !== '' ? originalVal : undefined,
+                originalMeta: originalVal !== undefined && originalVal !== '' ? metaStr : undefined
+            }, `型式 [${model}] ${month} 計画数`);
+        }
+    };
+
+    const handleDeleteHistory = async (planId, historyIdx, model, month) => {
+        const targetPlan = yoshiiPlans.find(p => p.id === planId);
+        if (!targetPlan || !targetPlan.qtyHistory) return;
+
+        const newHist = [...targetPlan.qtyHistory];
+        newHist.splice(historyIdx, 1);
+        const latestQty = newHist.length > 0 ? newHist[0].qty : 0;
+
+        await ctx.updatePlan(planId, { quantity: latestQty, qtyHistory: newHist }, `型式 [${model}] ${month} 履歴削除`);
+    };
+
+    const calculateRowTotal = (model) => {
+        return displayMonths.reduce((sum, mo) => sum + Number(getPlanData(model, mo)?.quantity || 0), 0);
+    };
+
+    const calculateColTotal = (month) => {
+        return visibleModels.reduce((sum, m) => {
+            const p = getPlanData(m, month);
+            const q = p ? Number(p.quantity) : 0;
+            return sum + (isNaN(q) ? 0 : q);
+        }, 0);
+    };
+
+    const totalGrandTotal = visibleModels.reduce((sum, m) => sum + calculateRowTotal(m), 0);
+    const handleGridNav = ctx.createGridNav('y-matrix-plan', visibleModels.length - 1, displayMonths.length - 1);
+
+    const startStr = `${displayMonths[0]?.split('-')[0]}年${displayMonths[0]?.split('-')[1]}月`;
+    const endStr = `${displayMonths[displayMonths.length - 1]?.split('-')[0]}年${displayMonths[displayMonths.length - 1]?.split('-')[1]}月`;
+    const dynamicTitle = `吉井電気（株）様向け 納品・出荷計画（${startStr}～${endStr}）`;
+
+    const rowPaddingClass = 'py-0 px-0.5 h-[24px]';
+
     return (
-        <div className="p-3 bg-white flex-grow flex flex-col h-full overflow-hidden text-xs">
-            {/* ヘッダーエリア */}
-            <div className="flex justify-between items-center mb-2 no-print flex-shrink-0">
+        <div className="p-4 bg-white flex-grow flex flex-col h-full">
+            <div className="hidden print:block font-bold text-sm text-black mb-1.5 border-b pb-1 text-left w-full">
+                {dynamicTitle} [仕入先: {ctx.selectedVendorFilter || 'ALL'}]
+            </div>
+            
+            <div className="mb-2 flex-shrink-0 flex justify-between items-center no-print">
                 <div className="flex items-center gap-2">
-                    <h2 className="text-base font-bold text-indigo-900">吉井電気 年間出荷計画表</h2>
+                    <h2 className="text-base md:text-lg font-extrabold text-emerald-900 border-b-2 border-emerald-600 pb-1">
+                        {dynamicTitle}
+                    </h2>
                     <span className="bg-slate-700 text-slate-100 border border-slate-500 text-[10px] font-extrabold px-2 py-0.5 rounded font-mono shadow-sm">
                         {displayVer}
                     </span>
                 </div>
-                <div className="flex items-center gap-2 font-bold">
-                    <button onClick={() => setExportModal({ isOpen: true, type: 'excel' })} className="px-2 py-1 text-xs font-bold rounded bg-emerald-700 hover:bg-emerald-800 text-white shadow transition flex items-center gap-1">📊 Excel出力</button>
-                    <button onClick={() => setExportModal({ isOpen: true, type: 'print' })} className="px-2 py-1 text-xs font-bold rounded bg-slate-700 hover:bg-slate-800 text-white shadow transition flex items-center gap-1">🖨 印刷</button>
+
+                <div className="flex items-center gap-1.5 no-print">
+                    <button onClick={() => setExportModal({ isOpen: true, type: 'excel' })} className="px-2.5 py-1 text-xs font-bold rounded bg-emerald-700 hover:bg-emerald-800 text-white shadow transition flex items-center gap-1">📊 Excel出力</button>
+                    <button onClick={() => setExportModal({ isOpen: true, type: 'print' })} className="px-2.5 py-1 text-xs font-bold rounded bg-slate-700 hover:bg-slate-800 text-white shadow transition flex items-center gap-1">🖨 印刷</button>
+                    <button onClick={ctx.handleStartTracking} className={`px-2.5 py-1 text-xs font-bold rounded shadow transition ${ctx.isChangeTrackingMode ? 'bg-red-600 text-white animate-pulse' : 'bg-gray-200 hover:bg-gray-300 text-gray-800'}`}>{ctx.isChangeTrackingMode ? '● 変更記録中' : '変更開始'}</button>
+                    <button onClick={ctx.handleClearTracking} className="px-2.5 py-1 text-xs font-bold rounded bg-gray-600 hover:bg-gray-700 text-white shadow transition">変更クリア</button>
                 </div>
             </div>
 
-            {/* テーブルエリア */}
-            <div className="table-container flex-grow border rounded shadow-inner overflow-x-auto overflow-y-auto" ref={ctx.tableContainerRef}>
-                <table className="w-full text-center border-collapse text-[11px]">
-                    <thead className="sticky top-0 z-30 bg-gray-200 font-bold">
-                        <tr className="border-b">
-                            <th className="p-1.5 border w-20">仕入先</th>
-                            <th className="p-1.5 border w-32">型番</th>
-                            <th className="p-1.5 border w-40">品名</th>
-                            <th className="p-1 border w-14">4月</th>
-                            <th className="p-1 border w-14">5月</th>
-                            <th className="p-1 border w-14">6月</th>
-                            <th className="p-1 border w-14">7月</th>
-                            <th className="p-1 border w-14">8月</th>
-                            <th className="p-1 border w-14">9月</th>
-                            <th className="p-1 border w-14">10月</th>
-                            <th className="p-1 border w-14">11月</th>
-                            <th className="p-1 border w-14">12月</th>
-                            <th className="p-1 border w-14">1月</th>
-                            <th className="p-1 border w-14">2月</th>
-                            <th className="p-1 border w-14">3月</th>
-                            <th className="p-1.5 border w-20 bg-indigo-50 text-indigo-900">合計</th>
+            <div className="flex flex-wrap justify-between items-center mb-3 no-print gap-3 flex-shrink-0">
+                <div className="flex items-center gap-3 flex-wrap">
+                    <div className="flex items-center gap-1">
+                        <span className="text-xs font-bold text-gray-700">カテゴリ:</span>
+                        <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} className="border rounded px-2 py-1 text-xs font-bold bg-white text-emerald-900 shadow-sm">
+                            <option value="全体">全体 (全表示)</option>
+                            <option value="ALC">ALC</option>
+                            <option value="KS">KS</option>
+                            <option value="（Z)CCN">（Z)CCN</option>
+                            <option value="その他">その他</option>
+                        </select>
+                    </div>
+
+                    <div className="flex items-center gap-2 bg-gray-50 p-1 rounded border text-xs">
+                        <select value={rangeMode} onChange={e => setRangeMode(e.target.value)} className="font-bold border rounded px-1 py-0.5 bg-white">
+                            <option value="year">年度指定</option>
+                            <option value="custom">カスタム指定</option>
+                        </select>
+
+                        {rangeMode === 'year' ? (
+                            <select value={selectedYear} onChange={e => setSelectedYear(Number(e.target.value))} className="font-bold border rounded px-2 py-0.5 bg-white text-emerald-800">
+                                <option value={2025}>2025年度</option>
+                                <option value={2026}>2026年度</option>
+                                <option value={2027}>2027年度</option>
+                            </select>
+                        ) : (
+                            <div className="flex items-center gap-1 font-bold">
+                                <input type="month" value={customStartMonth} onChange={e => setCustomStartMonth(e.target.value)} className="border rounded px-1 bg-white"/>
+                                <span>〜</span>
+                                <input type="month" value={customEndMonth} onChange={e => setCustomEndMonth(e.target.value)} className="border rounded px-1 bg-white"/>
+                            </div>
+                        )}
+                    </div>
+
+                    <button onClick={() => setIsAddModalOpen(true)} disabled={ctx.authUser && !ctx.authUser.canEdit} className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 text-white px-3 py-1 rounded text-xs font-bold shadow transition">+ 型式追加</button>
+                    <button onClick={() => setIsEditModalOpen(true)} disabled={ctx.authUser && !ctx.authUser.canEdit} className="bg-gray-700 hover:bg-gray-800 disabled:bg-gray-300 text-white px-2.5 py-1 rounded text-xs font-bold shadow transition flex items-center gap-1">✏ 型式編集</button>
+                </div>
+
+                <div className="flex items-center gap-3">
+                    <label className="flex items-center gap-1.5 text-xs font-bold text-gray-700 cursor-pointer bg-emerald-50 px-2.5 py-1 rounded border border-emerald-200 shadow-sm hover:bg-emerald-100 transition">
+                        <input type="checkbox" checked={showHistory} onChange={e => setShowHistory(e.target.checked)} className="w-3.5 h-3.5 text-emerald-600 rounded" />
+                        <span>変更履歴を表示</span>
+                    </label>
+                </div>
+            </div>
+
+            <div className="table-container flex-grow border rounded shadow-inner" ref={ctx.tableContainerRef}>
+                <table className="alloc-print-table w-max text-center border-collapse">
+                    <thead className="sticky top-0 z-30 bg-gray-200">
+                        <tr>
+                            <th className="p-1 border w-8 sticky left-0 bg-gray-200 z-40 text-xs no-print">順</th>
+                            <th className="p-1 border w-[60px] min-w-[60px] sticky left-[32px] bg-gray-200 z-40 text-xs text-center align-middle">
+                                <div className="relative flex items-center justify-center w-full h-full">
+                                    <div className="flex items-center justify-center gap-0.5 w-full cursor-pointer hover:text-emerald-700">
+                                        <span className="text-[11px] font-bold text-gray-800 truncate">{ctx.selectedVendorFilter === 'ALL' ? '仕入先' : ctx.selectedVendorFilter}</span>
+                                        <span className="text-[9px] text-gray-500 no-print">▼</span>
+                                        <select value={ctx.selectedVendorFilter} onChange={e => ctx.setSelectedVendorFilter(e.target.value)} className="no-print absolute inset-0 w-full h-full opacity-0 cursor-pointer text-xs font-bold" title="仕入先コードで絞り込み">
+                                            <option value="ALL">全体 (全表示)</option>
+                                            {Array.from(new Set(['JP', 'GM', 'LDS', 'SLT', 'YO', ...(ctx.masterData.yoshii?.vendors || [])])).map(v => (
+                                                <option key={v} value={v}>{v}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </div>
+                            </th>
+                            <th className="p-1 border w-[110px] min-w-[110px] sticky left-[92px] bg-gray-200 z-40 text-xs">型式</th>
+                            <th className="p-1 border min-w-[220px] text-xs whitespace-nowrap">品名</th>
+                            <th className="p-1 border min-w-[95px] max-w-[100px] text-xs">JANコード</th>
+                            <th className="p-1 border w-[65px] min-w-[65px] bg-emerald-100 text-xs font-bold text-emerald-900">合計</th>
+                            {displayMonths.map(mo => {
+                                const yr = mo.split('-')[0].slice(-2);
+                                const m = mo.split('-')[1];
+                                return <th key={mo} className="p-1 border w-[58px] min-w-[58px] max-w-[58px] text-xs font-bold bg-gray-200 text-center">{yr}/{m}</th>;
+                            })}
+                            <th className="p-1 border min-w-[180px] text-xs font-bold bg-gray-200">備考 / 出荷調整状況</th>
+                        </tr>
+
+                        <tr className="bg-emerald-50 text-xs text-emerald-900 border-b-2 border-emerald-300">
+                            <td className="p-1 border sticky left-0 bg-emerald-100 z-40 text-center no-print">-</td>
+                            <td className="p-1 border sticky left-[32px] bg-emerald-100 z-40 text-center">-</td>
+                            <td className="p-1 border sticky left-[92px] bg-emerald-100 z-40 text-center font-bold">月間合計</td>
+                            <td className="p-1 border text-center">-</td>
+                            <td className="p-1 border text-center">-</td>
+                            <td className="p-1 border text-right pr-1 font-mono text-xs font-bold text-emerald-900 bg-emerald-200">{totalGrandTotal.toLocaleString()}</td>
+                            {displayMonths.map(mo => {
+                                const colTot = calculateColTotal(mo);
+                                return <td key={`tot-${mo}`} className="p-1 border text-right pr-1 font-mono text-xs text-emerald-900 w-[58px] min-w-[58px]">{colTot > 0 ? colTot.toLocaleString() : '0'}</td>;
+                            })}
+                            <td className="p-1 border text-center">-</td>
                         </tr>
                     </thead>
                     <tbody>
-                        {filteredPlans.length === 0 ? (
-                            <tr>
-                                <td colSpan="16" className="p-6 text-center text-slate-400 font-bold">
-                                    該当する計画データがありません。
-                                </td>
-                            </tr>
-                        ) : (
-                            filteredPlans.map((plan, idx) => {
-                                const m = plan.months || {};
-                                const rowTotal = ['04','05','06','07','08','09','10','11','12','01','02','03']
-                                    .reduce((acc, k) => acc + (Number(m[k]) || 0), 0);
+                        {visibleModels.map((model, rowIdx) => {
+                            const matchModelDetails = ctx.masterData.yoshii?.modelDetails?.[model] || {};
+                            const normTarget = normalizeModelCode(model);
+                            const matchPlanInfo = yoshiiPlans.find(p => normalizeModelCode(p.model) === normTarget && (p.productName || p.janCode || p.notes));
+                            
+                            const currentProdName = matchModelDetails.productName !== undefined ? matchModelDetails.productName : (matchPlanInfo?.productName || '');
+                            const currentJanCode = matchModelDetails.janCode !== undefined ? matchModelDetails.janCode : (matchPlanInfo?.janCode || '');
+                            const currentVendorCode = matchModelDetails.vendorCode !== undefined ? matchModelDetails.vendorCode : (matchPlanInfo?.vendorCode || '');
+                            const currentNotes = matchModelDetails.notes !== undefined ? matchModelDetails.notes : (matchPlanInfo?.notes || '');
+                            const rowTot = calculateRowTotal(model);
 
-                                return (
-                                    <tr key={plan.id || idx} className="border-b hover:bg-indigo-50/50 h-7">
-                                        <td className="p-1 border font-bold text-indigo-900">{plan.vendorCode || plan.vendorName || '―'}</td>
-                                        <td className="p-1 border font-bold text-slate-800 text-left pl-2">{plan.model || '―'}</td>
-                                        <td className="p-1 border text-slate-600 text-left pl-2 truncate">{plan.productName || '―'}</td>
-                                        
-                                        {['04','05','06','07','08','09','10','11','12','01','02','03'].map(moKey => (
-                                            <td key={moKey} className="p-0 border text-right font-mono font-bold">
-                                                <LocalInput 
-                                                    type="number"
-                                                    value={m[moKey] !== undefined && m[moKey] !== null ? m[moKey] : ''}
-                                                    onChange={(val) => handleMonthChange(plan.id, moKey, val, m)}
-                                                    disabled={!canEdit}
-                                                    className="w-full h-full text-right font-mono font-bold px-1 bg-transparent border-none outline-none focus:bg-amber-100"
-                                                    placeholder="0"
-                                                />
+                            return (
+                                <tr key={model} onDragOver={e => handleModelDragOver(e, model)} onDrop={e => handleModelDrop(e, model)} className={`hover:bg-emerald-50 border-b ${dragOverModel === model ? 'border-t-2 border-t-emerald-600 bg-emerald-100' : ''}`}>
+                                    <td draggable onDragStart={e => handleModelDragStart(e, model)} className={`border font-bold text-xs sticky left-0 bg-white z-10 text-center drag-handle text-gray-400 hover:text-emerald-600 cursor-grab active:cursor-grabbing ${rowPaddingClass}`}>≡</td>
+                                    <td className={`border text-xs text-center sticky left-[32px] bg-white z-10 w-[52px] min-w-[52px] ${rowPaddingClass}`}>
+                                        <LocalInput value={currentVendorCode} originalValue={(matchModelDetails.originals || {}).vendorCode} originalMeta={(matchModelDetails.originalMetas || {}).vendorCode} onChange={(v, orig) => handleModelDetailChange(model, 'vendorCode', v)} className="w-full text-xs text-center font-mono border-none bg-transparent h-[22px]"/>
+                                    </td>
+                                    <td className={`border font-bold text-xs sticky left-[92px] bg-white z-10 text-left pl-2 ${rowPaddingClass}`}>{model}</td>
+                                    <td className={`border text-xs text-left min-w-[220px] whitespace-nowrap ${rowPaddingClass}`}>
+                                        <LocalInput value={currentProdName} originalValue={(matchModelDetails.originals || {}).productName} originalMeta={(matchModelDetails.originalMetas || {}).productName} onChange={(v, orig) => handleModelDetailChange(model, 'productName', v)} listId="auto_yoshii_productNames" className="w-full text-xs text-left px-1 border-none bg-transparent h-[22px]"/>
+                                    </td>
+                                    <td className={`border text-xs text-center min-w-[95px] max-w-[100px] ${rowPaddingClass}`}>
+                                        <LocalInput value={currentJanCode} originalValue={(matchModelDetails.originals || {}).janCode} originalMeta={(matchModelDetails.originalMetas || {}).janCode} onChange={(v, orig) => handleModelDetailChange(model, 'janCode', v)} className="w-full text-xs text-center font-mono border-none bg-transparent h-[22px]"/>
+                                    </td>
+                                    <td className={`border text-xs font-mono text-right pr-1 bg-emerald-50 text-emerald-900 ${rowPaddingClass}`}>{rowTot > 0 ? rowTot.toLocaleString() : '0'}</td>
+                                    
+                                    {displayMonths.map((mo, colIdx) => {
+                                        const plan = getPlanData(model, mo);
+                                        const currentQty = plan?.quantity || '';
+                                        const historyList = plan?.qtyHistory || [];
+
+                                        return (
+                                            <td key={mo} className="matrix-td align-top p-0 w-[58px] min-w-[58px]">
+                                                <LocalInput type="number" value={currentQty} originalValue={plan?.originalVal} originalMeta={plan?.originalMeta} onChange={(v, orig) => handleQuantityChange(model, mo, v, orig)} className="matrix-input text-right font-mono pr-1 text-xs h-[22px]" dataGridId={`y-matrix-plan-${rowIdx}-${colIdx}`} onGridKeyDown={handleGridNav} />
+                                                {showHistory && historyList.length > 0 && (
+                                                    <div className="relative group/hist no-print">
+                                                        <span className="absolute -top-5 right-0.5 text-[9px] bg-amber-100 text-amber-800 border border-amber-300 px-1 rounded cursor-pointer font-bold z-10 shadow-sm">📜{historyList.length}</span>
+                                                        <div className="hidden group-hover/hist:block absolute right-0 top-0 mt-1 w-44 bg-slate-800 text-white p-2 rounded shadow-xl z-50 text-[10px] space-y-1 border border-slate-600">
+                                                            <div className="font-bold border-b border-slate-600 pb-1 text-amber-300">履歴一覧 ({model} {mo})</div>
+                                                            <div className="max-h-36 overflow-y-auto space-y-1">
+                                                                {historyList.map((hist, hIdx) => (
+                                                                    <div key={hIdx} className="flex justify-between items-center bg-slate-700 px-1.5 py-0.5 rounded">
+                                                                        <span className="font-mono font-bold text-emerald-300">{hist.qty.toLocaleString()} 台</span>
+                                                                        <div className="flex items-center gap-1">
+                                                                            <span className="text-[9px] text-slate-300">{hist.date || ctx.getFormattedShortDate()}</span>
+                                                                            <button onClick={() => handleDeleteHistory(plan.id, hIdx, model, mo)} disabled={ctx.authUser && !ctx.authUser.canEdit} className="text-red-400 hover:text-red-200 font-bold ml-1 text-xs" title="この履歴を削除">×</button>
+                                                                        </div>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </td>
-                                        ))}
+                                        );
+                                    })}
 
-                                        <td className="p-1 border text-right pr-2 font-mono font-extrabold text-indigo-900 bg-indigo-50/60">
-                                            {rowTotal.toLocaleString()}
-                                        </td>
-                                    </tr>
-                                );
-                            })
-                        )}
+                                    <td className={`border text-xs text-left min-w-[180px] ${rowPaddingClass}`}>
+                                        <LocalTextArea value={currentNotes} originalValue={(matchModelDetails.originals || {}).notes} originalMeta={(matchModelDetails.originalMetas || {}).notes} onChange={(v, orig) => handleModelDetailChange(model, 'notes', v)} isCompact={!showHistory}/>
+                                    </td>
+                                </tr>
+                            );
+                        })}
                     </tbody>
                 </table>
             </div>
 
-            <ExportPrintModal 
-                isOpen={exportModal.isOpen} 
-                onClose={() => setExportModal({ isOpen: false, type: 'excel' })} 
-                screenName="年間出荷計画表" 
-                currentMonthStr={ctx.currentMonthStr} 
-                defaultMode="year" 
-                onStartExport={handleExecuteExport} 
-            />
+            {isAddModalOpen && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+                    <form onSubmit={handleAddNewModelSubmit} className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md flex flex-col gap-4">
+                        <h3 className="font-bold text-base border-b pb-2 text-emerald-800">+ 新規型式の追加</h3>
+                        <div>
+                            <label className="block text-xs font-bold mb-1">品番 (型式名) <span className="text-red-500">*</span></label>
+                            <input type="text" required value={newModel} onChange={e => setNewModel(e.target.value)} placeholder="例: ALC-08SK" className="w-full border p-1.5 rounded text-sm"/>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold mb-1">仕入先コード (3桁)</label>
+                            <input type="text" maxLength={3} value={newVendorCode} onChange={e => setNewJanVendorCode(e.target.value)} placeholder="例: 001" className="w-full border p-1.5 rounded text-sm font-mono text-center"/>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold mb-1">品名 (製品名)</label>
+                            <input type="text" value={newProductName} onChange={e => setNewProductName(e.target.value)} placeholder="例: ｱﾋﾞﾃﾗｯックス LEDｼｰﾘﾝｸﾞ" className="w-full border p-1.5 rounded text-sm"/>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold mb-1">JANコード</label>
+                            <input type="text" value={newJanCode} onChange={e => setNewJanCode(e.target.value)} placeholder="例: 4912345678901" className="w-full border p-1.5 rounded text-sm"/>
+                        </div>
+                        <div className="flex justify-end gap-2 border-t pt-3 mt-2">
+                            <button type="button" onClick={() => setIsAddModalOpen(false)} className="bg-gray-200 text-gray-700 px-4 py-1.5 rounded text-xs font-bold">キャンセル</button>
+                            <button type="submit" className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-1.5 rounded text-xs font-bold shadow">追加する</button>
+                        </div>
+                    </form>
+                </div>
+            )}
+
+            <ModelEditModal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} company="yoshii" />
+            <ExportPrintModal isOpen={exportModal.isOpen} onClose={() => setExportModal({ isOpen: false, type: 'excel' })} screenName="納品・出荷計画" currentMonthStr={ctx.currentMonthStr} defaultMode="year" onStartExport={handleExecuteExport} />
         </div>
     );
 };
 
-// 【2. 吉井電気 割振り画面ビュー (欠落コンポーネント完全復元)】
+// 【ヘルパー: 型式表示改行フォーマット】
+const formatModelWithBreak = (m) => {
+    if (!m) return '';
+    const str = String(m);
+    const idx = str.indexOf('-');
+    if (idx !== -1) {
+        return (
+            <span>
+                {str.substring(0, idx + 1)}
+                <br />
+                {str.substring(idx + 1)}
+            </span>
+        );
+    }
+    if (str.toUpperCase().startsWith('ALC') && str.length > 3) {
+        return (
+            <span>
+                ALC
+                <br />
+                {str.substring(3)}
+            </span>
+        );
+    }
+    return str;
+};
+
+// 【2. 吉井電気 コンテナ割振りビュー (V94完全構造)】
 const YoshiiAllocationView = () => {
     const ctx = React.useContext(AppContext);
     const [exportModal, setExportModal] = React.useState({ isOpen: false, type: 'excel' });
@@ -159,259 +772,350 @@ const YoshiiAllocationView = () => {
     const baseAppVer = typeof SYSTEM_VERSION !== 'undefined' ? SYSTEM_VERSION : '';
     const displayVer = `${baseAppVer}${JS_PLAN_VERSION}`;
 
-    const canEdit = ctx.authUser && ctx.authUser.canEdit;
-
-    // 対象月のコンテナ一覧（並び順順）
-    let monthContainers = ctx.containers.filter(c => c.company === 'yoshii' && c.deliveryMonth === ctx.yoshiiAllocMonth);
-    monthContainers.sort((a, b) => (a.allocNo || a.sortOrder || 0) - (b.allocNo || b.sortOrder || 0));
-
-    // 型番マスター一覧
-    let targetPlans = ctx.plans.filter(p => p.company === 'yoshii' || !p.company);
-    if (ctx.selectedVendorFilter && ctx.selectedVendorFilter !== 'ALL') {
-        targetPlans = targetPlans.filter(p => p.vendorCode === ctx.selectedVendorFilter || p.vendorName === ctx.selectedVendorFilter);
-    }
-
-    const handleAddContainer = async () => {
-        if (!canEdit) return;
-        const newNo = monthContainers.length + 1;
-        await ctx.updateContainer(null, {
-            company: 'yoshii',
-            deliveryMonth: ctx.yoshiiAllocMonth,
-            allocNo: newNo,
-            sortOrder: newNo,
-            managementNo: `C-${newNo}`,
-            allocations: {},
-            totalQuantity: 0,
-            status: '未確定'
-        }, ctx.yoshiiAllocMonth, 'yoshii', 'コンテナ追加');
-    };
-
-    const handleExecuteExport = ({ selectedYear }) => {
+    const handleExecuteExport = ({ mode, selectedYear: selYr, singleMonth: sgMo, startMonth: sMo, endMonth: eMo }) => {
+        const targetVendor = ctx.selectedVendorFilter || 'ALL';
+        
         if (exportModal.type === 'print') {
             setTimeout(() => window.print(), 300);
             return;
         }
 
-        const headers = ['順序', '管理番号', '進行状況', 'コンテナNo.', '到着港', 'ETD', 'ETA', '合計数量'];
-        targetPlans.forEach(p => headers.push(p.model));
+        const excelModels = models.map(m => { const idx = String(m).indexOf('-'); return idx === -1 ? m : m.substring(0, idx + 1) + '\n' + m.substring(idx + 1); });
+        const headers = ['管理番号', '到着港', ...excelModels];
+        const planRow = ['計画数', '-', ...models.map(m => modelTotals[m] || 0)];
+        const remainRow = ['残数', '-', ...models.map(m => {
+            const allocated = monthContainers.reduce((sum, c) => {
+                const q = getContainerAllocationQty(c.allocations, m);
+                return sum + (Number(q) || 0);
+            }, 0);
+            return modelTotals[m] - allocated;
+        })];
 
-        const rows = monthContainers.map(c => {
-            const alloc = c.allocations || {};
-            const r = [
-                c.allocNo || '', c.managementNo || '', c.status || '', c.containerNo || '',
-                c.port || '', c.etd || '', c.eta || '', c.totalQuantity || 0
-            ];
-            targetPlans.forEach(p => r.push(alloc[p.model] || 0));
-            return r;
+        const containerRows = Array.from({ length: displayRows }).map((_, idx) => {
+            const c = monthContainers[idx] || {};
+            const allocs = models.map(m => {
+                const q = getContainerAllocationQty(c.allocations, m);
+                return q !== '' ? Number(q) : '';
+            });
+            return [c.managementNo || '-', c.port || '-', ...allocs];
         });
 
-        const filename = `吉井電気_割振表_${ctx.yoshiiAllocMonth}.xlsx`;
+        const rows = [planRow, remainRow, [], ...containerRows];
+        const dateTag = formatYYMM(ctx.yoshiiAllocMonth);
+        const filename = `${targetVendor}_コンテナ割振り_${dateTag}.xlsx`;
+
         exportToExcelSimple({
-            title: `吉井電気 コンテナ割振表 [対象月: ${ctx.yoshiiAllocMonth}]`,
+            title: `吉井電気 コンテナ割振り [対象年月: ${ctx.yoshiiAllocMonth}] [仕入先: ${targetVendor}]`,
             headers, rows, filename
         });
     };
 
+    const [rowLimit, setRowLimit] = React.useState(3);
+    const [focusTargetIdx, setFocusTargetIdx] = React.useState(null);
+    const [deleteConfirmTarget, setDeleteConfirmTarget] = React.useState(null);
+
+    const getNaturalMgmtKey = (c) => {
+        if (c.allocNo !== undefined && c.allocNo !== null) return c.allocNo;
+        if (c.sortOrder !== undefined && c.sortOrder !== null) return c.sortOrder;
+        
+        const mgmt = String(c.managementNo || '').trim();
+        if (!mgmt || mgmt === '-') return 999999;
+
+        const match = mgmt.match(/^([A-Za-z]+)(\d+)(?:-(\d+))?$/);
+        if (match) {
+            const prefix = match[1].toUpperCase();
+            const num1 = parseInt(match[2], 10);
+            const num2 = match[3] ? parseInt(match[3], 10) : 0;
+            const prefixPriority = prefix === 'A' ? 0 : (prefix === 'YK' ? 1 : 2);
+            return prefixPriority * 10000 + num1 * 10 + num2;
+        }
+        return 500000;
+    };
+
+    let rawMonthContainers = ctx.containers.filter(c => c.company === 'yoshii' && c.deliveryMonth === ctx.yoshiiAllocMonth);
+
+    if (ctx.selectedVendorFilter && ctx.selectedVendorFilter !== 'ALL') {
+        rawMonthContainers = rawMonthContainers.filter(c => {
+            return Object.keys(c.allocations || {}).some(m => {
+                const q = c.allocations[m];
+                if (q <= 0) return false;
+                const matchModelDetails = ctx.masterData.yoshii?.modelDetails?.[m] || {};
+                const normTarget = normalizeModelCode(m);
+                const matchPlanInfo = ctx.plans.find(p => normalizeModelCode(p.model) === normTarget && p.vendorCode);
+                const vCode = matchModelDetails.vendorCode !== undefined ? matchModelDetails.vendorCode : (matchPlanInfo?.vendorCode || '');
+                return vCode === ctx.selectedVendorFilter;
+            });
+        });
+    }
+
+    const monthContainers = rawMonthContainers.sort((a, b) => {
+        const keyA = getNaturalMgmtKey(a);
+        const keyB = getNaturalMgmtKey(b);
+        if (keyA !== keyB) return keyA - keyB;
+        return (a.createdAt || '').localeCompare(b.createdAt || '');
+    });
+    
+    const getModelVendorCode = (m) => {
+        const matchModelDetails = ctx.masterData.yoshii?.modelDetails?.[m] || {};
+        const normTarget = normalizeModelCode(m);
+        const matchPlanInfo = ctx.plans.find(p => normalizeModelCode(p.model) === normTarget && p.vendorCode);
+        return matchModelDetails.vendorCode !== undefined ? matchModelDetails.vendorCode : (matchPlanInfo?.vendorCode || '');
+    };
+
+    const yoshiiPlans = ctx.plans.filter(p => p.company === 'yoshii');
+
+    const getDirectPlanQty = (model, month) => {
+        const normTarget = normalizeModelCode(model);
+        const matchPlan = yoshiiPlans.find(p => normalizeModelCode(p.model) === normTarget && p.deliveryMonth === month);
+        return matchPlan ? Number(matchPlan.quantity || 0) : 0;
+    };
+
+    const getContainerAllocationQty = (allocationsObj, masterModel) => {
+        if (!allocationsObj) return '';
+        const normTarget = normalizeModelCode(masterModel);
+        for (const [key, qty] of Object.entries(allocationsObj)) {
+            if (normalizeModelCode(key) === normTarget && qty > 0) {
+                return qty;
+            }
+        }
+        return '';
+    };
+
+    const modelsSet = new Set();
+    yoshiiPlans.forEach(p => {
+        if (p.model) {
+            const vCode = getModelVendorCode(p.model);
+            if (!ctx.selectedVendorFilter || ctx.selectedVendorFilter === 'ALL' || vCode === ctx.selectedVendorFilter) {
+                modelsSet.add(p.model);
+            }
+        }
+    });
+    monthContainers.forEach(c => {
+        Object.keys(c.allocations || {}).forEach(m => {
+            if (c.allocations[m] > 0) {
+                const vCode = getModelVendorCode(m);
+                if (!ctx.selectedVendorFilter || ctx.selectedVendorFilter === 'ALL' || vCode === ctx.selectedVendorFilter) {
+                    modelsSet.add(m);
+                }
+            }
+        });
+    });
+
+    const modelTotals = {};
+    modelsSet.forEach(m => {
+        modelTotals[m] = getDirectPlanQty(m, ctx.yoshiiAllocMonth);
+    });
+    
+    const modelOrders = ctx.masterData.yoshii?.modelOrder || {};
+    let models = Array.from(modelsSet).sort((a, b) => {
+        const orderA = modelOrders[a] !== undefined ? modelOrders[a] : 9999;
+        const orderB = modelOrders[b] !== undefined ? modelOrders[b] : 9999;
+        if (orderA !== orderB) return orderA - orderB;
+        return a.localeCompare(b, 'ja');
+    });
+
+    if (ctx.selectedVendorFilter && ctx.selectedVendorFilter !== 'ALL') {
+        models = models.filter(m => {
+            const matchModelDetails = ctx.masterData.yoshii?.modelDetails?.[m] || {};
+            const normTarget = normalizeModelCode(m);
+            const matchPlanInfo = ctx.plans.find(p => normalizeModelCode(p.model) === normTarget && p.vendorCode);
+            const vCode = matchModelDetails.vendorCode !== undefined ? matchModelDetails.vendorCode : (matchPlanInfo?.vendorCode || '');
+            return vCode === ctx.selectedVendorFilter;
+        });
+    }
+
+    models = models.filter(m => {
+        const targetMonthPlanQty = Number(modelTotals[m]) || 0;
+        const targetMonthAllocQty = monthContainers.reduce((sum, c) => {
+            const q = getContainerAllocationQty(c.allocations, m);
+            return sum + (Number(q) || 0);
+        }, 0);
+        return targetMonthPlanQty > 0 || targetMonthAllocQty > 0;
+    });
+
+    const handleAllocationValueChange = (container, masterModel, val, orig) => {
+        const currentAllocs = container.allocations || {};
+        const newQty = val === '' ? 0 : Number(val);
+        const updatedAllocs = { ...currentAllocs, [masterModel]: newQty };
+
+        const origAlloc = container.originals?.allocations || {};
+        const metaAlloc = container.originalMetas?.allocations || {};
+
+        const updatedOrigs = {
+            ...(container.originals || {}),
+            allocations: {
+                ...origAlloc,
+                [masterModel]: origAlloc[masterModel] !== undefined ? origAlloc[masterModel] : (orig || '')
+            }
+        };
+
+        const updatedMetas = {
+            ...(container.originalMetas || {}),
+            allocations: {
+                ...metaAlloc,
+                [masterModel]: metaAlloc[masterModel] !== undefined ? metaAlloc[masterModel] : `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}`
+            }
+        };
+
+        ctx.updateContainer(
+            container.id, 
+            { allocations: updatedAllocs, originals: updatedOrigs, originalMetas: updatedMetas }, 
+            ctx.yoshiiAllocMonth, 
+            'yoshii', 
+            '型式 [' + masterModel + '] 数量'
+        );
+    };
+
+    const displayRows = Math.max(monthContainers.length, rowLimit);
+    const handleGridNav = ctx.createGridNav('y-alloc', displayRows - 1, models.length + 1);
+
+    const getModelColWidth = (m) => {
+        const len = (m || '').length;
+        if (len <= 6) return 'w-[44px] min-w-[44px] max-w-[44px]';
+        if (len <= 8) return 'w-[50px] min-w-[50px] max-w-[50px]';
+        if (len <= 10) return 'w-[56px] min-w-[56px] max-w-[56px]';
+        return 'w-[62px] min-w-[62px] max-w-[62px]';
+    };
+
+    const handleAddRow = () => {
+        const nextIdx = displayRows;
+        setRowLimit(displayRows + 1);
+        setFocusTargetIdx(nextIdx);
+    };
+
+    const handleExecuteDeleteRow = async (containerId, index) => {
+        if (containerId) {
+            await ctx.deleteContainer(containerId, '吉井電気 コンテナ割振り');
+        } else {
+            setRowLimit(prev => Math.max(monthContainers.length, prev - 1));
+        }
+        setDeleteConfirmTarget(null);
+    };
+
     return (
-        <div className="p-3 bg-white flex-grow flex flex-col h-full overflow-hidden text-xs">
-            {/* ヘッダーエリア */}
-            <div className="flex justify-between items-center mb-2 no-print flex-shrink-0">
-                <div className="flex items-center gap-3">
-                    <h2 className="text-base font-bold text-indigo-900">吉井電気 コンテナ割振管理</h2>
-                    <span className="bg-slate-700 text-slate-100 border border-slate-500 text-[10px] font-extrabold px-2 py-0.5 rounded font-mono shadow-sm">
-                        {displayVer}
-                    </span>
-                    <div className="flex items-center gap-1 font-bold ml-4">
-                        <label className="text-slate-600">対象月:</label>
-                        <input 
-                            type="month" 
-                            value={ctx.yoshiiAllocMonth} 
-                            onChange={e => ctx.setYoshiiAllocMonth(e.target.value)}
-                            className="border rounded px-2 py-0.5 font-bold text-xs bg-slate-50"
-                        />
+        <div className="p-4 bg-white flex-grow flex flex-col h-full">
+            <div className="hidden print:block font-bold text-sm text-black mb-1.5 border-b pb-1 text-left w-full">
+                吉井電気 コンテナ割振り [対象年月: {ctx.yoshiiAllocMonth}] [仕入先: {ctx.selectedVendorFilter || 'ALL'}]
+            </div>
+            
+            <div className="flex justify-between items-center mb-3 no-print flex-shrink-0">
+                <div className="flex gap-4 items-center bg-gray-50 p-2 rounded border">
+                    <div className="flex items-center gap-2">
+                        <h2 className="text-lg font-bold">吉井電気 コンテナ割振り</h2>
+                        <span className="bg-slate-700 text-slate-100 border border-slate-500 text-[10px] font-extrabold px-2 py-0.5 rounded font-mono shadow-sm">
+                            {displayVer}
+                        </span>
+                    </div>
+                    <label className="font-bold text-sm ml-4">対象年月:</label>
+                    <input type="month" value={ctx.yoshiiAllocMonth} onChange={e => ctx.setYoshiiAllocMonth(e.target.value)} className="border p-1 rounded text-sm text-center" />
+                    <label className="font-bold text-sm ml-4">コンテナ枠数:</label>
+                    <div className="flex items-center gap-1">
+                        <button onClick={() => { if (displayRows > monthContainers.length) setRowLimit(displayRows - 1); }} disabled={ctx.authUser && !ctx.authUser.canEdit} className="bg-gray-300 hover:bg-gray-400 disabled:opacity-30 w-8 h-8 rounded font-bold transition">-</button>
+                        <span className="w-8 text-center font-bold">{displayRows}</span>
+                        <button onClick={handleAddRow} disabled={ctx.authUser && !ctx.authUser.canEdit} className="bg-gray-300 hover:bg-gray-400 disabled:opacity-30 w-8 h-8 rounded font-bold transition">+</button>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-2 font-bold">
-                    {canEdit && (
-                        <button onClick={handleAddContainer} className="px-3 py-1 text-xs font-bold rounded bg-indigo-600 hover:bg-indigo-700 text-white shadow transition flex items-center gap-1">
-                            ➕ コンテナ追加
-                        </button>
-                    )}
-                    <button onClick={() => setExportModal({ isOpen: true, type: 'excel' })} className="px-2 py-1 text-xs font-bold rounded bg-emerald-700 hover:bg-emerald-800 text-white shadow transition flex items-center gap-1">📊 Excel出力</button>
-                    <button onClick={() => setExportModal({ isOpen: true, type: 'print' })} className="px-2 py-1 text-xs font-bold rounded bg-slate-700 hover:bg-slate-800 text-white shadow transition flex items-center gap-1">🖨 印刷</button>
+                <div className="flex items-center gap-1.5 no-print">
+                    <button onClick={() => setExportModal({ isOpen: true, type: 'excel' })} className="px-2.5 py-1 text-xs font-bold rounded bg-emerald-700 hover:bg-emerald-800 text-white shadow transition flex items-center gap-1">📊 Excel出力</button>
+                    <button onClick={() => setExportModal({ isOpen: true, type: 'print' })} className="px-2.5 py-1 text-xs font-bold rounded bg-slate-700 hover:bg-slate-800 text-white shadow transition flex items-center gap-1">🖨 印刷</button>
+                    <button onClick={ctx.handleStartTracking} className={`px-2.5 py-1 text-xs font-bold rounded shadow transition ${ctx.isChangeTrackingMode ? 'bg-red-600 text-white animate-pulse' : 'bg-gray-200 hover:bg-gray-300 text-gray-800'}`}>{ctx.isChangeTrackingMode ? '● 変更記録中' : '変更開始'}</button>
+                    <button onClick={ctx.handleClearTracking} className="px-2.5 py-1 text-xs font-bold rounded bg-gray-600 hover:bg-gray-700 text-white shadow transition">変更クリア</button>
                 </div>
             </div>
 
-            {/* テーブルエリア */}
-            <div className="table-container flex-grow border rounded shadow-inner overflow-x-auto overflow-y-auto" ref={ctx.tableContainerRef}>
-                <table className="w-full text-center border-collapse text-[11px]">
-                    <thead className="sticky top-0 z-30 bg-gray-200 font-bold">
-                        <tr className="border-b">
-                            <th className="p-1 border w-8">移動</th>
-                            <th className="p-1 border w-10">No</th>
-                            <th className="p-1 border w-24">管理番号</th>
-                            <th className="p-1 border w-24">進行状況</th>
-                            <th className="p-1 border w-28">コンテナNo</th>
-                            <th className="p-1 border w-20">到着港</th>
-                            <th className="p-1 border w-24">ETD</th>
-                            <th className="p-1 border w-24">ETA</th>
-                            <th className="p-1.5 border w-20 bg-emerald-100 text-emerald-900 font-extrabold">合計数量</th>
-                            {targetPlans.map(p => (
-                                <th key={p.id || p.model} className="p-1 border min-w-[90px] max-w-[120px] bg-slate-100 truncate" title={p.model}>
-                                    {p.model}
-                                </th>
-                            ))}
-                            <th className="p-1 border w-12 no-print">削除</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {monthContainers.length === 0 ? (
-                            <tr>
-                                <td colSpan={10 + targetPlans.length} className="p-6 text-center text-slate-400 font-bold">
-                                    {ctx.yoshiiAllocMonth} の割振りコンテナデータはありません。「コンテナ追加」ボタンから作成してください。
-                                </td>
+            {!ctx.yoshiiAllocMonth ? <p className="text-gray-500">対象年月を選択してください。</p> : models.length === 0 ? <p className="text-gray-500">この月（{ctx.yoshiiAllocMonth}）の計画データが存在しません。</p> : (
+                <div className="table-container flex-grow" ref={ctx.tableContainerRef}>
+                    <table className="alloc-print-table w-max text-center border-collapse">
+                        <thead className="sticky top-0 z-30 bg-gray-200 shadow-sm">
+                            <tr className="bg-gray-200">
+                                <th className="p-1 border w-10 sticky left-0 top-0 bg-gray-200 z-40 text-xs no-print">移動</th>
+                                <th className="p-1 border w-16 sticky left-10 top-0 bg-gray-200 z-40 text-xs">項目</th>
+                                <th className="p-1 border w-[90px] min-w-[90px] sticky left-[104px] top-0 bg-gray-200 z-40 text-xs">管理番号</th>
+                                <th className="p-1 border w-[76px] min-w-[70px] sticky left-[194px] top-0 bg-gray-200 z-40 text-xs">到着港</th>
+                                {models.map(m => <th key={m} className={`p-1 border bg-emerald-100 text-xs leading-tight align-bottom model-hdr ${getModelColWidth(m)}`} title={m}>{formatModelWithBreak(m)}</th>)}
+                                <th className="p-1 border w-12 bg-gray-200 no-print">削除</th>
                             </tr>
-                        ) : (
-                            monthContainers.map((c, idx) => {
-                                const allocMap = c.allocations || {};
-                                const isDragged = ctx.draggedRowId === c.id;
-                                const isDragOver = ctx.dragOverRowId === c.id;
-
+                            <tr className="bg-gray-50 font-bold text-xs text-gray-700 border-b">
+                                <td className="p-1 border sticky left-0 bg-gray-50 z-40 text-center no-print">-</td>
+                                <td className="p-1 border sticky left-10 bg-gray-50 z-40 text-center">計画数</td>
+                                <td className="p-1 border sticky left-[104px] bg-gray-50 z-40 text-center text-gray-500 font-normal">(合計)</td>
+                                <td className="p-1 border sticky left-[194px] bg-gray-50 z-40 text-right pr-1 font-mono text-xs font-bold text-emerald-900 bg-emerald-100/60">
+                                    {models.reduce((sum, m) => sum + (Number(modelTotals[m]) || 0), 0).toLocaleString()}
+                                </td>
+                                {models.map(m => <td key={m} className={`p-1 border font-mono text-xs text-right pr-1 ${getModelColWidth(m)} ${modelTotals[m] === 0 ? 'text-red-500' : ''}`}>{Number(modelTotals[m]).toLocaleString()}</td>)}
+                                <td className="p-1 border bg-gray-50 no-print"></td>
+                            </tr>
+                            <tr className="bg-gray-100 font-bold text-xs text-gray-800 border-b-2 border-gray-300">
+                                <td className="p-1 border sticky left-0 bg-gray-100 z-40 text-center no-print">-</td>
+                                <td className="p-1 border sticky left-10 bg-gray-100 z-40 text-center">残数</td>
+                                <td className="p-1 border sticky left-[104px] bg-gray-100 z-40 text-center text-gray-500 font-normal">(合計)</td>
+                                <td className="p-1 border sticky left-[194px] bg-gray-100 z-40 text-right pr-1 font-mono text-xs font-bold text-indigo-900 bg-indigo-100/60">
+                                    {models.reduce((sum, m) => {
+                                        const allocated = monthContainers.reduce((cSum, c) => cSum + (Number(getContainerAllocationQty(c.allocations, m)) || 0), 0);
+                                        return sum + (modelTotals[m] - allocated);
+                                    }, 0).toLocaleString()}
+                                </td>
+                                {models.map(m => {
+                                    const allocated = monthContainers.reduce((sum, c) => {
+                                        const q = getContainerAllocationQty(c.allocations, m);
+                                        return sum + (Number(q) || 0);
+                                    }, 0);
+                                    const remain = modelTotals[m] - allocated;
+                                    return <td key={m} className={`p-1 border font-mono text-xs text-right pr-1 ${getModelColWidth(m)} ${remain < 0 ? 'text-red-600' : remain > 0 ? 'text-blue-600' : 'text-green-600'}`}>{remain.toLocaleString()}</td>;
+                                })}
+                                <td className="p-1 border bg-gray-100 no-print"></td>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {Array.from({ length: displayRows }).map((_, idx) => {
+                                const container = monthContainers[idx] || {};
                                 return (
                                     <tr 
-                                        key={c.id || idx} 
-                                        draggable={canEdit}
-                                        onDragStart={(e) => ctx.handleDragStart(e, c.id)}
-                                        onDragOver={(e) => ctx.handleDragOver(e, c.id)}
+                                        key={container.id || `new-${idx}`}
+                                        onDragOver={(e) => ctx.handleDragOver(e, container.id)}
+                                        onDrop={(e) => ctx.handleDrop(e, container.id, monthContainers)}
                                         onDragEnd={ctx.handleDragEnd}
-                                        onDrop={(e) => ctx.handleDrop(e, c.id, monthContainers)}
-                                        className={`border-b hover:bg-slate-50 h-8 transition ${isDragged ? 'opacity-40 bg-indigo-100' : ''} ${isDragOver ? 'border-t-2 border-t-indigo-600 bg-indigo-50' : ''}`}
+                                        className={`hover:bg-emerald-50 ${ctx.dragOverRowId === container.id ? (ctx.dragDirection === 'top' ? 'drag-over-top' : 'drag-over-bottom') : ''} ${ctx.draggedRowId === container.id ? 'dragging-row' : ''}`}
                                     >
-                                        <td className="p-1 border text-center text-slate-400 drag-handle cursor-grab active:cursor-grabbing font-bold">
-                                            ☰
-                                        </td>
-                                        <td className="p-1 border font-mono font-bold text-slate-600 text-center">
-                                            {idx + 1}
-                                        </td>
-                                        <td className="p-0.5 border">
-                                            <LocalInput 
-                                                value={c.managementNo || ''} 
-                                                onChange={(val) => ctx.updateContainer(c.id, { managementNo: val }, ctx.yoshiiAllocMonth, 'yoshii', '管理番号')}
-                                                disabled={!canEdit}
-                                                className="w-full text-center font-bold border-none bg-transparent"
-                                                placeholder="管理番号"
-                                            />
-                                        </td>
-                                        <td className="p-0.5 border">
-                                            <select 
-                                                value={c.status || '未確定'}
-                                                onChange={(e) => ctx.handleSelectChange(c.id, 'status', true, 'yoshii', true, '進行状況')(e.target.value)}
-                                                disabled={!canEdit}
-                                                className="w-full text-center border-none bg-transparent font-bold cursor-pointer"
-                                            >
-                                                {(ctx.masterData?.common?.statuses || []).map((st, i) => (
-                                                    <option key={i} value={st}>{st}</option>
-                                                ))}
-                                            </select>
-                                        </td>
-                                        <td className="p-0.5 border">
-                                            <LocalInput 
-                                                value={c.containerNo || ''} 
-                                                onChange={(val) => ctx.updateContainer(c.id, { containerNo: val }, ctx.yoshiiAllocMonth, 'yoshii', 'コンテナNo')}
-                                                disabled={!canEdit}
-                                                className="w-full text-center font-mono font-bold border-none bg-transparent"
-                                                placeholder="コンテナNo"
-                                            />
-                                        </td>
-                                        <td className="p-0.5 border">
-                                            <select 
-                                                value={c.port || ''}
-                                                onChange={(e) => ctx.handleSelectChange(c.id, 'port', true, 'yoshii', true, '到着港')(e.target.value)}
-                                                disabled={!canEdit}
-                                                className="w-full text-center border-none bg-transparent font-bold cursor-pointer"
-                                            >
-                                                <option value="">未選択</option>
-                                                {(ctx.masterData?.yoshii?.ports || []).map((pt, i) => (
-                                                    <option key={i} value={pt}>{pt}</option>
-                                                ))}
-                                            </select>
-                                        </td>
-                                        <td className="p-0.5 border">
-                                            <LocalInput 
-                                                type="date"
-                                                value={c.etd || ''} 
-                                                onChange={(val) => ctx.updateContainer(c.id, { etd: val }, ctx.yoshiiAllocMonth, 'yoshii', 'ETD')}
-                                                disabled={!canEdit}
-                                                className="w-full text-center font-mono border-none bg-transparent text-[10px]"
-                                            />
-                                        </td>
-                                        <td className="p-0.5 border">
-                                            <LocalInput 
-                                                type="date"
-                                                value={c.eta || ''} 
-                                                onChange={(val) => ctx.updateContainer(c.id, { eta: val }, ctx.yoshiiAllocMonth, 'yoshii', 'ETA')}
-                                                disabled={!canEdit}
-                                                className="w-full text-center font-mono border-none bg-transparent text-[10px]"
-                                            />
-                                        </td>
-                                        <td className="p-1 border text-right pr-2 font-mono font-extrabold text-emerald-900 bg-emerald-50/70">
-                                            {(c.totalQuantity || 0).toLocaleString()}
+                                        <td draggable={!!container.id && (ctx.authUser ? ctx.authUser.canEdit : true)} onDragStart={(e) => ctx.handleDragStart(e, container.id, 'containers')} className="p-1 border bg-white sticky left-0 z-20 text-center drag-handle text-gray-400 hover:text-emerald-600 font-bold text-base cursor-grab active:cursor-grabbing no-print">≡</td>
+                                        <td className="p-1 border bg-white sticky left-10 z-20 text-[11px] font-medium whitespace-nowrap">コンテナ {idx + 1}</td>
+                                        
+                                        <td className="matrix-td px-0 sticky left-[104px] bg-white z-20">
+                                            <LocalInput value={container.managementNo} originalValue={(container.originals || {}).managementNo} originalMeta={(container.originalMetas || {}).managementNo} onChange={(v, orig) => ctx.updateContainer(container.id, { managementNo: v, originals: { ...(container.originals || {}), managementNo: container.originals?.managementNo !== undefined ? container.originals.managementNo : orig }, originalMetas: { ...(container.originalMetas || {}), managementNo: container.originalMetas?.managementNo !== undefined ? container.originalMetas.managementNo : `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}` } }, ctx.yoshiiAllocMonth, 'yoshii', '管理番号')} className="matrix-input text-center text-xs font-bold" dataGridId={`y-alloc-${idx}-0`} onGridKeyDown={handleGridNav} />
                                         </td>
 
-                                        {/* 各型番の割振入力セル */}
-                                        {targetPlans.map(p => {
-                                            const qty = allocMap[p.model] !== undefined ? allocMap[p.model] : '';
+                                        <td className="matrix-td px-0 sticky left-[194px] bg-white z-20">
+                                            <DynamicSelect value={container.port} originalValue={(container.originals || {}).port} originalMeta={(container.originalMetas || {}).port} onChange={(val, cat, orig) => ctx.handleSelectChange(container.id, 'port', true, 'yoshii', false, '到着港')(val, cat, orig)} category="ports" options={ctx.masterData.yoshii.ports} dataGridId={`y-alloc-${idx}-1`} onGridKeyDown={handleGridNav} autoFocus={focusTargetIdx === idx} onAutoFocused={() => setFocusTargetIdx(null)} className="w-full h-full text-xs border-none bg-transparent outline-none text-center min-w-0 px-0" />
+                                        </td>
+                                        {models.map((m, mIdx) => {
+                                            const cellValue = getContainerAllocationQty(container.allocations, m);
                                             return (
-                                                <td key={p.id || p.model} className="p-0 border font-mono">
-                                                    <LocalInput 
-                                                        type="number"
-                                                        value={qty}
-                                                        onChange={(val) => {
-                                                            const num = Number(val) || 0;
-                                                            const updatedAlloc = { ...allocMap, [p.model]: num };
-                                                            const newTotal = Object.values(updatedAlloc).reduce((a, b) => a + (Number(b) || 0), 0);
-                                                            ctx.updateContainer(c.id, { allocations: updatedAlloc, totalQuantity: newTotal }, ctx.yoshiiAllocMonth, 'yoshii', `割振_${p.model}`);
-                                                        }}
-                                                        disabled={!canEdit}
-                                                        className="w-full h-full text-right font-mono font-bold px-1 bg-transparent border-none outline-none focus:bg-emerald-100 text-emerald-900"
-                                                        placeholder="0"
-                                                    />
+                                                <td key={m} className={`matrix-td px-0.5 ${getModelColWidth(m)}`}>
+                                                    <LocalInput type="number" value={cellValue} originalValue={(container.originals?.allocations || {})[m]} originalMeta={(container.originalMetas?.allocations || {})[m]} onChange={(v, orig) => handleAllocationValueChange(container, m, v, orig)} className="matrix-input text-emerald-800 font-bold pr-1 text-right" dataGridId={`y-alloc-${idx}-${mIdx + 2}`} onGridKeyDown={handleGridNav} />
                                                 </td>
                                             );
                                         })}
-
-                                        <td className="p-1 border text-center no-print">
-                                            {canEdit && (
-                                                <button 
-                                                    onClick={() => {
-                                                        if (confirm(`管理番号 "${c.managementNo || '未設定'}" を削除してよろしいですか？`)) {
-                                                            ctx.deleteContainer(c.id);
-                                                        }
-                                                    }}
-                                                    className="text-red-500 hover:text-red-700 font-bold px-1"
-                                                    title="コンテナ削除"
-                                                >
-                                                    🗑
-                                                </button>
+                                        
+                                        <td className="p-1 border text-center align-middle whitespace-nowrap relative no-print">
+                                            <button tabIndex="-1" onClick={() => setDeleteConfirmTarget(deleteConfirmTarget === idx ? null : idx)} disabled={ctx.authUser && !ctx.authUser.canEdit} className="text-red-500 hover:text-red-700 disabled:opacity-30 font-bold text-lg leading-none" title="削除">×</button>
+                                            {deleteConfirmTarget === idx && (
+                                                <div className="absolute right-8 top-1/2 -translate-y-1/2 bg-white border border-red-300 shadow-lg rounded p-2 z-50 text-xs flex items-center gap-2 font-bold whitespace-nowrap">
+                                                    <span className="text-red-700">削除しますか？</span>
+                                                    <button onClick={() => handleExecuteDeleteRow(container.id, idx)} className="bg-red-600 hover:bg-red-700 text-white px-2 py-0.5 rounded text-[11px]">削除</button>
+                                                    <button onClick={() => setDeleteConfirmTarget(null)} className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-2 py-0.5 rounded text-[11px]">消す</button>
+                                                </div>
                                             )}
                                         </td>
                                     </tr>
                                 );
-                            })
-                        )}
-                    </tbody>
-                </table>
-            </div>
-
-            <ExportPrintModal 
-                isOpen={exportModal.isOpen} 
-                onClose={() => setExportModal({ isOpen: false, type: 'excel' })} 
-                screenName="コンテナ割振表" 
-                currentMonthStr={ctx.currentMonthStr} 
-                defaultMode="year" 
-                onStartExport={handleExecuteExport} 
-            />
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+        
+            <ExportPrintModal isOpen={exportModal.isOpen} onClose={() => setExportModal({ isOpen: false, type: 'excel' })} screenName="コンテナ割振り" currentMonthStr={ctx.currentMonthStr} defaultMode="current" onStartExport={handleExecuteExport} />
         </div>
     );
 };
