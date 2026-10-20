@@ -3,8 +3,8 @@
 // 操作・接続ログ管理モジュール (shipping_logs.js)
 // =========================================================
 
-// ★ JSファイル固有バージョン（コード変更に伴い _js003 へ繰り上げ）
-const JS_LOGS_VERSION = '_js003';
+// ★ JSファイル固有バージョン（クラッシュ修正に伴い _js004 へ繰り上げ）
+const JS_LOGS_VERSION = '_js004';
 
 // 1. GMを含む全アカウント対応 ログインログ記録関数
 const recordLoginSession = async (user) => {
@@ -20,8 +20,6 @@ const recordLoginSession = async (user) => {
         const seconds = String(now.getSeconds()).padStart(2, '0');
         
         const timeFormatted = `${year}/${month}/${date} ${hours}:${minutes}:${seconds}`;
-        
-        // 単一真実源 SYSTEM_VERSION を直接参照（手書き数値のフォールバックは完全廃止）
         const sysVer = typeof SYSTEM_VERSION !== 'undefined' ? SYSTEM_VERSION : '';
 
         await sessionRef.set({
@@ -50,7 +48,6 @@ const LogViewModal = ({ isOpen, onClose, logs, sessions }) => {
 
     if (!isOpen) return null;
 
-    // SYSTEM_VERSION と JS_LOGS_VERSION (_js003) の完全連動結合
     const baseAppVer = typeof SYSTEM_VERSION !== 'undefined' ? SYSTEM_VERSION : '';
     const displayVer = `${baseAppVer}${JS_LOGS_VERSION}`;
 
@@ -77,20 +74,34 @@ const LogViewModal = ({ isOpen, onClose, logs, sessions }) => {
         return parts.length > 1 ? parts[1] : cleanTime;
     };
 
-    // 最新ログインが最上部に来るよう強制降順ソート
+    // ★ 日時文字列/オブジェクトを安全にミリ秒数値へ変換する完全ガード関数
+    const safeGetTime = (item) => {
+        if (!item) return 0;
+        if (item.createdAt) {
+            if (typeof item.createdAt.toDate === 'function') {
+                return item.createdAt.toDate().getTime();
+            }
+            const t = new Date(item.createdAt).getTime();
+            if (!isNaN(t)) return t;
+        }
+        if (item.loginTimeStr) {
+            const cleanStr = item.loginTimeStr.replace(/\//g, '-');
+            const t = new Date(cleanStr).getTime();
+            if (!isNaN(t)) return t;
+        }
+        return 0;
+    };
+
+    // 最新ログインが最上部に来るよう安全性重視のソート処理
     const sortedSessions = React.useMemo(() => {
-        if (!sessions || sessions.length === 0) return [];
-        return [...sessions].sort((a, b) => {
-            const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-            const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-            return timeB - timeA;
-        });
+        if (!sessions || !Array.isArray(sessions) || sessions.length === 0) return [];
+        return [...sessions].sort((a, b) => safeGetTime(b) - safeGetTime(a));
     }, [sessions]);
 
     return (
         <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 no-print">
             <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl h-[85vh] flex flex-col border border-slate-300 overflow-hidden text-xs">
-                {/* ヘッダー（ダークグレー枠付きバッジ & SYSTEM_VERSION + _js003 表示） */}
+                {/* ヘッダー */}
                 <div className="p-3 bg-indigo-900 text-white flex justify-between items-center flex-shrink-0">
                     <div className="flex items-center gap-3">
                         <h3 className="font-bold text-sm flex items-center gap-2">⚙ システム管理ログ・接続履歴</h3>
@@ -117,7 +128,7 @@ const LogViewModal = ({ isOpen, onClose, logs, sessions }) => {
                     </button>
                 </div>
 
-                {/* コンテンツエリア（横スクロール排除・table-fixed構造） */}
+                {/* コンテンツエリア */}
                 <div className="p-3 overflow-y-auto flex-grow bg-white">
                     {activeTab === 'data_logs' ? (
                         <table className="w-full text-xs border-collapse table-fixed">
@@ -173,7 +184,6 @@ const LogViewModal = ({ isOpen, onClose, logs, sessions }) => {
                                         const loginDatePart = s.loginTimeStr ? s.loginTimeStr.split(' ')[0] : '';
                                         const isPastDay = loginDatePart && loginDatePart !== todayStr;
                                         
-                                        // 状況判定 & 前日残存セッションの 23:59強制切断 自動補正
                                         let finalStatusText = '';
                                         let statusBadgeClass = '';
 
@@ -197,7 +207,7 @@ const LogViewModal = ({ isOpen, onClose, logs, sessions }) => {
                                         }
 
                                         return (
-                                            <tr key={s.id} className="border-b hover:bg-slate-50 text-[11px] h-[24px]">
+                                            <tr key={s.id || Math.random()} className="border-b hover:bg-slate-50 text-[11px] h-[24px]">
                                                 <td className="p-1 border font-bold text-indigo-950 text-center truncate">{s.operator || '未設定'}</td>
                                                 <td className="p-1 border text-center text-slate-600 truncate">{formatRoleLabel(s.roleLabel)}</td>
                                                 <td className="p-1 border font-mono font-bold text-amber-700 bg-amber-50/50 text-center text-[10px] truncate">{s.appVersion || baseAppVer}</td>
