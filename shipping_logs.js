@@ -1,10 +1,10 @@
 // =========================================================
 // 吉井電気 製品出荷管理システム
 // 操作・接続ログ管理モジュール (shipping_logs.js)
+// ★ JSファイル固有バージョン: _js006
 // =========================================================
 
-// ★ JSファイル固有バージョン（クラッシュ防止ガード強化に伴い _js005 へ繰り上げ）
-const JS_LOGS_VERSION = '_js005';
+const JS_LOGS_VERSION = '_js006';
 
 // 1. GMを含む全アカウント対応 ログインログ記録関数
 const recordLoginSession = async (user) => {
@@ -78,7 +78,7 @@ const LogViewModal = ({ isOpen, onClose, logs, sessions }) => {
         }
     };
 
-    // 配列の安全な取得とソート（useMemoの例外エラーを完全回避）
+    // 配列の安全な取得と降順ソート（クラッシュ完全防止）
     let safeSessions = [];
     if (Array.isArray(sessions)) {
         safeSessions = [...sessions].sort((a, b) => {
@@ -97,7 +97,7 @@ const LogViewModal = ({ isOpen, onClose, logs, sessions }) => {
     return (
         <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 no-print">
             <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl h-[85vh] flex flex-col border border-slate-300 overflow-hidden text-xs">
-                {/* ヘッダー */}
+                {/* ヘッダー (ダークグレー枠付きバッジ & 118_js006 表示) */}
                 <div className="p-3 bg-indigo-900 text-white flex justify-between items-center flex-shrink-0">
                     <div className="flex items-center gap-3">
                         <h3 className="font-bold text-sm flex items-center gap-2">⚙ システム管理ログ・接続履歴</h3>
@@ -124,7 +124,7 @@ const LogViewModal = ({ isOpen, onClose, logs, sessions }) => {
                     </button>
                 </div>
 
-                {/* コンテンツエリア */}
+                {/* コンテンツエリア（横スクロール排除・table-fixed構造） */}
                 <div className="p-3 overflow-y-auto flex-grow bg-white">
                     {activeTab === 'data_logs' ? (
                         <table className="w-full text-xs border-collapse table-fixed">
