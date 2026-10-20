@@ -1,12 +1,12 @@
 // =========================================================
 // shipping_views_plan.js - 出荷計画・割振り画面モジュール
-// ★ WebVer. 122 対応 / _js006 バージョン繰り上げ版
-// ★ 割振り画面【当月(currentMonthStr)】初期表示の非同期上書き防止修復
+// ★ WebVer. 123 対応 / _js007 バージョン繰り上げ版
+// ★ 勝手なfont-bold除去 (V94標準ウェイト font-mono 復元)
 // ★ 管理番号の表示位置を全画面【中央揃え(text-center)】に統一
-// ★ 割振り数値枠の可読性向上 (font-mono font-bold / 12px)
+// ★ 割振り画面【当月(currentMonthStr)】初期表示の非同期上書き防止修復
 // =========================================================
 
-const JS_PLAN_VERSION = '_js006';
+const JS_PLAN_VERSION = '_js007';
 
 // 【型式編集・削除モーダル (V94完全移植)】
 const ModelEditModal = ({ isOpen, onClose, company='yoshii' }) => {
@@ -629,10 +629,10 @@ const YoshiiPlanView = () => {
                             <td className="p-0.5 border sticky left-[92px] bg-emerald-100 z-40 text-center font-bold">月間合計</td>
                             <td className="p-0.5 border text-center">-</td>
                             <td className="p-0.5 border text-center">-</td>
-                            <td className="p-0.5 border text-right pr-1 font-mono text-xs font-bold text-emerald-900 bg-emerald-200">{totalGrandTotal.toLocaleString()}</td>
+                            <td className="p-0.5 border text-right pr-1 font-mono text-xs text-emerald-900 bg-emerald-200">{totalGrandTotal.toLocaleString()}</td>
                             {displayMonths.map(mo => {
                                 const colTot = calculateColTotal(mo);
-                                return <td key={`tot-${mo}`} className="p-0.5 border text-right pr-1 font-mono text-xs font-bold text-emerald-900 w-[58px] min-w-[58px]">{colTot > 0 ? colTot.toLocaleString() : '0'}</td>;
+                                return <td key={`tot-${mo}`} className="p-0.5 border text-right pr-1 font-mono text-xs text-emerald-900 w-[58px] min-w-[58px]">{colTot > 0 ? colTot.toLocaleString() : '0'}</td>;
                             })}
                             <td className="p-0.5 border text-center">-</td>
                         </tr>
@@ -655,7 +655,7 @@ const YoshiiPlanView = () => {
                                     <td className="border text-xs text-center sticky left-[32px] bg-white z-10 w-[52px] min-w-[52px] p-0">
                                         <LocalInput value={currentVendorCode} originalValue={(matchModelDetails.originals || {}).vendorCode} originalMeta={(matchModelDetails.originalMetas || {}).vendorCode} onChange={(v, orig) => handleModelDetailChange(model, 'vendorCode', v)} className="w-full text-xs text-center font-mono input-compact"/>
                                     </td>
-                                    <td className="border font-bold text-xs sticky left-[92px] bg-white z-10 text-left pl-2 p-0">{model}</td>
+                                    <td className="border text-xs sticky left-[92px] bg-white z-10 text-left pl-2 p-0">{model}</td>
                                     <td className="border text-xs text-left min-w-[220px] whitespace-nowrap p-0">
                                         <LocalInput value={currentProdName} originalValue={(matchModelDetails.originals || {}).productName} originalMeta={(matchModelDetails.originalMetas || {}).productName} onChange={(v, orig) => handleModelDetailChange(model, 'productName', v)} listId="auto_yoshii_productNames" className="w-full text-xs text-left px-1 input-compact"/>
                                     </td>
@@ -680,7 +680,7 @@ const YoshiiPlanView = () => {
                                                             <div className="max-h-36 overflow-y-auto space-y-1">
                                                                 {historyList.map((hist, hIdx) => (
                                                                     <div key={hIdx} className="flex justify-between items-center bg-slate-700 px-1.5 py-0.5 rounded">
-                                                                        <span className="font-mono font-bold text-emerald-300">{hist.qty.toLocaleString()} 台</span>
+                                                                        <span className="font-mono text-emerald-300">{hist.qty.toLocaleString()} 台</span>
                                                                         <div className="flex items-center gap-1">
                                                                             <span className="text-[9px] text-slate-300">{hist.date || ctx.getFormattedShortDate()}</span>
                                                                             <button onClick={() => handleDeleteHistory(plan.id, hIdx, model, mo)} disabled={ctx.authUser && !ctx.authUser.canEdit} className="text-red-400 hover:text-red-200 font-bold ml-1 text-xs" title="この履歴を削除">×</button>
@@ -1047,17 +1047,17 @@ const YoshiiAllocationView = () => {
                                 {models.map(m => <th key={m} className={`p-0.5 border bg-emerald-100 text-xs leading-tight align-bottom model-hdr ${getModelColWidth(m)}`} title={m}>{formatModelWithBreak(m)}</th>)}
                                 <th className="p-0.5 border w-12 bg-gray-200 no-print">削除</th>
                             </tr>
-                            <tr className="bg-gray-50 font-bold text-xs text-gray-700 border-b table-row-compact">
+                            <tr className="bg-gray-50 text-xs text-gray-700 border-b table-row-compact">
                                 <td className="p-0.5 border sticky left-0 bg-gray-50 z-40 text-center no-print">-</td>
                                 <td className="p-0.5 border sticky left-10 bg-gray-50 z-40 text-center">計画数</td>
                                 <td className="p-0.5 border sticky left-[104px] bg-gray-50 z-40 text-center text-gray-500 font-normal">(合計)</td>
                                 <td className="p-0.5 border sticky left-[194px] bg-gray-50 z-40 text-right pr-1 font-mono text-xs font-bold text-emerald-900 bg-emerald-100/60">
                                     {models.reduce((sum, m) => sum + (Number(modelTotals[m]) || 0), 0).toLocaleString()}
                                 </td>
-                                {models.map(m => <td key={m} className={`p-0.5 border font-mono text-xs font-bold text-right pr-1 ${getModelColWidth(m)} ${modelTotals[m] === 0 ? 'text-red-500' : ''}`}>{Number(modelTotals[m]).toLocaleString()}</td>)}
+                                {models.map(m => <td key={m} className={`p-0.5 border font-mono text-xs text-right pr-1 ${getModelColWidth(m)} ${modelTotals[m] === 0 ? 'text-red-500' : ''}`}>{Number(modelTotals[m]).toLocaleString()}</td>)}
                                 <td className="p-0.5 border bg-gray-50 no-print"></td>
                             </tr>
-                            <tr className="bg-gray-100 font-bold text-xs text-gray-800 border-b-2 border-gray-300 table-row-compact">
+                            <tr className="bg-gray-100 text-xs text-gray-800 border-b-2 border-gray-300 table-row-compact">
                                 <td className="p-0.5 border sticky left-0 bg-gray-100 z-40 text-center no-print">-</td>
                                 <td className="p-0.5 border sticky left-10 bg-gray-100 z-40 text-center">残数</td>
                                 <td className="p-0.5 border sticky left-[104px] bg-gray-100 z-40 text-center text-gray-500 font-normal">(合計)</td>
@@ -1073,7 +1073,7 @@ const YoshiiAllocationView = () => {
                                         return sum + (Number(q) || 0);
                                     }, 0);
                                     const remain = modelTotals[m] - allocated;
-                                    return <td key={m} className={`p-0.5 border font-mono text-xs font-bold text-right pr-1 ${getModelColWidth(m)} ${remain < 0 ? 'text-red-600' : remain > 0 ? 'text-blue-600' : 'text-green-600'}`}>{remain.toLocaleString()}</td>;
+                                    return <td key={m} className={`p-0.5 border font-mono text-xs text-right pr-1 ${getModelColWidth(m)} ${remain < 0 ? 'text-red-600' : remain > 0 ? 'text-blue-600' : 'text-green-600'}`}>{remain.toLocaleString()}</td>;
                                 })}
                                 <td className="p-0.5 border bg-gray-100 no-print"></td>
                             </tr>
@@ -1103,9 +1103,9 @@ const YoshiiAllocationView = () => {
                                         {models.map((m, mIdx) => {
                                             const cellValue = getContainerAllocationQty(container.allocations, m);
                                             return (
-                                                /* ★ 修復: 割振り数値枠の可読性向上 (font-mono font-bold / 12px) */
+                                                /* ★ 修復: 勝手なfont-boldを除去した標準ウェイトの等幅フォント(font-mono / 12px) */
                                                 <td key={m} className={`matrix-td px-0.5 ${getModelColWidth(m)} table-row-compact`}>
-                                                    <LocalInput type="number" value={cellValue} originalValue={(container.originals?.allocations || {})[m]} originalMeta={(container.originalMetas?.allocations || {})[m]} onChange={(v, orig) => handleAllocationValueChange(container, m, v, orig)} className="matrix-input text-emerald-900 font-bold font-mono pr-1 text-right text-xs input-compact" dataGridId={`y-alloc-${idx}-${mIdx + 2}`} onGridKeyDown={handleGridNav} />
+                                                    <LocalInput type="number" value={cellValue} originalValue={(container.originals?.allocations || {})[m]} originalMeta={(container.originalMetas?.allocations || {})[m]} onChange={(v, orig) => handleAllocationValueChange(container, m, v, orig)} className="matrix-input text-emerald-900 font-mono pr-1 text-right text-xs input-compact" dataGridId={`y-alloc-${idx}-${mIdx + 2}`} onGridKeyDown={handleGridNav} />
                                                 </td>
                                             );
                                         })}
