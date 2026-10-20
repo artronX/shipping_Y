@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>吉井電気 製品出荷管理システム (WebVer. 116)</title>
+    <title>吉井電気 製品出荷管理システム (WebVer. 117)</title>
     
     <!-- React 18 -->
     <script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js" crossorigin></script>
@@ -155,11 +155,26 @@
 <body class="bg-gray-100 text-gray-800">
     <div id="root"></div>
 
+    <!-- 1. 単一真実源 SYSTEM_VERSION を標準スクリプト空間で定義 -->
+    <script>
+        window.SYSTEM_VERSION = 'WebVer. 117';
+    </script>
+
+    <!-- 2. SYSTEM_VERSION と完全連動する動的外部スクリプト読み込み -->
+    <script>
+        (function() {
+            var v = encodeURIComponent(window.SYSTEM_VERSION);
+            document.write('<script type="text/babel" src="shipping_components.js?v=' + v + '"><\/script>');
+            document.write('<script type="text/babel" src="shipping_exports.js?v=' + v + '"><\/script>');
+            document.write('<script type="text/babel" src="shipping_logs.js?v=' + v + '"><\/script>');
+            document.write('<script type="text/babel" src="shipping_views_plan.js?v=' + v + '"><\/script>');
+            document.write('<script type="text/babel" src="shipping_views_ship.js?v=' + v + '"><\/script>');
+        })();
+    </script>
+
+    <!-- 3. React アプリケーション本体 -->
     <script type="text/babel">
-        // =========================================================
-        // SYSTEM_VERSION = 'WebVer. 116'; // バージョン単一真実源 (116へ繰り上げ)
-        // =========================================================
-        const SYSTEM_VERSION = 'WebVer. 116';
+        const SYSTEM_VERSION = window.SYSTEM_VERSION;
 
         const AUTO_LOGOUT_MINUTES = 15;
         const LAST_OPERATOR_STORAGE_KEY = 'shipping_last_operator_name';
@@ -233,7 +248,6 @@
             });
         };
 
-        // ログインモーダル定義（SYSTEM_VERSION 定数完全一元化）
         const LoginModal = ({ onLogin }) => {
             const [workerId, setWorkerId] = useState(() => localStorage.getItem(LAST_OPERATOR_STORAGE_KEY) || '');
             const [password, setPassword] = useState('');
@@ -342,7 +356,6 @@
                 setIsLoggedIn(true);
                 setSelectedVendorFilter(user.vendorRestriction || 'ALL');
                 
-                // 全仕入先対応 ログインログ記録
                 if (typeof recordLoginSession === 'function') {
                     recordLoginSession(user);
                 }
@@ -596,15 +609,5 @@
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
     </script>
-
-    <!-- 外部スクリプトの全自動一元読み込み (SYSTEM_VERSION 完全連動) -->
-    <script>
-        document.write('<script type="text/babel" src="shipping_components.js?v=' + encodeURIComponent(SYSTEM_VERSION) + '"><\/script>');
-        document.write('<script type="text/babel" src="shipping_exports.js?v=' + encodeURIComponent(SYSTEM_VERSION) + '"><\/script>');
-        document.write('<script type="text/babel" src="shipping_logs.js?v=' + encodeURIComponent(SYSTEM_VERSION) + '"><\/script>');
-    </script>
-
-    <script type="text/babel" src="shipping_views_plan.js?v=116"></script>
-    <script type="text/babel" src="shipping_views_ship.js?v=116"></script>
 </body>
 </html>
