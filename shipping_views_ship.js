@@ -1,11 +1,12 @@
 // =========================================================
 // shipping_views_ship.js - 出荷日程・ドレージ画面モジュール
-// ★ WebVer. 121 対応 / _js004 バージョン繰り上げ版
+// ★ WebVer. 122 対応 / _js005 バージョン繰り上げ版
 // ★ ドレージ画面【総数量】割振りデータ(allocations)動的自動計算修復
-// ★ 出荷日程・ドレージ画面【当月(currentMonthStr)】初期表示デフォルト固定
+// ★ 出荷日程・ドレージ画面【当月(currentMonthStr)】初期表示の非同期上書き防止修復
+// ★ 管理番号の表示位置を全画面【中央揃え(text-center)】に統一
 // =========================================================
 
-const JS_SHIP_VERSION = '_js004';
+const JS_SHIP_VERSION = '_js005';
 
 // 【ヘルパー: コンテナ内割振り総数量の動的自動計算】
 const calculateContainerTotalQty = (allocationsObj) => {
@@ -25,10 +26,16 @@ const YoshiiShipView = () => {
     const cmpVer = typeof JS_COMPONENTS_VERSION !== 'undefined' ? JS_COMPONENTS_VERSION : '';
     const displayVer = `${baseAppVer}${JS_SHIP_VERSION}${cmpVer}`;
 
-    // ★ 改修ポイント: 初期表示月を当月(currentMonthStr)へ厳格固定
-    const [selectedMonth, setSelectedMonth] = React.useState(() => {
-        return ctx.currentMonthStr || `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
-    });
+    // ★ 修復: 初回データ受信時の非同期処理による「過去月(8月)への勝手な上書き」をブロックする構造
+    const [selectedMonth, setSelectedMonth] = React.useState(ctx.currentMonthStr || `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`);
+    const isInitRef = React.useRef(false);
+
+    React.useEffect(() => {
+        if (!isInitRef.current && ctx.currentMonthStr) {
+            setSelectedMonth(ctx.currentMonthStr);
+            isInitRef.current = true;
+        }
+    }, [ctx.currentMonthStr]);
 
     const [filterRange, setFilterRange] = React.useState('current'); // 'current', 'all'
     const [rowLimit, setRowLimit] = React.useState(5);
@@ -190,7 +197,7 @@ const YoshiiShipView = () => {
                     <thead className="sticky top-0 z-30 bg-gray-200 shadow-sm">
                         <tr className="table-row-compact">
                             <th className="p-0.5 border w-10 text-xs no-print">移動</th>
-                            <th className="p-0.5 border w-[80px] min-w-[80px] text-xs">管理番号</th>
+                            <th className="p-0.5 border w-[80px] min-w-[80px] text-xs text-center">管理番号</th>
                             <th className="p-0.5 border w-[75px] min-w-[75px] text-xs">進行状況</th>
                             <th className="p-0.5 border w-[110px] min-w-[110px] text-xs">コンテナNO.</th>
                             <th className="p-0.5 border min-w-[130px] text-xs">積載型式</th>
@@ -224,7 +231,6 @@ const YoshiiShipView = () => {
                             
                             // ★ 修復: 割振りデータ(allocations)からの動的自動計算
                             const totalQty = calculateContainerTotalQty(container.allocations);
-
                             const activeAllocEntries = Object.entries(container.allocations || {}).filter(([_, q]) => Number(q) > 0);
 
                             return (
@@ -237,6 +243,7 @@ const YoshiiShipView = () => {
                                 >
                                     <td draggable={!!container.id && (ctx.authUser ? ctx.authUser.canEdit : true)} onDragStart={(e) => ctx.handleDragStart(e, container.id)} className="p-0.5 border bg-white text-center drag-handle text-gray-400 hover:text-emerald-600 font-bold text-sm cursor-grab active:cursor-grabbing no-print">≡</td>
                                     
+                                    {/* ★ 修復: 管理番号を全画面統一の【中央揃え(text-center)】に修正 */}
                                     <td className="matrix-td px-0">
                                         <LocalInput value={container.managementNo} originalValue={(container.originals || {}).managementNo} originalMeta={(container.originalMetas || {}).managementNo} onChange={(v, orig) => ctx.updateContainer(container.id, { managementNo: v, originals: { ...(container.originals || {}), managementNo: container.originals?.managementNo !== undefined ? container.originals.managementNo : orig }, originalMetas: { ...(container.originalMetas || {}), managementNo: container.originalMetas?.managementNo !== undefined ? container.originalMetas.managementNo : `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}` } }, selectedMonth, 'yoshii', '管理番号')} className="matrix-input text-center text-xs font-bold input-compact" dataGridId={`y-ship-${idx}-0`} onGridKeyDown={handleGridNav} />
                                     </td>
@@ -351,10 +358,16 @@ const YoshiiDrayageView = () => {
 
     const [filterRange, setFilterRange] = React.useState('all'); // 'all', 'current'
     
-    // ★ 改修ポイント: 初期表示月を当月(currentMonthStr)へ厳格固定
-    const [selectedMonth, setSelectedMonth] = React.useState(() => {
-        return ctx.currentMonthStr || `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
-    });
+    // ★ 修復: 初回データ受信時の非同期処理による「過去月(8月)への勝手な上書き」をブロックする構造
+    const [selectedMonth, setSelectedMonth] = React.useState(ctx.currentMonthStr || `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`);
+    const isInitRef = React.useRef(false);
+
+    React.useEffect(() => {
+        if (!isInitRef.current && ctx.currentMonthStr) {
+            setSelectedMonth(ctx.currentMonthStr);
+            isInitRef.current = true;
+        }
+    }, [ctx.currentMonthStr]);
 
     React.useLayoutEffect(() => {
         if (ctx.tableContainerRef.current && ctx.drayScrollPosRef.current !== null) {
@@ -472,7 +485,7 @@ const YoshiiDrayageView = () => {
                 <table className="alloc-print-table w-max text-center border-collapse">
                     <thead className="sticky top-0 z-30 bg-gray-200 shadow-sm">
                         <tr className="table-row-compact">
-                            <th className="p-0.5 border w-[80px] min-w-[80px] text-xs">管理番号</th>
+                            <th className="p-0.5 border w-[80px] min-w-[80px] text-xs text-center">管理番号</th>
                             <th className="p-0.5 border w-[75px] min-w-[75px] text-xs">進行状況</th>
                             <th className="p-0.5 border w-[110px] min-w-[110px] text-xs">コンテナNO.</th>
                             <th className="p-0.5 border min-w-[130px] text-xs">積載型式</th>
@@ -521,6 +534,7 @@ const YoshiiDrayageView = () => {
 
                                             return (
                                                 <tr key={container.id || `dray-${mo}-${idx}`} className="hover:bg-emerald-50 border-b table-row-compact">
+                                                    {/* ★ 修復: 管理番号を全画面統一の【中央揃え(text-center)】に修正 */}
                                                     <td className="matrix-td px-0">
                                                         <LocalInput value={container.managementNo} originalValue={(container.originals || {}).managementNo} originalMeta={(container.originalMetas || {}).managementNo} onChange={(v, orig) => ctx.updateContainer(container.id, { managementNo: v }, mo, 'yoshii', '管理番号')} className="matrix-input text-center text-xs font-bold input-compact" dataGridId={`y-dray-${mo}-${idx}-0`} onGridKeyDown={handleGridNav} />
                                                     </td>

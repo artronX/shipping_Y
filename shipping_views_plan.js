@@ -1,10 +1,12 @@
 // =========================================================
 // shipping_views_plan.js - 出荷計画・割振り画面モジュール
-// ★ WebVer. 94 完全レイアウト & 極小縦幅CSS統合修復版
-// ★ JSファイル固有バージョン: _js005
+// ★ WebVer. 122 対応 / _js006 バージョン繰り上げ版
+// ★ 割振り画面【当月(currentMonthStr)】初期表示の非同期上書き防止修復
+// ★ 管理番号の表示位置を全画面【中央揃え(text-center)】に統一
+// ★ 割振り数値枠の可読性向上 (font-mono font-bold / 12px)
 // =========================================================
 
-const JS_PLAN_VERSION = '_js005';
+const JS_PLAN_VERSION = '_js006';
 
 // 【型式編集・削除モーダル (V94完全移植)】
 const ModelEditModal = ({ isOpen, onClose, company='yoshii' }) => {
@@ -197,13 +199,14 @@ const ModelEditModal = ({ isOpen, onClose, company='yoshii' }) => {
     );
 };
 
-// 【1. 吉井電気 納品・出荷計画ビュー (V94完全構造 & 縦幅極小クラス適用)】
+// 【1. 吉井電気 納品・出荷計画ビュー (YoshiiPlanView)】
 const YoshiiPlanView = () => {
     const ctx = React.useContext(AppContext);
     const [exportModal, setExportModal] = React.useState({ isOpen: false, type: 'excel' });
 
     const baseAppVer = typeof SYSTEM_VERSION !== 'undefined' ? SYSTEM_VERSION : '';
-    const displayVer = `${baseAppVer}${JS_PLAN_VERSION}`;
+    const cmpVer = typeof JS_COMPONENTS_VERSION !== 'undefined' ? JS_COMPONENTS_VERSION : '';
+    const displayVer = `${baseAppVer}${JS_PLAN_VERSION}${cmpVer}`;
 
     const handleExecuteExport = ({ mode, selectedYear: selYr, singleMonth: sgMo, startMonth: sMo, endMonth: eMo }) => {
         const targetVendor = ctx.selectedVendorFilter || 'ALL';
@@ -525,7 +528,6 @@ const YoshiiPlanView = () => {
                 {dynamicTitle} [仕入先: {ctx.selectedVendorFilter || 'ALL'}]
             </div>
             
-            {/* ★ タイトルとバッジの重なり解消構造 (タイトル文言のみに下線を付与) */}
             <div className="mb-1.5 flex-shrink-0 flex justify-between items-center no-print">
                 <div className="flex items-center gap-2">
                     <span className="text-base md:text-lg font-extrabold text-emerald-900 border-b-2 border-emerald-600 pb-0.5">
@@ -630,7 +632,7 @@ const YoshiiPlanView = () => {
                             <td className="p-0.5 border text-right pr-1 font-mono text-xs font-bold text-emerald-900 bg-emerald-200">{totalGrandTotal.toLocaleString()}</td>
                             {displayMonths.map(mo => {
                                 const colTot = calculateColTotal(mo);
-                                return <td key={`tot-${mo}`} className="p-0.5 border text-right pr-1 font-mono text-xs text-emerald-900 w-[58px] min-w-[58px]">{colTot > 0 ? colTot.toLocaleString() : '0'}</td>;
+                                return <td key={`tot-${mo}`} className="p-0.5 border text-right pr-1 font-mono text-xs font-bold text-emerald-900 w-[58px] min-w-[58px]">{colTot > 0 ? colTot.toLocaleString() : '0'}</td>;
                             })}
                             <td className="p-0.5 border text-center">-</td>
                         </tr>
@@ -763,13 +765,23 @@ const formatModelWithBreak = (m) => {
     return str;
 };
 
-// 【2. 吉井電気 コンテナ割振りビュー (V94完全構造 & 縦幅極小クラス適用)】
+// 【2. 吉井電気 コンテナ割振りビュー (YoshiiAllocationView)】
 const YoshiiAllocationView = () => {
     const ctx = React.useContext(AppContext);
     const [exportModal, setExportModal] = React.useState({ isOpen: false, type: 'excel' });
 
     const baseAppVer = typeof SYSTEM_VERSION !== 'undefined' ? SYSTEM_VERSION : '';
-    const displayVer = `${baseAppVer}${JS_PLAN_VERSION}`;
+    const cmpVer = typeof JS_COMPONENTS_VERSION !== 'undefined' ? JS_COMPONENTS_VERSION : '';
+    const displayVer = `${baseAppVer}${JS_PLAN_VERSION}${cmpVer}`;
+
+    // ★ 修復: 初回データ受信時の非同期処理による「過去月(8月)への勝手な上書き」をブロックする構造
+    const isInitRef = React.useRef(false);
+    React.useEffect(() => {
+        if (!isInitRef.current && ctx.currentMonthStr) {
+            ctx.setYoshiiAllocMonth(ctx.currentMonthStr);
+            isInitRef.current = true;
+        }
+    }, [ctx.currentMonthStr]);
 
     const handleExecuteExport = ({ mode, selectedYear: selYr, singleMonth: sgMo, startMonth: sMo, endMonth: eMo }) => {
         const targetVendor = ctx.selectedVendorFilter || 'ALL';
@@ -970,10 +982,10 @@ const YoshiiAllocationView = () => {
 
     const getModelColWidth = (m) => {
         const len = (m || '').length;
-        if (len <= 6) return 'w-[44px] min-w-[44px] max-w-[44px]';
-        if (len <= 8) return 'w-[50px] min-w-[50px] max-w-[50px]';
-        if (len <= 10) return 'w-[56px] min-w-[56px] max-w-[56px]';
-        return 'w-[62px] min-w-[62px] max-w-[62px]';
+        if (len <= 6) return 'w-[48px] min-w-[48px] max-w-[48px]';
+        if (len <= 8) return 'w-[54px] min-w-[54px] max-w-[54px]';
+        if (len <= 10) return 'w-[60px] min-w-[60px] max-w-[60px]';
+        return 'w-[66px] min-w-[66px] max-w-[66px]';
     };
 
     const handleAddRow = () => {
@@ -1006,7 +1018,7 @@ const YoshiiAllocationView = () => {
                         </span>
                     </div>
                     <label className="font-bold text-sm ml-2">対象年月:</label>
-                    <input type="month" value={ctx.yoshiiAllocMonth} onChange={e => ctx.setYoshiiAllocMonth(e.target.value)} className="border p-1 rounded text-sm text-center" />
+                    <input type="month" value={ctx.yoshiiAllocMonth} onChange={e => ctx.setYoshiiAllocMonth(e.target.value)} className="border p-1 rounded text-sm text-center font-bold bg-white" />
                     <label className="font-bold text-sm ml-2">コンテナ枠数:</label>
                     <div className="flex items-center gap-1">
                         <button onClick={() => { if (displayRows > monthContainers.length) setRowLimit(displayRows - 1); }} disabled={ctx.authUser && !ctx.authUser.canEdit} className="bg-gray-300 hover:bg-gray-400 disabled:opacity-30 w-7 h-7 rounded font-bold transition">-</button>
@@ -1030,7 +1042,7 @@ const YoshiiAllocationView = () => {
                             <tr className="bg-gray-200 table-row-compact">
                                 <th className="p-0.5 border w-10 sticky left-0 top-0 bg-gray-200 z-40 text-xs no-print">移動</th>
                                 <th className="p-0.5 border w-16 sticky left-10 top-0 bg-gray-200 z-40 text-xs">項目</th>
-                                <th className="p-0.5 border w-[90px] min-w-[90px] sticky left-[104px] top-0 bg-gray-200 z-40 text-xs">管理番号</th>
+                                <th className="p-0.5 border w-[90px] min-w-[90px] sticky left-[104px] top-0 bg-gray-200 z-40 text-xs text-center">管理番号</th>
                                 <th className="p-0.5 border w-[76px] min-w-[70px] sticky left-[194px] top-0 bg-gray-200 z-40 text-xs">到着港</th>
                                 {models.map(m => <th key={m} className={`p-0.5 border bg-emerald-100 text-xs leading-tight align-bottom model-hdr ${getModelColWidth(m)}`} title={m}>{formatModelWithBreak(m)}</th>)}
                                 <th className="p-0.5 border w-12 bg-gray-200 no-print">削除</th>
@@ -1042,7 +1054,7 @@ const YoshiiAllocationView = () => {
                                 <td className="p-0.5 border sticky left-[194px] bg-gray-50 z-40 text-right pr-1 font-mono text-xs font-bold text-emerald-900 bg-emerald-100/60">
                                     {models.reduce((sum, m) => sum + (Number(modelTotals[m]) || 0), 0).toLocaleString()}
                                 </td>
-                                {models.map(m => <td key={m} className={`p-0.5 border font-mono text-xs text-right pr-1 ${getModelColWidth(m)} ${modelTotals[m] === 0 ? 'text-red-500' : ''}`}>{Number(modelTotals[m]).toLocaleString()}</td>)}
+                                {models.map(m => <td key={m} className={`p-0.5 border font-mono text-xs font-bold text-right pr-1 ${getModelColWidth(m)} ${modelTotals[m] === 0 ? 'text-red-500' : ''}`}>{Number(modelTotals[m]).toLocaleString()}</td>)}
                                 <td className="p-0.5 border bg-gray-50 no-print"></td>
                             </tr>
                             <tr className="bg-gray-100 font-bold text-xs text-gray-800 border-b-2 border-gray-300 table-row-compact">
@@ -1061,7 +1073,7 @@ const YoshiiAllocationView = () => {
                                         return sum + (Number(q) || 0);
                                     }, 0);
                                     const remain = modelTotals[m] - allocated;
-                                    return <td key={m} className={`p-0.5 border font-mono text-xs text-right pr-1 ${getModelColWidth(m)} ${remain < 0 ? 'text-red-600' : remain > 0 ? 'text-blue-600' : 'text-green-600'}`}>{remain.toLocaleString()}</td>;
+                                    return <td key={m} className={`p-0.5 border font-mono text-xs font-bold text-right pr-1 ${getModelColWidth(m)} ${remain < 0 ? 'text-red-600' : remain > 0 ? 'text-blue-600' : 'text-green-600'}`}>{remain.toLocaleString()}</td>;
                                 })}
                                 <td className="p-0.5 border bg-gray-100 no-print"></td>
                             </tr>
@@ -1080,6 +1092,7 @@ const YoshiiAllocationView = () => {
                                         <td draggable={!!container.id && (ctx.authUser ? ctx.authUser.canEdit : true)} onDragStart={(e) => ctx.handleDragStart(e, container.id, 'containers')} className="p-0.5 border bg-white sticky left-0 z-20 text-center drag-handle text-gray-400 hover:text-emerald-600 font-bold text-base cursor-grab active:cursor-grabbing no-print">≡</td>
                                         <td className="p-0.5 border bg-white sticky left-10 z-20 text-[11px] font-medium whitespace-nowrap">コンテナ {idx + 1}</td>
                                         
+                                        {/* ★ 修復: 管理番号を全画面統一の【中央揃え(text-center)】に修正 */}
                                         <td className="matrix-td px-0 sticky left-[104px] bg-white z-20 table-row-compact">
                                             <LocalInput value={container.managementNo} originalValue={(container.originals || {}).managementNo} originalMeta={(container.originalMetas || {}).managementNo} onChange={(v, orig) => ctx.updateContainer(container.id, { managementNo: v, originals: { ...(container.originals || {}), managementNo: container.originals?.managementNo !== undefined ? container.originals.managementNo : orig }, originalMetas: { ...(container.originalMetas || {}), managementNo: container.originalMetas?.managementNo !== undefined ? container.originalMetas.managementNo : `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}` } }, ctx.yoshiiAllocMonth, 'yoshii', '管理番号')} className="matrix-input text-center text-xs font-bold input-compact" dataGridId={`y-alloc-${idx}-0`} onGridKeyDown={handleGridNav} />
                                         </td>
@@ -1090,8 +1103,9 @@ const YoshiiAllocationView = () => {
                                         {models.map((m, mIdx) => {
                                             const cellValue = getContainerAllocationQty(container.allocations, m);
                                             return (
+                                                /* ★ 修復: 割振り数値枠の可読性向上 (font-mono font-bold / 12px) */
                                                 <td key={m} className={`matrix-td px-0.5 ${getModelColWidth(m)} table-row-compact`}>
-                                                    <LocalInput type="number" value={cellValue} originalValue={(container.originals?.allocations || {})[m]} originalMeta={(container.originalMetas?.allocations || {})[m]} onChange={(v, orig) => handleAllocationValueChange(container, m, v, orig)} className="matrix-input text-emerald-800 font-bold pr-1 text-right input-compact" dataGridId={`y-alloc-${idx}-${mIdx + 2}`} onGridKeyDown={handleGridNav} />
+                                                    <LocalInput type="number" value={cellValue} originalValue={(container.originals?.allocations || {})[m]} originalMeta={(container.originalMetas?.allocations || {})[m]} onChange={(v, orig) => handleAllocationValueChange(container, m, v, orig)} className="matrix-input text-emerald-900 font-bold font-mono pr-1 text-right text-xs input-compact" dataGridId={`y-alloc-${idx}-${mIdx + 2}`} onGridKeyDown={handleGridNav} />
                                                 </td>
                                             );
                                         })}
