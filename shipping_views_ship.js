@@ -1,13 +1,4 @@
-// =========================================================
-// shipping_views_ship.js - 出荷日程・ドレージ画面モジュール
-// ★ WebVer. 123 対応 / _js006 バージョン繰り上げ版
-// ★ V94正統コントロール【納入月表示切替】完全復元
-// ★ 出荷日程・ドレージ画面【当月(2026年10月)】位置自動スクロール配置
-// ★ ドレージ画面【総数量】割振りデータ(allocations)動的自動計算修復
-// ★ 管理番号の表示位置を全画面【中央揃え(text-center)】に統一
-// =========================================================
-
-const JS_SHIP_VERSION = '_js006';
+const JS_SHIP_VERSION = '_js007';
 
 // 【ヘルパー: コンテナ内割振り総数量の動的自動計算】
 const calculateContainerTotalQty = (allocationsObj) => {
@@ -34,7 +25,6 @@ const YoshiiShipView = () => {
     const [rangeStartMonth, setRangeStartMonth] = React.useState('2026-04');
     const [rangeEndMonth, setRangeEndMonth] = React.useState('2027-03');
 
-    const [rowLimit, setRowLimit] = React.useState(5);
     const [focusTargetIdx, setFocusTargetIdx] = React.useState(null);
     const [deleteConfirmTarget, setDeleteConfirmTarget] = React.useState(null);
 
@@ -46,11 +36,13 @@ const YoshiiShipView = () => {
             if (ctx.shipScrollPosRef.current !== null) {
                 ctx.tableContainerRef.current.scrollTop = ctx.shipScrollPosRef.current;
             } else if (!isInitialScrolledRef.current && ctx.currentMonthStr) {
-                const targetHeader = document.getElementById(`ship-month-hdr-${ctx.currentMonthStr}`);
-                if (targetHeader) {
-                    targetHeader.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                    isInitialScrolledRef.current = true;
-                }
+                setTimeout(() => {
+                    const targetHeader = document.getElementById(`ship-month-hdr-${ctx.currentMonthStr}`);
+                    if (targetHeader) {
+                        targetHeader.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        isInitialScrolledRef.current = true;
+                    }
+                }, 100);
             }
         }
     }, [ctx.currentMonthStr]);
@@ -157,7 +149,7 @@ const YoshiiShipView = () => {
         });
     };
 
-    const handleExecuteDeleteRow = async (containerId, monthKey) => {
+    const handleExecuteDeleteRow = async (containerId) => {
         if (containerId) {
             await ctx.deleteContainer(containerId, '吉井電気 出荷日程表');
         }
@@ -167,7 +159,7 @@ const YoshiiShipView = () => {
     return (
         <div className="p-4 bg-white flex-grow flex flex-col h-full">
             <div className="hidden print:block font-bold text-sm text-black mb-1 border-b pb-0.5 text-left w-full">
-                吉井電気 出荷日程表 [仕入先: {ctx.selectedVendorFilter || 'ALL'}]
+                吉井電気 出荷日程表 [仕入先: \${ctx.selectedVendorFilter || 'ALL'}]
             </div>
 
             <div className="flex justify-between items-center mb-2 no-print flex-shrink-0">
@@ -273,7 +265,6 @@ const YoshiiShipView = () => {
                                             </td>
                                         </tr>
                                         {containersInMonth.map((container, idx) => {
-                                            // ★ 修復: 割振りデータ(allocations)からの動的自動計算
                                             const totalQty = calculateContainerTotalQty(container.allocations);
                                             const activeAllocEntries = Object.entries(container.allocations || {}).filter(([_, q]) => Number(q) > 0);
 
@@ -287,7 +278,7 @@ const YoshiiShipView = () => {
                                                 >
                                                     <td draggable={!!container.id && (ctx.authUser ? ctx.authUser.canEdit : true)} onDragStart={(e) => ctx.handleDragStart(e, container.id)} className="p-0.5 border bg-white text-center drag-handle text-gray-400 hover:text-emerald-600 font-bold text-sm cursor-grab active:cursor-grabbing no-print">≡</td>
                                                     
-                                                    {/* ★ 修復: 管理番号を全画面統一の【中央揃え(text-center)】に修正 */}
+                                                    {/* 管理番号: 中央揃え */}
                                                     <td className="matrix-td px-0">
                                                         <LocalInput value={container.managementNo} originalValue={(container.originals || {}).managementNo} originalMeta={(container.originalMetas || {}).managementNo} onChange={(v, orig) => ctx.updateContainer(container.id, { managementNo: v, originals: { ...(container.originals || {}), managementNo: container.originals?.managementNo !== undefined ? container.originals.managementNo : orig }, originalMetas: { ...(container.originalMetas || {}), managementNo: container.originalMetas?.managementNo !== undefined ? container.originalMetas.managementNo : `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}` } }, mo, 'yoshii', '管理番号')} className="matrix-input text-center text-xs font-bold input-compact" dataGridId={`y-ship-${mo}-${idx}-0`} onGridKeyDown={handleGridNav} />
                                                     </td>
@@ -325,7 +316,7 @@ const YoshiiShipView = () => {
 
                                                     <td className="border font-mono text-xs text-right pr-1 bg-gray-50">{totalQty > 0 ? totalQty.toLocaleString() : '0'}</td>
                                                     
-                                                    {/* ★ 修復: 割振りデータから動的自動計算された正しい総数量を表示 */}
+                                                    {/* 総数量 (動的自動計算) */}
                                                     <td className="border font-mono text-xs text-right pr-1 bg-emerald-100 text-emerald-900 font-bold">{totalQty > 0 ? totalQty.toLocaleString() : '0'}</td>
 
                                                     <td className="matrix-td px-0">
@@ -374,7 +365,7 @@ const YoshiiShipView = () => {
                                                         {deleteConfirmTarget === idx && (
                                                             <div className="absolute right-8 top-1/2 -translate-y-1/2 bg-white border border-red-300 shadow-lg rounded p-2 z-50 text-xs flex items-center gap-2 font-bold whitespace-nowrap">
                                                                 <span className="text-red-700">削除しますか？</span>
-                                                                <button onClick={() => handleExecuteDeleteRow(container.id, mo)} className="bg-red-600 hover:bg-red-700 text-white px-2 py-0.5 rounded text-[11px]">削除</button>
+                                                                <button onClick={() => handleExecuteDeleteRow(container.id)} className="bg-red-600 hover:bg-red-700 text-white px-2 py-0.5 rounded text-[11px]">削除</button>
                                                                 <button onClick={() => setDeleteConfirmTarget(null)} className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-2 py-0.5 rounded text-[11px]">消す</button>
                                                             </div>
                                                         )}
@@ -414,11 +405,13 @@ const YoshiiDrayageView = () => {
             if (ctx.drayScrollPosRef.current !== null) {
                 ctx.tableContainerRef.current.scrollTop = ctx.drayScrollPosRef.current;
             } else if (!isInitialScrolledRef.current && ctx.currentMonthStr) {
-                const targetHeader = document.getElementById(`dray-month-hdr-${ctx.currentMonthStr}`);
-                if (targetHeader) {
-                    targetHeader.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                    isInitialScrolledRef.current = true;
-                }
+                setTimeout(() => {
+                    const targetHeader = document.getElementById(`dray-month-hdr-${ctx.currentMonthStr}`);
+                    if (targetHeader) {
+                        targetHeader.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        isInitialScrolledRef.current = true;
+                    }
+                }, 100);
             }
         }
     }, [ctx.currentMonthStr]);
@@ -576,13 +569,12 @@ const YoshiiDrayageView = () => {
                                             </td>
                                         </tr>
                                         {containersInMonth.map((container, idx) => {
-                                            // ★ 修復: 割振りデータ(allocations)からの動的自動計算
                                             const totalQty = calculateContainerTotalQty(container.allocations);
                                             const activeAllocEntries = Object.entries(container.allocations || {}).filter(([_, q]) => Number(q) > 0);
 
                                             return (
                                                 <tr key={container.id || `dray-${mo}-${idx}`} className="hover:bg-emerald-50 border-b table-row-compact">
-                                                    {/* ★ 修復: 管理番号を全画面統一の【中央揃え(text-center)】に修正 */}
+                                                    {/* 管理番号: 中央揃え */}
                                                     <td className="matrix-td px-0">
                                                         <LocalInput value={container.managementNo} originalValue={(container.originals || {}).managementNo} originalMeta={(container.originalMetas || {}).managementNo} onChange={(v, orig) => ctx.updateContainer(container.id, { managementNo: v }, mo, 'yoshii', '管理番号')} className="matrix-input text-center text-xs font-bold input-compact" dataGridId={`y-dray-${mo}-${idx}-0`} onGridKeyDown={handleGridNav} />
                                                     </td>
@@ -620,7 +612,7 @@ const YoshiiDrayageView = () => {
 
                                                     <td className="border font-mono text-xs text-right pr-1 bg-gray-50">{totalQty > 0 ? totalQty.toLocaleString() : '0'}</td>
                                                     
-                                                    {/* ★ 修復: 割振りデータから動的自動計算された正しい総数量を表示 */}
+                                                    {/* 総数量 (動的自動計算) */}
                                                     <td className="border font-mono text-xs text-right pr-1 bg-emerald-100 text-emerald-900 font-bold">{totalQty > 0 ? totalQty.toLocaleString() : '0'}</td>
 
                                                     <td className="matrix-td px-0">
