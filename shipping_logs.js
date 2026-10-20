@@ -1,28 +1,71 @@
-// ==========================================
-// 吉井電気 製品出荷管理システム (WebVer. 115)
+// =========================================================
+// 吉井電気 製品出荷管理システム
 // 操作・接続ログ管理モジュール (shipping_logs.js)
-// ==========================================
+// =========================================================
 
-// ★ このJSファイル固有のバージョン表記（更新確認用）
-const JS_LOGS_VERSION = '_js001';
+// ★ JSファイル固有バージョン（コード変更に伴い _js003 へ繰り上げ）
+const JS_LOGS_VERSION = '_js003';
 
+// 1. GMを含む全アカウント対応 ログインログ記録関数
+const recordLoginSession = async (user) => {
+    if (!user || !user.name) return;
+    try {
+        const sessionRef = firebase.firestore().collection('user_sessions').doc();
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const date = String(now.getDate()).padStart(2, '0');
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const seconds = String(now.getSeconds()).padStart(2, '0');
+        
+        const timeFormatted = `${year}/${month}/${date} ${hours}:${minutes}:${seconds}`;
+        
+        // 単一真実源 SYSTEM_VERSION を直接参照（手書き数値のフォールバックは完全廃止）
+        const sysVer = typeof SYSTEM_VERSION !== 'undefined' ? SYSTEM_VERSION : '';
+
+        await sessionRef.set({
+            id: sessionRef.id,
+            operator: user.name,
+            roleLabel: user.label || '一般',
+            appVersion: sysVer,
+            ipAddress: user.ip || '―',
+            ipLocation: user.region || '―',
+            deviceInfo: user.device || 'Windows / Chrome',
+            loginTimeStr: timeFormatted,
+            logoutTimeStr: '',
+            lastActiveStr: timeFormatted,
+            createdAt: now.toISOString(),
+            company: 'yoshii'
+        });
+        localStorage.setItem('yoshii_current_session_id', sessionRef.id);
+    } catch (err) {
+        console.error("ログインログ記録エラー:", err);
+    }
+};
+
+// 2. 接続履歴・データ操作ログ モーダルコンポーネント本体
 const LogViewModal = ({ isOpen, onClose, logs, sessions }) => {
     const [activeTab, setActiveTab] = React.useState('data_logs');
 
     if (!isOpen) return null;
 
-    const baseAppVer = typeof APP_VERSION !== 'undefined' ? APP_VERSION : 'WebVer. 115';
-    // 例: "WebVer. 115_js001" と結合して表示
+    // SYSTEM_VERSION と JS_LOGS_VERSION (_js003) の完全連動結合
+    const baseAppVer = typeof SYSTEM_VERSION !== 'undefined' ? SYSTEM_VERSION : '';
     const displayVer = `${baseAppVer}${JS_LOGS_VERSION}`;
-    const todayStr = new Date().toLocaleDateString('ja-JP');
 
-    // 権限表記の短縮化（列幅圧縮）
+    const now = new Date();
+    const todayStr = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')}`;
+
+    // 権限表記の極小短縮化（横幅圧縮）
     const formatRoleLabel = (role) => {
         if (!role) return '一般';
         if (role.includes('東亜全体')) return '東亜全体';
         if (role.includes('LDS')) return 'LDS専用';
         if (role.includes('GM')) return 'GM専用';
         if (role.includes('SLT')) return 'SLT専用';
+        if (role.includes('JP')) return 'JP専用';
+        if (role.includes('YO')) return 'YO専用';
         return role.replace(/\(.*\)/, '').trim();
     };
 
@@ -34,10 +77,20 @@ const LogViewModal = ({ isOpen, onClose, logs, sessions }) => {
         return parts.length > 1 ? parts[1] : cleanTime;
     };
 
+    // 最新ログインが最上部に来るよう強制降順ソート
+    const sortedSessions = React.useMemo(() => {
+        if (!sessions || sessions.length === 0) return [];
+        return [...sessions].sort((a, b) => {
+            const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+            const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+            return timeB - timeA;
+        });
+    }, [sessions]);
+
     return (
         <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 no-print">
             <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl h-[85vh] flex flex-col border border-slate-300 overflow-hidden text-xs">
-                {/* ヘッダー（オレンジ背景廃止 ➔ ダークグレー枠付きバッジへ変更） */}
+                {/* ヘッダー（ダークグレー枠付きバッジ & SYSTEM_VERSION + _js003 表示） */}
                 <div className="p-3 bg-indigo-900 text-white flex justify-between items-center flex-shrink-0">
                     <div className="flex items-center gap-3">
                         <h3 className="font-bold text-sm flex items-center gap-2">⚙ システム管理ログ・接続履歴</h3>
@@ -60,7 +113,7 @@ const LogViewModal = ({ isOpen, onClose, logs, sessions }) => {
                         onClick={() => setActiveTab('access_logs')}
                         className={`px-4 py-2 rounded-t-lg transition flex items-center gap-1.5 ${activeTab === 'access_logs' ? 'bg-white border-t-2 border-indigo-600 text-indigo-900 shadow-sm' : 'text-slate-600 hover:bg-slate-200'}`}
                     >
-                        🔑 ログイン・接続時間履歴 ({(sessions || []).length})
+                        🔑 ログイン・接続時間履歴 ({sortedSessions.length})
                     </button>
                 </div>
 
@@ -113,14 +166,14 @@ const LogViewModal = ({ isOpen, onClose, logs, sessions }) => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {(!sessions || sessions.length === 0) ? (
+                                {(sortedSessions.length === 0) ? (
                                     <tr><td colSpan="9" className="p-4 text-center text-gray-500 font-bold">接続履歴はまだありません。</td></tr>
                                 ) : (
-                                    sessions.map(s => {
+                                    sortedSessions.map(s => {
                                         const loginDatePart = s.loginTimeStr ? s.loginTimeStr.split(' ')[0] : '';
                                         const isPastDay = loginDatePart && loginDatePart !== todayStr;
                                         
-                                        // 状況列の切断状態判定 & 前日未切断セッションの 23:59強制切断 自動補正
+                                        // 状況判定 & 前日残存セッションの 23:59強制切断 自動補正
                                         let finalStatusText = '';
                                         let statusBadgeClass = '';
 
