@@ -1,17 +1,22 @@
 // ==========================================
 // 吉井電気 製品出荷管理システム (WebVer. 115)
-// 操作・接続ログ管理モジュール (shipping_logs.js 完全修復版)
+// 操作・接続ログ管理モジュール (shipping_logs.js)
 // ==========================================
+
+// ★ このJSファイル固有のバージョン表記（更新確認用）
+const JS_LOGS_VERSION = '_js001';
 
 const LogViewModal = ({ isOpen, onClose, logs, sessions }) => {
     const [activeTab, setActiveTab] = React.useState('data_logs');
 
     if (!isOpen) return null;
 
-    const currentAppVer = typeof APP_VERSION !== 'undefined' ? APP_VERSION : 'WebVer. 115';
+    const baseAppVer = typeof APP_VERSION !== 'undefined' ? APP_VERSION : 'WebVer. 115';
+    // 例: "WebVer. 115_js001" と結合して表示
+    const displayVer = `${baseAppVer}${JS_LOGS_VERSION}`;
     const todayStr = new Date().toLocaleDateString('ja-JP');
 
-    // 1. 権限表記の極小短縮化（「東亜全体」「GM専用」等に短縮して横幅カット）
+    // 権限表記の短縮化（列幅圧縮）
     const formatRoleLabel = (role) => {
         if (!role) return '一般';
         if (role.includes('東亜全体')) return '東亜全体';
@@ -21,7 +26,7 @@ const LogViewModal = ({ isOpen, onClose, logs, sessions }) => {
         return role.replace(/\(.*\)/, '').trim();
     };
 
-    // 2. 最終操作日時から「時刻のみ (HH:mm:ss)」を抽出
+    // 最終操作日時から「時刻のみ (HH:mm:ss)」を抽出
     const formatTimeOnly = (timeStr) => {
         if (!timeStr || timeStr === '―') return '―';
         let cleanTime = timeStr.includes('(') ? timeStr.split('(')[0].trim() : timeStr;
@@ -32,12 +37,12 @@ const LogViewModal = ({ isOpen, onClose, logs, sessions }) => {
     return (
         <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 no-print">
             <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl h-[85vh] flex flex-col border border-slate-300 overflow-hidden text-xs">
-                {/* ヘッダー */}
+                {/* ヘッダー（オレンジ背景廃止 ➔ ダークグレー枠付きバッジへ変更） */}
                 <div className="p-3 bg-indigo-900 text-white flex justify-between items-center flex-shrink-0">
                     <div className="flex items-center gap-3">
                         <h3 className="font-bold text-sm flex items-center gap-2">⚙ システム管理ログ・接続履歴</h3>
-                        <span className="bg-amber-400 text-slate-900 text-[10px] font-extrabold px-2 py-0.5 rounded font-mono">
-                            {currentAppVer}
+                        <span className="bg-slate-700 text-slate-100 border border-slate-500 text-[10px] font-extrabold px-2 py-0.5 rounded font-mono shadow-sm">
+                            {displayVer}
                         </span>
                     </div>
                     <button onClick={onClose} className="text-2xl font-bold hover:text-gray-300 leading-none">×</button>
@@ -115,7 +120,7 @@ const LogViewModal = ({ isOpen, onClose, logs, sessions }) => {
                                         const loginDatePart = s.loginTimeStr ? s.loginTimeStr.split(' ')[0] : '';
                                         const isPastDay = loginDatePart && loginDatePart !== todayStr;
                                         
-                                        // 3. 切断状況の判定・「状況」列の新設および23:59強制切断の自動補正
+                                        // 状況列の切断状態判定 & 前日未切断セッションの 23:59強制切断 自動補正
                                         let finalStatusText = '';
                                         let statusBadgeClass = '';
 
@@ -131,7 +136,6 @@ const LogViewModal = ({ isOpen, onClose, logs, sessions }) => {
                                                 statusBadgeClass = 'bg-gray-100 text-gray-700 border-gray-300';
                                             }
                                         } else if (isPastDay) {
-                                            // 前日以前で未切断のセッションは描画時に「23:59強制切断」へ補正
                                             finalStatusText = '23:59強制切断';
                                             statusBadgeClass = 'bg-slate-200 text-slate-700 border-slate-400';
                                         } else {
@@ -143,7 +147,7 @@ const LogViewModal = ({ isOpen, onClose, logs, sessions }) => {
                                             <tr key={s.id} className="border-b hover:bg-slate-50 text-[11px] h-[24px]">
                                                 <td className="p-1 border font-bold text-indigo-950 text-center truncate">{s.operator || '未設定'}</td>
                                                 <td className="p-1 border text-center text-slate-600 truncate">{formatRoleLabel(s.roleLabel)}</td>
-                                                <td className="p-1 border font-mono font-bold text-amber-700 bg-amber-50/50 text-center text-[10px] truncate">{s.appVersion || currentAppVer}</td>
+                                                <td className="p-1 border font-mono font-bold text-amber-700 bg-amber-50/50 text-center text-[10px] truncate">{s.appVersion || baseAppVer}</td>
                                                 <td className="p-1 border font-mono text-blue-700 text-center truncate">{s.ipAddress || '―'}</td>
                                                 <td className="p-1 border text-center text-slate-700 truncate">{s.ipLocation || '―'}</td>
                                                 <td className="p-1 border text-center text-slate-600 font-mono text-[10px] truncate">{s.deviceInfo || '―'}</td>
