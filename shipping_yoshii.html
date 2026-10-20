@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>吉井電気 製品出荷管理システム (WebVer. 117)</title>
+    <title>吉井電気 製品出荷管理システム (WebVer. 118)</title>
     
     <!-- React 18 -->
     <script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js" crossorigin></script>
@@ -157,10 +157,10 @@
 
     <!-- 1. 単一真実源 SYSTEM_VERSION を標準スクリプト空間で定義 -->
     <script>
-        window.SYSTEM_VERSION = 'WebVer. 117';
+        window.SYSTEM_VERSION = 'WebVer. 118';
     </script>
 
-    <!-- 2. SYSTEM_VERSION と完全連動する動的外部スクリプト読み込み -->
+    <!-- 2. 全5ファイルを漏れなく動的一元ロード（キャッシュバイパス & 順序保証） -->
     <script>
         (function() {
             var v = encodeURIComponent(window.SYSTEM_VERSION);
