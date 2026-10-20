@@ -1,7 +1,9 @@
 // =========================================================
-// shipping_views_ship.js - 出荷日程・ドレージ画面モジュール (WebVer. 115 列構造完全修復版 + 依存補完)
-// ★ JSファイル固有バージョン: _js002
+// shipping_views_ship.js - 出荷日程・ドレージ画面モジュール
+// ★ JSファイル固有バージョン: _js003 (バージョン明記 & 当月デフォルト & スクロール記憶修復)
 // =========================================================
+
+const JS_SHIP_VERSION = '_js003';
 
 // 【依存コンポーネント: フィルター・ソート制御UI】
 const ScheduleFilterSortControl = React.memo(({ 
@@ -76,12 +78,33 @@ const YoshiiShipView = () => {
     const ctx = React.useContext(AppContext);
     const [exportModal, setExportModal] = React.useState({ isOpen: false, type: 'excel' });
 
+    const tableContainerRef = React.useRef(null);
+
+    const baseAppVer = typeof SYSTEM_VERSION !== 'undefined' ? SYSTEM_VERSION : '';
+    const displayVer = `${baseAppVer}${JS_SHIP_VERSION}`;
+
     const [filterMode, setFilterMode] = React.useState('all');
-    const [selectedYear, setSelectedYear] = React.useState(2026);
-    const [singleMonth, setSingleMonth] = React.useState('2026-10');
-    const [startMonth, setStartMonth] = React.useState('2026-04');
-    const [endMonth, setEndMonth] = React.useState('2027-03');
+    const [selectedYear, setSelectedYear] = React.useState(() => {
+        const yr = new Date().getFullYear();
+        const mo = new Date().getMonth() + 1;
+        return mo >= 4 ? yr : yr - 1;
+    });
+    const [singleMonth, setSingleMonth] = React.useState(() => ctx.currentMonthStr || `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`);
+    const [startMonth, setStartMonth] = React.useState(() => `${new Date().getFullYear()}-04`);
+    const [endMonth, setEndMonth] = React.useState(() => `${new Date().getFullYear() + 1}-03`);
     const [sortConfig, setSortConfig] = React.useState([]);
+
+    React.useEffect(() => {
+        if (tableContainerRef.current && ctx.shipScrollPosRef && ctx.shipScrollPosRef.current) {
+            tableContainerRef.current.scrollTop = ctx.shipScrollPosRef.current;
+        }
+    }, []);
+
+    const handleScroll = (e) => {
+        if (ctx.shipScrollPosRef) {
+            ctx.shipScrollPosRef.current = e.target.scrollTop;
+        }
+    };
 
     const handleExecuteExport = ({ mode, selectedYear: selYr, singleMonth: sgMo, startMonth: sMo, endMonth: eMo }) => {
         const targetVendor = ctx.selectedVendorFilter || 'ALL';
@@ -185,7 +208,12 @@ const YoshiiShipView = () => {
             </div>
 
             <div className="flex justify-between items-center mb-2 no-print flex-shrink-0">
-                <h2 className="text-base font-bold text-emerald-900">吉井電気 出荷日程表 [仕入先: {ctx.selectedVendorFilter || 'ALL'}]</h2>
+                <div className="flex items-center gap-2">
+                    <h2 className="text-base font-bold text-emerald-900">吉井電気 出荷日程表 [仕入先: {ctx.selectedVendorFilter || 'ALL'}]</h2>
+                    <span className="bg-slate-700 text-slate-100 border border-slate-500 text-[10px] font-extrabold px-2 py-0.5 rounded font-mono shadow-sm">
+                        {displayVer}
+                    </span>
+                </div>
                 <div className="flex items-center gap-2 font-bold">
                     <button onClick={() => setExportModal({ isOpen: true, type: 'excel' })} className="px-2 py-1 text-xs font-bold rounded bg-emerald-700 hover:bg-emerald-800 text-white shadow transition flex items-center gap-1">📊 Excel出力</button>
                     <button onClick={() => setExportModal({ isOpen: true, type: 'print' })} className="px-2 py-1 text-xs font-bold rounded bg-slate-700 hover:bg-slate-800 text-white shadow transition flex items-center gap-1">🖨 印刷</button>
@@ -203,7 +231,7 @@ const YoshiiShipView = () => {
                 sortConfig={sortConfig} setSortConfig={setSortConfig}
             />
 
-            <div className="table-container flex-grow border rounded shadow-inner overflow-x-auto overflow-y-auto" ref={ctx.tableContainerRef}>
+            <div className="table-container flex-grow border rounded shadow-inner overflow-x-auto overflow-y-auto" ref={tableContainerRef} onScroll={handleScroll}>
                 <table className="w-full text-center border-collapse text-[11px]">
                     <thead className="sticky top-0 z-30 bg-gray-200 font-bold">
                         <tr>
@@ -331,12 +359,33 @@ const YoshiiDrayageView = () => {
     const ctx = React.useContext(AppContext);
     const [exportModal, setExportModal] = React.useState({ isOpen: false, type: 'excel' });
 
+    const drayTableContainerRef = React.useRef(null);
+
+    const baseAppVer = typeof SYSTEM_VERSION !== 'undefined' ? SYSTEM_VERSION : '';
+    const displayVer = `${baseAppVer}${JS_SHIP_VERSION}`;
+
     const [filterMode, setFilterMode] = React.useState('all');
-    const [selectedYear, setSelectedYear] = React.useState(2026);
-    const [singleMonth, setSingleMonth] = React.useState('2026-10');
-    const [startMonth, setStartMonth] = React.useState('2026-04');
-    const [endMonth, setEndMonth] = React.useState('2027-03');
+    const [selectedYear, setSelectedYear] = React.useState(() => {
+        const yr = new Date().getFullYear();
+        const mo = new Date().getMonth() + 1;
+        return mo >= 4 ? yr : yr - 1;
+    });
+    const [singleMonth, setSingleMonth] = React.useState(() => ctx.currentMonthStr || `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`);
+    const [startMonth, setStartMonth] = React.useState(() => `${new Date().getFullYear()}-04`);
+    const [endMonth, setEndMonth] = React.useState(() => `${new Date().getFullYear() + 1}-03`);
     const [sortConfig, setSortConfig] = React.useState([]);
+
+    React.useEffect(() => {
+        if (drayTableContainerRef.current && ctx.drayScrollPosRef && ctx.drayScrollPosRef.current) {
+            drayTableContainerRef.current.scrollTop = ctx.drayScrollPosRef.current;
+        }
+    }, []);
+
+    const handleScroll = (e) => {
+        if (ctx.drayScrollPosRef) {
+            ctx.drayScrollPosRef.current = e.target.scrollTop;
+        }
+    };
 
     const handleExecuteExport = ({ mode, selectedYear: selYr, singleMonth: sgMo, startMonth: sMo, endMonth: eMo }) => {
         const targetVendor = ctx.selectedVendorFilter || 'ALL';
@@ -444,7 +493,12 @@ const YoshiiDrayageView = () => {
             </div>
 
             <div className="flex justify-between items-center mb-2 no-print flex-shrink-0">
-                <h2 className="text-base font-bold text-emerald-900">吉井電気 ドレージ手配 [仕入先: {ctx.selectedVendorFilter || 'ALL'}]</h2>
+                <div className="flex items-center gap-2">
+                    <h2 className="text-base font-bold text-emerald-900">吉井電気 ドレージ手配 [仕入先: {ctx.selectedVendorFilter || 'ALL'}]</h2>
+                    <span className="bg-slate-700 text-slate-100 border border-slate-500 text-[10px] font-extrabold px-2 py-0.5 rounded font-mono shadow-sm">
+                        {displayVer}
+                    </span>
+                </div>
                 <div className="flex items-center gap-2 font-bold">
                     <button onClick={() => setExportModal({ isOpen: true, type: 'excel' })} className="px-2 py-1 text-xs font-bold rounded bg-emerald-700 hover:bg-emerald-800 text-white shadow transition flex items-center gap-1">📊 Excel出力</button>
                     <button onClick={() => setExportModal({ isOpen: true, type: 'print' })} className="px-2 py-1 text-xs font-bold rounded bg-slate-700 hover:bg-slate-800 text-white shadow transition flex items-center gap-1">🖨 印刷</button>
@@ -462,10 +516,10 @@ const YoshiiDrayageView = () => {
                 sortConfig={sortConfig} setSortConfig={setSortConfig}
             />
 
-            <div className="table-container flex-grow border rounded shadow-inner overflow-x-auto overflow-y-auto" ref={ctx.tableContainerRef}>
+            <div className="table-container flex-grow border rounded shadow-inner overflow-x-auto overflow-y-auto" ref={drayTableContainerRef} onScroll={handleScroll}>
                 <table className="w-full text-center border-collapse text-[11px]">
                     <thead className="sticky top-0 z-30 bg-gray-200 font-bold">
-                        {/* 1行目ヘッダー：19項目（rowSpan={2}で単独項目を縦に結合） */}
+                        {/* 1行目ヘッダー：19項目 */}
                         <tr>
                             <th className="p-1 border min-w-[70px]" rowSpan={2}>管理番号</th>
                             <th className="p-1 border min-w-[70px]" rowSpan={2}>進行状況</th>
@@ -484,7 +538,7 @@ const YoshiiDrayageView = () => {
                             <th className="p-1 border min-w-[60px]" rowSpan={2}>サイズ</th>
                             <th className="p-1 border min-w-[110px]" rowSpan={2}>本船名</th>
                         </tr>
-                        {/* 2行目サブヘッダー：結合されているグループ下のみサブ項目を配置 */}
+                        {/* 2行目サブヘッダー */}
                         <tr className="bg-gray-100 text-[10px]">
                             <th className="p-0.5 border text-emerald-800 font-bold bg-emerald-50">外装箱</th>
                             <th className="p-0.5 border text-emerald-800 font-bold bg-emerald-50">化粧箱</th>
