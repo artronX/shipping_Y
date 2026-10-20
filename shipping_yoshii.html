@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>吉井電気 製品出荷管理システム (WebVer. 119)</title>
+    <title>吉井電気 製品出荷管理システム (WebVer. 120)</title>
     
     <!-- React 18 -->
     <script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js" crossorigin></script>
@@ -152,7 +152,7 @@
             color: #374151 !important;
         }
 
-        /* ★ 保守性向上のため一元定義した V94互換極小サイズ専用スタイル ★ */
+        /* ★ 保守性向上のため一元定義した V94互換極小サイズ & フォントサイズ・等幅統一スタイル ★ */
         .table-row-compact {
             height: 20px !important;
         }
@@ -160,7 +160,8 @@
             height: 18px !important;
             line-height: 18px !important;
             padding: 0 2px !important;
-            font-size: 11px !important;
+            font-size: 0.75rem !important; /* 12pxに統一して月間合計行と文字サイズ・桁位置を完全合致 */
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
             border: none !important;
             background: transparent;
         }
@@ -171,7 +172,7 @@
 
     <!-- 単一真実源: バージョン一元定義 -->
     <script>
-        const SYSTEM_VERSION = 'WebVer. 119';
+        const SYSTEM_VERSION = 'WebVer. 120';
     </script>
 
     <!-- 1. 基本UI・モーダル共通モジュール -->
@@ -311,7 +312,6 @@
             return "";
         };
 
-        // ★ 完全復元: LoginModal コンポーネント ★
         const LoginModal = ({ onLogin }) => {
             const [workerId, setWorkerId] = React.useState(() => {
                 return localStorage.getItem(LAST_OPERATOR_STORAGE_KEY) || '';
