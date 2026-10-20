@@ -3,8 +3,8 @@
 // 操作・接続ログ管理モジュール (shipping_logs.js)
 // =========================================================
 
-// ★ JSファイル固有バージョン（クラッシュ修正に伴い _js004 へ繰り上げ）
-const JS_LOGS_VERSION = '_js004';
+// ★ JSファイル固有バージョン（クラッシュ防止ガード強化に伴い _js005 へ繰り上げ）
+const JS_LOGS_VERSION = '_js005';
 
 // 1. GMを含む全アカウント対応 ログインログ記録関数
 const recordLoginSession = async (user) => {
@@ -63,40 +63,36 @@ const LogViewModal = ({ isOpen, onClose, logs, sessions }) => {
         if (role.includes('SLT')) return 'SLT専用';
         if (role.includes('JP')) return 'JP専用';
         if (role.includes('YO')) return 'YO専用';
-        return role.replace(/\(.*\)/, '').trim();
+        return String(role).replace(/\(.*\)/, '').trim();
     };
 
     // 最終操作日時から「時刻のみ (HH:mm:ss)」を抽出
     const formatTimeOnly = (timeStr) => {
         if (!timeStr || timeStr === '―') return '―';
-        let cleanTime = timeStr.includes('(') ? timeStr.split('(')[0].trim() : timeStr;
-        const parts = cleanTime.split(' ');
-        return parts.length > 1 ? parts[1] : cleanTime;
+        try {
+            let cleanTime = String(timeStr).includes('(') ? String(timeStr).split('(')[0].trim() : String(timeStr);
+            const parts = cleanTime.split(' ');
+            return parts.length > 1 ? parts[1] : cleanTime;
+        } catch (e) {
+            return '―';
+        }
     };
 
-    // ★ 日時文字列/オブジェクトを安全にミリ秒数値へ変換する完全ガード関数
-    const safeGetTime = (item) => {
-        if (!item) return 0;
-        if (item.createdAt) {
-            if (typeof item.createdAt.toDate === 'function') {
-                return item.createdAt.toDate().getTime();
+    // 配列の安全な取得とソート（useMemoの例外エラーを完全回避）
+    let safeSessions = [];
+    if (Array.isArray(sessions)) {
+        safeSessions = [...sessions].sort((a, b) => {
+            try {
+                const timeA = a && a.createdAt ? new Date(a.createdAt).getTime() : 0;
+                const timeB = b && b.createdAt ? new Date(b.createdAt).getTime() : 0;
+                return (isNaN(timeB) ? 0 : timeB) - (isNaN(timeA) ? 0 : timeA);
+            } catch (e) {
+                return 0;
             }
-            const t = new Date(item.createdAt).getTime();
-            if (!isNaN(t)) return t;
-        }
-        if (item.loginTimeStr) {
-            const cleanStr = item.loginTimeStr.replace(/\//g, '-');
-            const t = new Date(cleanStr).getTime();
-            if (!isNaN(t)) return t;
-        }
-        return 0;
-    };
+        });
+    }
 
-    // 最新ログインが最上部に来るよう安全性重視のソート処理
-    const sortedSessions = React.useMemo(() => {
-        if (!sessions || !Array.isArray(sessions) || sessions.length === 0) return [];
-        return [...sessions].sort((a, b) => safeGetTime(b) - safeGetTime(a));
-    }, [sessions]);
+    let safeLogs = Array.isArray(logs) ? logs : [];
 
     return (
         <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 no-print">
@@ -118,13 +114,13 @@ const LogViewModal = ({ isOpen, onClose, logs, sessions }) => {
                         onClick={() => setActiveTab('data_logs')}
                         className={`px-4 py-2 rounded-t-lg transition flex items-center gap-1.5 ${activeTab === 'data_logs' ? 'bg-white border-t-2 border-indigo-600 text-indigo-900 shadow-sm' : 'text-slate-600 hover:bg-slate-200'}`}
                     >
-                        📝 データ操作履歴 ({logs ? logs.length : 0})
+                        📝 データ操作履歴 ({safeLogs.length})
                     </button>
                     <button 
                         onClick={() => setActiveTab('access_logs')}
                         className={`px-4 py-2 rounded-t-lg transition flex items-center gap-1.5 ${activeTab === 'access_logs' ? 'bg-white border-t-2 border-indigo-600 text-indigo-900 shadow-sm' : 'text-slate-600 hover:bg-slate-200'}`}
                     >
-                        🔑 ログイン・接続時間履歴 ({sortedSessions.length})
+                        🔑 ログイン・接続時間履歴 ({safeSessions.length})
                     </button>
                 </div>
 
@@ -142,20 +138,20 @@ const LogViewModal = ({ isOpen, onClose, logs, sessions }) => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {(!logs || logs.length === 0) ? (
+                                {(safeLogs.length === 0) ? (
                                     <tr><td colSpan="5" className="p-4 text-center text-gray-500 font-bold">データ操作ログはまだありません。</td></tr>
                                 ) : (
-                                    logs.map(log => (
-                                        <tr key={log.id} className="border-b hover:bg-slate-50">
-                                            <td className="p-1.5 border text-center font-mono text-[11px] text-slate-600">{log.timestamp}</td>
+                                    safeLogs.map((log, idx) => (
+                                        <tr key={log.id || idx} className="border-b hover:bg-slate-50">
+                                            <td className="p-1.5 border text-center font-mono text-[11px] text-slate-600">{log.timestamp || '―'}</td>
                                             <td className="p-1.5 border text-center font-bold text-indigo-950 truncate">{log.operator || '未設定'}</td>
-                                            <td className="p-1.5 border text-center font-bold text-slate-700 truncate">{log.sheetName}</td>
+                                            <td className="p-1.5 border text-center font-bold text-slate-700 truncate">{log.sheetName || '―'}</td>
                                             <td className="p-1.5 border text-center">
                                                 <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${log.action === '追加' ? 'bg-blue-100 text-blue-800' : log.action === '削除' ? 'bg-red-100 text-red-800' : 'bg-emerald-100 text-emerald-800'}`}>
-                                                    {log.action}
+                                                    {log.action || '更新'}
                                                 </span>
                                             </td>
-                                            <td className="p-1.5 border text-left pl-2 leading-relaxed text-slate-800 truncate">{log.detail}</td>
+                                            <td className="p-1.5 border text-left pl-2 leading-relaxed text-slate-800 truncate">{log.detail || '―'}</td>
                                         </tr>
                                     ))
                                 )}
@@ -177,21 +173,21 @@ const LogViewModal = ({ isOpen, onClose, logs, sessions }) => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {(sortedSessions.length === 0) ? (
+                                {(safeSessions.length === 0) ? (
                                     <tr><td colSpan="9" className="p-4 text-center text-gray-500 font-bold">接続履歴はまだありません。</td></tr>
                                 ) : (
-                                    sortedSessions.map(s => {
-                                        const loginDatePart = s.loginTimeStr ? s.loginTimeStr.split(' ')[0] : '';
+                                    safeSessions.map((s, idx) => {
+                                        const loginDatePart = (s && s.loginTimeStr) ? String(s.loginTimeStr).split(' ')[0] : '';
                                         const isPastDay = loginDatePart && loginDatePart !== todayStr;
                                         
                                         let finalStatusText = '';
                                         let statusBadgeClass = '';
 
-                                        if (s.logoutTimeStr) {
-                                            if (s.logoutTimeStr.includes('23:59')) {
+                                        if (s && s.logoutTimeStr) {
+                                            if (String(s.logoutTimeStr).includes('23:59')) {
                                                 finalStatusText = '23:59強制切断';
                                                 statusBadgeClass = 'bg-slate-200 text-slate-700 border-slate-400';
-                                            } else if (s.logoutTimeStr.includes('15分')) {
+                                            } else if (String(s.logoutTimeStr).includes('15分')) {
                                                 finalStatusText = '15分無操作切断';
                                                 statusBadgeClass = 'bg-amber-100 text-amber-800 border-amber-300';
                                             } else {
@@ -207,15 +203,15 @@ const LogViewModal = ({ isOpen, onClose, logs, sessions }) => {
                                         }
 
                                         return (
-                                            <tr key={s.id || Math.random()} className="border-b hover:bg-slate-50 text-[11px] h-[24px]">
-                                                <td className="p-1 border font-bold text-indigo-950 text-center truncate">{s.operator || '未設定'}</td>
-                                                <td className="p-1 border text-center text-slate-600 truncate">{formatRoleLabel(s.roleLabel)}</td>
-                                                <td className="p-1 border font-mono font-bold text-amber-700 bg-amber-50/50 text-center text-[10px] truncate">{s.appVersion || baseAppVer}</td>
-                                                <td className="p-1 border font-mono text-blue-700 text-center truncate">{s.ipAddress || '―'}</td>
-                                                <td className="p-1 border text-center text-slate-700 truncate">{s.ipLocation || '―'}</td>
-                                                <td className="p-1 border text-center text-slate-600 font-mono text-[10px] truncate">{s.deviceInfo || '―'}</td>
-                                                <td className="p-1 border text-center font-mono text-emerald-800 text-[10px] truncate">{s.loginTimeStr}</td>
-                                                <td className="p-1 border text-center font-mono font-bold text-slate-800">{formatTimeOnly(s.logoutTimeStr || s.lastActiveStr)}</td>
+                                            <tr key={(s && s.id) || idx} className="border-b hover:bg-slate-50 text-[11px] h-[24px]">
+                                                <td className="p-1 border font-bold text-indigo-950 text-center truncate">{(s && s.operator) || '未設定'}</td>
+                                                <td className="p-1 border text-center text-slate-600 truncate">{formatRoleLabel(s && s.roleLabel)}</td>
+                                                <td className="p-1 border font-mono font-bold text-amber-700 bg-amber-50/50 text-center text-[10px] truncate">{(s && s.appVersion) || baseAppVer}</td>
+                                                <td className="p-1 border font-mono text-blue-700 text-center truncate">{(s && s.ipAddress) || '―'}</td>
+                                                <td className="p-1 border text-center text-slate-700 truncate">{(s && s.ipLocation) || '―'}</td>
+                                                <td className="p-1 border text-center text-slate-600 font-mono text-[10px] truncate">{(s && s.deviceInfo) || '―'}</td>
+                                                <td className="p-1 border text-center font-mono text-emerald-800 text-[10px] truncate">{(s && s.loginTimeStr) || '―'}</td>
+                                                <td className="p-1 border text-center font-mono font-bold text-slate-800">{formatTimeOnly((s && s.logoutTimeStr) || (s && s.lastActiveStr))}</td>
                                                 <td className="p-1 border text-center">
                                                     <span className={`inline-block px-1.5 py-0.5 rounded text-[9px] font-bold border ${statusBadgeClass}`}>
                                                         {finalStatusText}
