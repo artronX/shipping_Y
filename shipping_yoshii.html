@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>吉井電気 製品出荷管理システム (WebVer. 120)</title>
+    <title>吉井電気 製品出荷管理システム (WebVer. 121)</title>
     
     <!-- React 18 -->
     <script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js" crossorigin></script>
@@ -152,16 +152,17 @@
             color: #374151 !important;
         }
 
-        /* ★ 保守性向上のため一元定義した V94互換極小サイズ & フォントサイズ・等幅統一スタイル ★ */
+        /* ★ V94極小サイズ & 合計列との桁位置完全統一スタイル ★ */
         .table-row-compact {
             height: 20px !important;
         }
         .input-compact {
             height: 18px !important;
             line-height: 18px !important;
-            padding: 0 2px !important;
-            font-size: 0.75rem !important; /* 12pxに統一して月間合計行と文字サイズ・桁位置を完全合致 */
+            padding: 0 4px 0 0 !important; /* 右余白を合計列と完全に統一して桁位置をぴったり合致 */
+            font-size: 0.75rem !important;
             font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
+            text-align: right !important;
             border: none !important;
             background: transparent;
         }
@@ -172,7 +173,7 @@
 
     <!-- 単一真実源: バージョン一元定義 -->
     <script>
-        const SYSTEM_VERSION = 'WebVer. 120';
+        const SYSTEM_VERSION = 'WebVer. 121';
     </script>
 
     <!-- 1. 基本UI・モーダル共通モジュール -->
