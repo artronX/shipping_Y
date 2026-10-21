@@ -337,6 +337,7 @@ const YoshiiShipView = () => {
                                                         <LocalInput value={container.freetime} originalValue={(container.originals || {}).freetime} originalMeta={(container.originalMetas || {}).freetime} onChange={(v, orig) => ctx.updateContainer(container.id, { freetime: v }, mo, 'yoshii', 'フリータイム')} className="matrix-input text-center text-xs input-compact" dataGridId={`y-ship-${mo}-${idx}-6`} onGridKeyDown={handleGridNav} />
                                                     </td>
 
+                                                    {/* ★ 構文修復: deliveryTime タグ記述エラー解消 */}
                                                     <td className="border text-center px-0 py-0.5 bg-emerald-50/30">
                                                         <div className="flex items-center justify-center gap-0.5">
                                                             <div className="w-[68px]">
