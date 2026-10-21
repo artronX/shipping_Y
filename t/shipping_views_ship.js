@@ -1,18 +1,17 @@
 // shipping_views_ship.js
 // =========================================================
 // shipping_views_ship.js - 出荷日程・ドレージ画面モジュール
-// ★ WebVer. 123 対応 / _js021 バージョン繰り上げ版
+// ★ WebVer. 123 対応 / _js022 バージョン繰り上げ版
 // ★ 最上行ファイル名識別コメント保持 (// shipping_views_ship.js)
-// ★ 実証実験(test_matrix_v5) 「引き算 (原点回帰)」による完全修復:
-//   - translateY / top: 50% / position: absolute 等の継ぎはぎ足し算プロパティを完全削除
+// ★ 実証実験(test_matrix_v5) 「引き算 (原点回帰)」による縦中央絶対維持:
 //   - 余計な wrapper や不必要なインラインスタイルを一切排除し、td の vertical-align: middle に素直に一任
-//   - 1行の低いセルでも、積載型式が複数行に伸びた高いセル(100px超)でも、1pxの狂いもなく完全な自然垂直中央へ固定
+// ★ 横幅最適化 (スリム化): 各列の固定幅を計-120px安全に詰め、右端の「本船名」までスクロールなしで全画面収容
 // ★ 納品日と時間の構造単純化(qc-date独立配置)により「08/31」等の表示・保存を完全保証
-// ★ 日付セル(ETD/ETA/納品日/フリータイム): 左寄せ(text-left pl-2.5)でカレンダーアイコンとの文字被りを完全解消
+// ★ 日付セル(ETD/ETA/納品日/フリータイム): 左寄せ(text-left pl-2)でカレンダーアイコンとの文字被りを完全解消
 // ★ ドレージ手配画面: 全13列の編集不可＋グレー背景(readonly-cell bg-gray-100)一括セット構造を維持
 // =========================================================
 
-const JS_SHIP_VERSION = '_js021';
+const JS_SHIP_VERSION = '_js022';
 
 // 【ヘルパー: コンテナ内割振り総数量の動的自動計算】
 const calculateContainerTotalQty = (allocationsObj) => {
@@ -232,37 +231,37 @@ const YoshiiShipView = () => {
                 </div>
             </div>
 
-            <div className="table-container flex-grow border rounded shadow-inner" ref={ctx.tableContainerRef} onScroll={handleScroll}>
-                <table className="alloc-print-table w-max text-center border-collapse">
+            <div className="table-container flex-grow border rounded shadow-inner overflow-x-auto" ref={ctx.tableContainerRef} onScroll={handleScroll}>
+                <table className="alloc-print-table w-full text-center border-collapse">
                     <thead className="sticky top-0 z-30 bg-gray-200 shadow-sm">
                         <tr className="table-row-compact">
-                            <th className="p-0.5 border w-10 text-xs no-print align-middle">移動</th>
-                            <th className="p-0.5 border w-[80px] min-w-[80px] text-xs text-center align-middle">管理番号</th>
-                            <th className="p-0.5 border w-[75px] min-w-[75px] text-xs align-middle">進行状況</th>
-                            <th className="p-0.5 border w-[110px] min-w-[110px] text-xs align-middle">コンテナNO.</th>
-                            <th className="p-0.5 border min-w-[130px] text-xs align-middle">積載型式</th>
-                            <th className="p-0.5 border w-[85px] min-w-[85px] bg-emerald-50 text-[10px] text-emerald-900 align-middle">
+                            <th className="p-0.5 border w-8 text-xs no-print align-middle">移動</th>
+                            <th className="p-0.5 border w-[75px] text-xs text-center align-middle">管理番号</th>
+                            <th className="p-0.5 border w-[70px] text-xs align-middle">進行状況</th>
+                            <th className="p-0.5 border w-[100px] text-xs align-middle">コンテナNO.</th>
+                            <th className="p-0.5 border min-w-[120px] text-xs align-middle">積載型式</th>
+                            <th className="p-0.5 border w-[75px] bg-emerald-50 text-[10px] text-emerald-900 align-middle">
                                 補充部品 (PCS)<br/>
-                                <span className="inline-block w-6 text-center">外装箱</span>
-                                <span className="inline-block w-6 text-center">化粧箱</span>
-                                <span className="inline-block w-6 text-center">ラベル</span>
+                                <span className="inline-block w-5 text-center">外</span>
+                                <span className="inline-block w-5 text-center">内</span>
+                                <span className="inline-block w-5 text-center">札</span>
                             </th>
-                            <th className="p-0.5 border w-[65px] min-w-[65px] text-xs align-middle">割振数</th>
-                            <th className="p-0.5 border w-[65px] min-w-[65px] text-xs bg-emerald-100 font-bold text-emerald-900 align-middle">総数量</th>
-                            <th className="p-0.5 border w-[75px] min-w-[75px] text-xs align-middle">到着港</th>
-                            <th className="p-0.5 border w-[85px] min-w-[85px] text-xs align-middle">ETD</th>
-                            <th className="p-0.5 border w-[85px] min-w-[85px] text-xs align-middle">ETA</th>
-                            <th className="p-0.5 border w-[85px] min-w-[85px] text-xs align-middle">フリータイム</th>
-                            <th className="p-0.5 border w-[170px] min-w-[170px] bg-emerald-50 text-xs text-emerald-900 align-middle">
+                            <th className="p-0.5 border w-[60px] text-xs align-middle">割振数</th>
+                            <th className="p-0.5 border w-[60px] text-xs bg-emerald-100 font-bold text-emerald-900 align-middle">総数量</th>
+                            <th className="p-0.5 border w-[65px] text-xs align-middle">到着港</th>
+                            <th className="p-0.5 border w-[80px] text-xs align-middle">ETD</th>
+                            <th className="p-0.5 border w-[80px] text-xs align-middle">ETA</th>
+                            <th className="p-0.5 border w-[80px] text-xs align-middle">フリータイム</th>
+                            <th className="p-0.5 border w-[155px] bg-emerald-50 text-xs text-emerald-900 align-middle">
                                 納品日時<br/>
-                                <span className="inline-block w-[90px] text-center">納品日</span>
-                                <span className="inline-block w-[65px] text-center">時間</span>
+                                <span className="inline-block w-[85px] text-center">納品日</span>
+                                <span className="inline-block w-[60px] text-center">時間</span>
                             </th>
-                            <th className="p-0.5 border w-[155px] min-w-[155px] text-xs align-middle">納品先</th>
-                            <th className="p-0.5 border min-w-[160px] text-xs align-middle">備考</th>
-                            <th className="p-0.5 border w-[65px] min-w-[65px] text-xs align-middle">サイズ</th>
-                            <th className="p-0.5 border w-[100px] min-w-[100px] text-xs align-middle">本船名</th>
-                            <th className="p-0.5 border w-10 text-xs no-print align-middle">削除</th>
+                            <th className="p-0.5 border w-[135px] text-xs align-middle">納品先</th>
+                            <th className="p-0.5 border min-w-[120px] text-xs align-middle">備考</th>
+                            <th className="p-0.5 border w-[55px] text-xs align-middle">サイズ</th>
+                            <th className="p-0.5 border w-[90px] text-xs align-middle">本船名</th>
+                            <th className="p-0.5 border w-8 text-xs no-print align-middle">削除</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -294,17 +293,17 @@ const YoshiiShipView = () => {
                                                 >
                                                     <td draggable={!!container.id && (ctx.authUser ? ctx.authUser.canEdit : true)} onDragStart={(e) => ctx.handleDragStart(e, container.id)} className="p-0.5 border bg-white text-center align-middle drag-handle text-gray-400 hover:text-emerald-600 font-bold text-sm cursor-grab active:cursor-grabbing no-print">≡</td>
                                                     
-                                                    {/* ★ 引き算適用: 余計な style(translateY) を完全削ぎ落とし、td の align-middle に素直に従わせる */}
+                                                    {/* 管理番号: 引き算構造維持 */}
                                                     <td className="p-0.5 border text-center align-middle">
                                                         <LocalInput value={container.managementNo} originalValue={(container.originals || {}).managementNo} originalMeta={(container.originalMetas || {}).managementNo} onChange={(v, orig) => ctx.updateContainer(container.id, { managementNo: v, originals: { ...(container.originals || {}), managementNo: container.originals?.managementNo !== undefined ? container.originals.managementNo : orig }, originalMetas: { ...(container.originalMetas || {}), managementNo: container.originalMetas?.managementNo !== undefined ? container.originalMetas.managementNo : `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}` } }, mo, 'yoshii', '管理番号')} className="text-center text-xs font-bold" dataGridId={`y-ship-${mo}-${idx}-0`} onGridKeyDown={handleGridNav} />
                                                     </td>
 
-                                                    {/* 進行状況: 引き算適用 */}
+                                                    {/* 進行状況: 引き算構造維持 */}
                                                     <td className="p-0.5 border text-center align-middle">
                                                         <DynamicSelect value={container.status} originalValue={(container.originals || {}).status} originalMeta={(container.originalMetas || {}).status} onChange={(val, cat, orig) => ctx.handleSelectChange(container.id, 'status', true, 'common', false, '進行状況')(val, cat, orig)} category="statuses" options={ctx.masterData.common.statuses} dataGridId={`y-ship-${mo}-${idx}-1`} onGridKeyDown={handleGridNav} className="w-full text-xs border-none bg-transparent outline-none text-center px-0" />
                                                     </td>
 
-                                                    {/* コンテナNO.: 引き算適用 */}
+                                                    {/* コンテナNO.: 引き算構造維持 */}
                                                     <td className="p-0.5 border text-center align-middle">
                                                         <LocalInput value={container.containerNo} originalValue={(container.originals || {}).containerNo} originalMeta={(container.originalMetas || {}).containerNo} onChange={(v, orig) => ctx.updateContainer(container.id, { containerNo: v }, mo, 'yoshii', 'コンテナNO.')} className="text-center text-xs font-mono" dataGridId={`y-ship-${mo}-${idx}-2`} onGridKeyDown={handleGridNav} />
                                                     </td>
@@ -326,71 +325,71 @@ const YoshiiShipView = () => {
 
                                                     <td className="border text-center px-0 py-0.5 bg-emerald-50/30 align-middle">
                                                         <div className="flex justify-center items-center gap-0.5">
-                                                            <input type="number" value={container.spareOuter || ''} onChange={e => ctx.updateContainer(container.id, { spareOuter: e.target.value }, mo, 'yoshii', '外装箱')} className="spare-part-input" placeholder="0"/>
-                                                            <input type="number" value={container.spareInner || ''} onChange={e => ctx.updateContainer(container.id, { spareInner: e.target.value }, mo, 'yoshii', '化粧箱')} className="spare-part-input" placeholder="0"/>
-                                                            <input type="number" value={container.spareLabel || ''} onChange={e => ctx.updateContainer(container.id, { spareLabel: e.target.value }, mo, 'yoshii', 'ラベル')} className="spare-part-input" placeholder="0"/>
+                                                            <input type="number" value={container.spareOuter || ''} onChange={e => ctx.updateContainer(container.id, { spareOuter: e.target.value }, mo, 'yoshii', '外装箱')} className="spare-part-input w-5 text-center text-[10px]" placeholder="0"/>
+                                                            <input type="number" value={container.spareInner || ''} onChange={e => ctx.updateContainer(container.id, { spareInner: e.target.value }, mo, 'yoshii', '化粧箱')} className="spare-part-input w-5 text-center text-[10px]" placeholder="0"/>
+                                                            <input type="number" value={container.spareLabel || ''} onChange={e => ctx.updateContainer(container.id, { spareLabel: e.target.value }, mo, 'yoshii', 'ラベル')} className="spare-part-input w-5 text-center text-[10px]" placeholder="0"/>
                                                         </div>
                                                     </td>
 
-                                                    {/* 割振数: グレー背景 (readonly-cell) & 上下中央揃え */}
+                                                    {/* 割振数 */}
                                                     <td className="border font-mono text-xs text-right pr-1 bg-gray-100 readonly-cell align-middle">{totalQty > 0 ? totalQty.toLocaleString() : '0'}</td>
                                                     
-                                                    {/* 総数量: 薄緑背景 & 上下中央揃え (動的自動計算) */}
+                                                    {/* 総数量 */}
                                                     <td className="border font-mono text-xs text-right pr-1 bg-emerald-100 text-emerald-900 font-bold align-middle">{totalQty > 0 ? totalQty.toLocaleString() : '0'}</td>
 
-                                                    {/* 到着港: 引き算適用 */}
+                                                    {/* 到着港 */}
                                                     <td className="p-0.5 border text-center align-middle">
                                                         <DynamicSelect value={container.port} originalValue={(container.originals || {}).port} originalMeta={(container.originalMetas || {}).port} onChange={(val, cat, orig) => ctx.handleSelectChange(container.id, 'port', true, 'yoshii', false, '到着港')(val, cat, orig)} category="ports" options={ctx.masterData.yoshii.ports} dataGridId={`y-ship-${mo}-${idx}-3`} onGridKeyDown={handleGridNav} className="w-full text-xs border-none bg-transparent outline-none text-center px-0" />
                                                     </td>
 
-                                                    {/* ETD: text-left pl-2.5 & 引き算適用 */}
+                                                    {/* ETD: text-left pl-2 */}
                                                     <td className="p-0.5 border text-center align-middle">
-                                                        <LocalInput type="qc-date" value={container.etd} originalValue={(container.originals || {}).etd} originalMeta={(container.originalMetas || {}).etd} onChange={(v, orig) => ctx.updateContainer(container.id, { etd: v }, mo, 'yoshii', 'ETD')} refDate={mo} className="text-left pl-2.5 text-xs" dataGridId={`y-ship-${mo}-${idx}-4`} onGridKeyDown={handleGridNav} />
+                                                        <LocalInput type="qc-date" value={container.etd} originalValue={(container.originals || {}).etd} originalMeta={(container.originalMetas || {}).etd} onChange={(v, orig) => ctx.updateContainer(container.id, { etd: v }, mo, 'yoshii', 'ETD')} refDate={mo} className="text-left pl-2 text-xs" dataGridId={`y-ship-${mo}-${idx}-4`} onGridKeyDown={handleGridNav} />
                                                     </td>
 
-                                                    {/* ETA: text-left pl-2.5 & 引き算適用 */}
+                                                    {/* ETA: text-left pl-2 */}
                                                     <td className="p-0.5 border text-center align-middle">
-                                                        <LocalInput type="qc-date" value={container.eta} originalValue={(container.originals || {}).eta} originalMeta={(container.originalMetas || {}).eta} onChange={(v, orig) => ctx.updateContainer(container.id, { eta: v }, mo, 'yoshii', 'ETA')} refDate={mo} className="text-left pl-2.5 text-xs" dataGridId={`y-ship-${mo}-${idx}-5`} onGridKeyDown={handleGridNav} />
+                                                        <LocalInput type="qc-date" value={container.eta} originalValue={(container.originals || {}).eta} originalMeta={(container.originalMetas || {}).eta} onChange={(v, orig) => ctx.updateContainer(container.id, { eta: v }, mo, 'yoshii', 'ETA')} refDate={mo} className="text-left pl-2 text-xs" dataGridId={`y-ship-${mo}-${idx}-5`} onGridKeyDown={handleGridNav} />
                                                     </td>
 
-                                                    {/* フリータイム: text-left pl-2.5 & 引き算適用 */}
+                                                    {/* フリータイム: text-left pl-2 */}
                                                     <td className="p-0.5 border text-center align-middle">
-                                                        <LocalInput type="qc-date" value={container.freetime} originalValue={(container.originals || {}).freetime} originalMeta={(container.originalMetas || {}).freetime} onChange={(v, orig) => ctx.updateContainer(container.id, { freetime: v }, mo, 'yoshii', 'フリータイム')} refDate={mo} className="text-left pl-2.5 text-xs" dataGridId={`y-ship-${mo}-${idx}-6`} onGridKeyDown={handleGridNav} />
+                                                        <LocalInput type="qc-date" value={container.freetime} originalValue={(container.originals || {}).freetime} originalMeta={(container.originalMetas || {}).freetime} onChange={(v, orig) => ctx.updateContainer(container.id, { freetime: v }, mo, 'yoshii', 'フリータイム')} refDate={mo} className="text-left pl-2 text-xs" dataGridId={`y-ship-${mo}-${idx}-6`} onGridKeyDown={handleGridNav} />
                                                     </td>
 
-                                                    {/* 納品日時: text-left pl-2.5 & 引き算適用 */}
+                                                    {/* 納品日時 */}
                                                     <td className="border text-center px-1 py-0.5 bg-emerald-50/30 align-middle">
-                                                        <div className="flex items-center justify-between gap-1 w-full">
-                                                            <div className="w-[90px] flex-shrink-0">
-                                                                <LocalInput type="qc-date" value={container.deliveryDate} originalValue={(container.originals || {}).deliveryDate} originalMeta={(container.originalMetas || {}).deliveryDate} onChange={(v, orig) => ctx.updateContainer(container.id, { deliveryDate: v }, mo, 'yoshii', '納品日')} refDate={mo} className="text-left pl-2.5 text-xs font-bold" dataGridId={`y-ship-${mo}-${idx}-7`} onGridKeyDown={handleGridNav} />
+                                                        <div className="flex items-center justify-between gap-0.5 w-full">
+                                                            <div className="w-[85px] flex-shrink-0">
+                                                                <LocalInput type="qc-date" value={container.deliveryDate} originalValue={(container.originals || {}).deliveryDate} originalMeta={(container.originalMetas || {}).deliveryDate} onChange={(v, orig) => ctx.updateContainer(container.id, { deliveryDate: v }, mo, 'yoshii', '納品日')} refDate={mo} className="text-left pl-2 text-xs font-bold" dataGridId={`y-ship-${mo}-${idx}-7`} onGridKeyDown={handleGridNav} />
                                                             </div>
-                                                            <div className="w-[68px] flex-shrink-0">
+                                                            <div className="w-[60px] flex-shrink-0">
                                                                 <input 
                                                                     type="time" 
                                                                     value={container.deliveryTime || ''} 
                                                                     onChange={e => ctx.updateContainer(container.id, { deliveryTime: e.target.value }, mo, 'yoshii', '納品時間')} 
-                                                                    className="border rounded px-0.5 py-0 text-[11px] font-bold bg-white text-center w-full h-[22px] cursor-pointer outline-none focus:ring-1 focus:ring-indigo-500"
+                                                                    className="border rounded px-0.5 py-0 text-[10px] font-bold bg-white text-center w-full h-[22px] cursor-pointer outline-none focus:ring-1 focus:ring-indigo-500"
                                                                 />
                                                             </div>
                                                         </div>
                                                     </td>
 
-                                                    {/* 納品先: 引き算適用 & 折り返し表示 */}
+                                                    {/* 納品先 */}
                                                     <td className="p-0.5 border text-center align-middle whitespace-normal word-break-all">
                                                         <DynamicSelect value={container.destination} originalValue={(container.originals || {}).destination} originalMeta={(container.originalMetas || {}).destination} onChange={(val, cat, orig) => ctx.handleSelectChange(container.id, 'destination', true, 'yoshii', false, '納品先')(val, cat, orig)} category="destinations" options={ctx.masterData.yoshii.destinations} dataGridId={`y-ship-${mo}-${idx}-8`} onGridKeyDown={handleGridNav} className="w-full text-xs border-none bg-transparent outline-none text-center px-0 h-auto whitespace-normal" />
                                                     </td>
 
-                                                    {/* 備考: 引き算適用 & 折り返し表示 */}
+                                                    {/* 備考 */}
                                                     <td className="p-0.5 border text-center align-middle whitespace-normal word-break-all">
                                                         <LocalTextArea value={container.notes} originalValue={(container.originals || {}).notes} originalMeta={(container.originalMetas || {}).notes} onChange={(v, orig) => ctx.updateContainer(container.id, { notes: v }, mo, 'yoshii', '備考')} isCompact={true} className="h-auto whitespace-normal"/>
                                                     </td>
 
-                                                    {/* サイズ: 引き算適用 */}
+                                                    {/* サイズ */}
                                                     <td className="p-0.5 border text-center align-middle">
                                                         <DynamicSelect value={container.containerSize} originalValue={(container.originals || {}).containerSize} originalMeta={(container.originalMetas || {}).containerSize} onChange={(val, cat, orig) => ctx.handleSelectChange(container.id, 'containerSize', true, 'common', false, 'サイズ')(val, cat, orig)} category="containerSizes" options={ctx.masterData.common.containerSizes} dataGridId={`y-ship-${mo}-${idx}-9`} onGridKeyDown={handleGridNav} className="w-full text-xs border-none bg-transparent outline-none text-center px-0" />
                                                     </td>
 
-                                                    {/* 本船名: 引き算適用 */}
+                                                    {/* 本船名 */}
                                                     <td className="p-0.5 border text-center align-middle">
                                                         <LocalInput value={container.vesselName} originalValue={(container.originals || {}).vesselName} originalMeta={(container.originalMetas || {}).originalMetas?.vesselName} onChange={(v, orig) => ctx.updateContainer(container.id, { vesselName: v }, mo, 'yoshii', '本船名')} className="text-center text-xs" dataGridId={`y-ship-${mo}-${idx}-10`} onGridKeyDown={handleGridNav} />
                                                     </td>
@@ -595,35 +594,35 @@ const YoshiiDrayageView = () => {
                 </div>
             </div>
 
-            <div className="table-container flex-grow border rounded shadow-inner" ref={ctx.tableContainerRef} onScroll={handleScroll}>
-                <table className="alloc-print-table w-max text-center border-collapse">
+            <div className="table-container flex-grow border rounded shadow-inner overflow-x-auto" ref={ctx.tableContainerRef} onScroll={handleScroll}>
+                <table className="alloc-print-table w-full text-center border-collapse">
                     <thead className="sticky top-0 z-30 bg-gray-200 shadow-sm">
                         <tr className="table-row-compact">
-                            <th className="p-0.5 border w-[80px] min-w-[80px] text-xs text-center align-middle">管理番号</th>
-                            <th className="p-0.5 border w-[75px] min-w-[75px] text-xs align-middle">進行状況</th>
-                            <th className="p-0.5 border w-[110px] min-w-[110px] text-xs align-middle">コンテナNO.</th>
-                            <th className="p-0.5 border min-w-[130px] text-xs align-middle">積載型式</th>
-                            <th className="p-0.5 border w-[85px] min-w-[85px] bg-emerald-50 text-[10px] text-emerald-900 align-middle">
+                            <th className="p-0.5 border w-[75px] text-xs text-center align-middle">管理番号</th>
+                            <th className="p-0.5 border w-[70px] text-xs align-middle">進行状況</th>
+                            <th className="p-0.5 border w-[100px] text-xs align-middle">コンテナNO.</th>
+                            <th className="p-0.5 border min-w-[120px] text-xs align-middle">積載型式</th>
+                            <th className="p-0.5 border w-[75px] bg-emerald-50 text-[10px] text-emerald-900 align-middle">
                                 補充部品 (PCS)<br/>
-                                <span className="inline-block w-6 text-center">外装箱</span>
-                                <span className="inline-block w-6 text-center">化粧箱</span>
-                                <span className="inline-block w-6 text-center">ラベル</span>
+                                <span className="inline-block w-5 text-center">外</span>
+                                <span className="inline-block w-5 text-center">内</span>
+                                <span className="inline-block w-5 text-center">札</span>
                             </th>
-                            <th className="p-0.5 border w-[65px] min-w-[65px] text-xs align-middle">割振数</th>
-                            <th className="p-0.5 border w-[65px] min-w-[65px] text-xs bg-emerald-100 font-bold text-emerald-900 align-middle">総数量</th>
-                            <th className="p-0.5 border w-[75px] min-w-[75px] text-xs align-middle">到着港</th>
-                            <th className="p-0.5 border w-[85px] min-w-[85px] text-xs align-middle">ETD</th>
-                            <th className="p-0.5 border w-[85px] min-w-[85px] text-xs align-middle">ETA</th>
-                            <th className="p-0.5 border w-[85px] min-w-[85px] text-xs align-middle">フリータイム</th>
-                            <th className="p-0.5 border w-[170px] min-w-[170px] bg-emerald-50 text-xs text-emerald-900 align-middle">
+                            <th className="p-0.5 border w-[60px] text-xs align-middle">割振数</th>
+                            <th className="p-0.5 border w-[60px] text-xs bg-emerald-100 font-bold text-emerald-900 align-middle">総数量</th>
+                            <th className="p-0.5 border w-[65px] text-xs align-middle">到着港</th>
+                            <th className="p-0.5 border w-[80px] text-xs align-middle">ETD</th>
+                            <th className="p-0.5 border w-[80px] text-xs align-middle">ETA</th>
+                            <th className="p-0.5 border w-[80px] text-xs align-middle">フリータイム</th>
+                            <th className="p-0.5 border w-[155px] bg-emerald-50 text-xs text-emerald-900 align-middle">
                                 納品日時<br/>
-                                <span className="inline-block w-[90px] text-center">納品日</span>
-                                <span className="inline-block w-[65px] text-center">時間</span>
+                                <span className="inline-block w-[85px] text-center">納品日</span>
+                                <span className="inline-block w-[60px] text-center">時間</span>
                             </th>
-                            <th className="p-0.5 border w-[155px] min-w-[155px] text-xs align-middle">納品先</th>
-                            <th className="p-0.5 border min-w-[160px] text-xs align-middle">備考</th>
-                            <th className="p-0.5 border w-[65px] min-w-[65px] text-xs align-middle">サイズ</th>
-                            <th className="p-0.5 border w-[100px] min-w-[100px] text-xs align-middle">本船名</th>
+                            <th className="p-0.5 border w-[135px] text-xs align-middle">納品先</th>
+                            <th className="p-0.5 border min-w-[120px] text-xs align-middle">備考</th>
+                            <th className="p-0.5 border w-[55px] text-xs align-middle">サイズ</th>
+                            <th className="p-0.5 border w-[90px] text-xs align-middle">本船名</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -681,9 +680,9 @@ const YoshiiDrayageView = () => {
                                                     {/* ★ 5. 補充部品(PCS): 編集不可・グレー背景セット & align-middle */}
                                                     <td className="border text-center px-0 py-0.5 align-middle readonly-cell bg-gray-100">
                                                         <div className="flex justify-center items-center gap-0.5">
-                                                            <input type="number" value={container.spareOuter || ''} disabled={true} className="spare-part-input readonly-cell bg-gray-100 text-gray-600 border-gray-300" placeholder="0"/>
-                                                            <input type="number" value={container.spareInner || ''} disabled={true} className="spare-part-input readonly-cell bg-gray-100 text-gray-600 border-gray-300" placeholder="0"/>
-                                                            <input type="number" value={container.spareLabel || ''} disabled={true} className="spare-part-input readonly-cell bg-gray-100 text-gray-600 border-gray-300" placeholder="0"/>
+                                                            <input type="number" value={container.spareOuter || ''} disabled={true} className="spare-part-input w-5 text-center text-[10px] readonly-cell bg-gray-100 text-gray-600 border-gray-300" placeholder="0"/>
+                                                            <input type="number" value={container.spareInner || ''} disabled={true} className="spare-part-input w-5 text-center text-[10px] readonly-cell bg-gray-100 text-gray-600 border-gray-300" placeholder="0"/>
+                                                            <input type="number" value={container.spareLabel || ''} disabled={true} className="spare-part-input w-5 text-center text-[10px] readonly-cell bg-gray-100 text-gray-600 border-gray-300" placeholder="0"/>
                                                         </div>
                                                     </td>
 
@@ -698,33 +697,33 @@ const YoshiiDrayageView = () => {
                                                         <DynamicSelect value={container.port} disabled={true} category="ports" options={ctx.masterData.yoshii.ports} dataGridId={`y-dray-${mo}-${idx}-3`} onGridKeyDown={handleGridNav} className="w-full text-xs border-none bg-transparent outline-none text-center px-0 readonly-cell bg-gray-100 cursor-not-allowed" />
                                                     </td>
 
-                                                    {/* ★ 9. ETD: 編集不可・グレー背景セット & align-middle & text-left pl-2.5 & 引き算適用 */}
+                                                    {/* ★ 9. ETD: 編集不可・グレー背景セット & align-middle & text-left pl-2 & 引き算適用 */}
                                                     <td className="p-0.5 border text-center align-middle readonly-cell bg-gray-100">
-                                                        <LocalInput type="qc-date" value={container.etd} readOnly={true} refDate={mo} className="text-left pl-2.5 text-xs readonly-cell bg-gray-100 cursor-not-allowed" dataGridId={`y-dray-${mo}-${idx}-4`} onGridKeyDown={handleGridNav} />
+                                                        <LocalInput type="qc-date" value={container.etd} readOnly={true} refDate={mo} className="text-left pl-2 text-xs readonly-cell bg-gray-100 cursor-not-allowed" dataGridId={`y-dray-${mo}-${idx}-4`} onGridKeyDown={handleGridNav} />
                                                     </td>
 
-                                                    {/* ★ 10. ETA: 編集不可・グレー背景セット & align-middle & text-left pl-2.5 & 引き算適用 */}
+                                                    {/* ★ 10. ETA: 編集不可・グレー背景セット & align-middle & text-left pl-2 & 引き算適用 */}
                                                     <td className="p-0.5 border text-center align-middle readonly-cell bg-gray-100">
-                                                        <LocalInput type="qc-date" value={container.eta} readOnly={true} refDate={mo} className="text-left pl-2.5 text-xs readonly-cell bg-gray-100 cursor-not-allowed" dataGridId={`y-dray-${mo}-${idx}-5`} onGridKeyDown={handleGridNav} />
+                                                        <LocalInput type="qc-date" value={container.eta} readOnly={true} refDate={mo} className="text-left pl-2 text-xs readonly-cell bg-gray-100 cursor-not-allowed" dataGridId={`y-dray-${mo}-${idx}-5`} onGridKeyDown={handleGridNav} />
                                                     </td>
 
-                                                    {/* ★ 11. フリータイム: 編集不可・グレー背景セット & align-middle & text-left pl-2.5 & 引き算適用 */}
+                                                    {/* ★ 11. フリータイム: 編集不可・グレー背景セット & align-middle & text-left pl-2 & 引き算適用 */}
                                                     <td className="p-0.5 border text-center align-middle readonly-cell bg-gray-100">
-                                                        <LocalInput type="qc-date" value={container.freetime} readOnly={true} refDate={mo} className="text-left pl-2.5 text-xs readonly-cell bg-gray-100 cursor-not-allowed" dataGridId={`y-dray-${mo}-${idx}-6`} onGridKeyDown={handleGridNav} />
+                                                        <LocalInput type="qc-date" value={container.freetime} readOnly={true} refDate={mo} className="text-left pl-2 text-xs readonly-cell bg-gray-100 cursor-not-allowed" dataGridId={`y-dray-${mo}-${idx}-6`} onGridKeyDown={handleGridNav} />
                                                     </td>
 
                                                     {/* 納品日時 (ドレージ手配 編集可能領域 & 引き算適用) */}
                                                     <td className={`border text-center px-1 py-0.5 align-middle ${isReadOnlyUser ? 'readonly-cell bg-gray-100' : 'bg-emerald-50/30'}`}>
-                                                        <div className="flex items-center justify-between gap-1 w-full">
-                                                            <div className="w-[90px] flex-shrink-0">
-                                                                <LocalInput type="qc-date" value={container.deliveryDate} originalValue={(container.originals || {}).deliveryDate} originalMeta={(container.originalMetas || {}).deliveryDate} onChange={(v, orig) => ctx.updateContainer(container.id, { deliveryDate: v }, mo, 'yoshii', '納品日')} refDate={mo} className={`text-left pl-2.5 text-xs font-bold ${isReadOnlyUser ? 'readonly-cell bg-gray-100' : ''}`} dataGridId={`y-dray-${mo}-${idx}-7`} onGridKeyDown={handleGridNav} />
+                                                        <div className="flex items-center justify-between gap-0.5 w-full">
+                                                            <div className="w-[85px] flex-shrink-0">
+                                                                <LocalInput type="qc-date" value={container.deliveryDate} originalValue={(container.originals || {}).deliveryDate} originalMeta={(container.originalMetas || {}).deliveryDate} onChange={(v, orig) => ctx.updateContainer(container.id, { deliveryDate: v }, mo, 'yoshii', '納品日')} refDate={mo} className={`text-left pl-2 text-xs font-bold ${isReadOnlyUser ? 'readonly-cell bg-gray-100' : ''}`} dataGridId={`y-dray-${mo}-${idx}-7`} onGridKeyDown={handleGridNav} />
                                                             </div>
-                                                            <div className="w-[68px] flex-shrink-0">
+                                                            <div className="w-[60px] flex-shrink-0">
                                                                 <input 
                                                                     type="time" 
                                                                     value={container.deliveryTime || ''} 
                                                                     onChange={e => ctx.updateContainer(container.id, { deliveryTime: e.target.value }, mo, 'yoshii', '納品時間')} 
-                                                                    className={`border rounded px-0.5 py-0 text-[11px] font-bold text-center w-full h-[22px] outline-none focus:ring-1 focus:ring-indigo-500 ${isReadOnlyUser ? 'readonly-cell bg-gray-100 cursor-not-allowed' : 'bg-white cursor-pointer'}`}
+                                                                    className={`border rounded px-0.5 py-0 text-[10px] font-bold text-center w-full h-[22px] outline-none focus:ring-1 focus:ring-indigo-500 ${isReadOnlyUser ? 'readonly-cell bg-gray-100 cursor-not-allowed' : 'bg-white cursor-pointer'}`}
                                                                     disabled={isReadOnlyUser}
                                                                 />
                                                             </div>
