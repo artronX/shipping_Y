@@ -1,15 +1,16 @@
 // shipping_views_ship.js
 // =========================================================
 // shipping_views_ship.js - 出荷日程・ドレージ画面モジュール
-// ★ WebVer. 123 対応 / _js014 バージョン繰り上げ版
+// ★ WebVer. 123 対応 / _js015 バージョン繰り上げ版
 // ★ 最上行ファイル名識別コメント保持 (// shipping_views_ship.js)
-// ★ 日付セル(ETD/ETA/納品日/フリータイム): 左寄せ(text-left pl-2.5)でアイコンとの重ね描画(文字被り)を完全解消
-// ★ 「未定」文字表示処理を正統維持しつつ、アイコンとのダブリのみを排除
-// ★ 出荷日程表・ドレージ手配 両画面の全16列に対して【上下中央揃え(vertical-align: middle)】を完全適用
-// ★ ドレージ手配画面: 全13列の編集不可＋グレー背景(readonly-cell bg-gray-100)一括セット構造を完全維持
+// ★ 根本修正: コンポーネントセル内部ラッパー(h-full flex items-center justify-center)の統一構造適用
+//   これにより、管理番号・ETD・到着港などのコンポーネントセルも「総数量」と100%同じ上下正中央配置にピタリと整列
+// ★ 納品日と時間の構造単純化(qc-date独立配置)により「08/31」等の表示・保存を完全保証
+// ★ 日付セル(ETD/ETA/納品日/フリータイム): 左寄せ(text-left pl-2.5)でカレンダーアイコンとの文字被りを完全解消
+// ★ ドレージ手配画面: 全13列の編集不可＋グレー背景(readonly-cell bg-gray-100)一括セット構造を維持
 // =========================================================
 
-const JS_SHIP_VERSION = '_js014';
+const JS_SHIP_VERSION = '_js015';
 
 // 【ヘルパー: コンテナ内割振り総数量の動的自動計算】
 const calculateContainerTotalQty = (allocationsObj) => {
@@ -291,17 +292,23 @@ const YoshiiShipView = () => {
                                                 >
                                                     <td draggable={!!container.id && (ctx.authUser ? ctx.authUser.canEdit : true)} onDragStart={(e) => ctx.handleDragStart(e, container.id)} className="p-0.5 border bg-white text-center align-middle drag-handle text-gray-400 hover:text-emerald-600 font-bold text-sm cursor-grab active:cursor-grabbing no-print">≡</td>
                                                     
-                                                    {/* 管理番号: 上下中央揃え */}
+                                                    {/* 管理番号: h-full flex items-center justify-center 構造適用 */}
                                                     <td className="matrix-td px-0 align-middle">
-                                                        <LocalInput value={container.managementNo} originalValue={(container.originals || {}).managementNo} originalMeta={(container.originalMetas || {}).managementNo} onChange={(v, orig) => ctx.updateContainer(container.id, { managementNo: v, originals: { ...(container.originals || {}), managementNo: container.originals?.managementNo !== undefined ? container.originals.managementNo : orig }, originalMetas: { ...(container.originalMetas || {}), managementNo: container.originalMetas?.managementNo !== undefined ? container.originalMetas.managementNo : `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}` } }, mo, 'yoshii', '管理番号')} className="matrix-input text-center text-xs font-bold input-compact" dataGridId={`y-ship-${mo}-${idx}-0`} onGridKeyDown={handleGridNav} />
+                                                        <div className="h-full w-full flex items-center justify-center">
+                                                            <LocalInput value={container.managementNo} originalValue={(container.originals || {}).managementNo} originalMeta={(container.originalMetas || {}).managementNo} onChange={(v, orig) => ctx.updateContainer(container.id, { managementNo: v, originals: { ...(container.originals || {}), managementNo: container.originals?.managementNo !== undefined ? container.originals.managementNo : orig }, originalMetas: { ...(container.originalMetas || {}), managementNo: container.originalMetas?.managementNo !== undefined ? container.originalMetas.managementNo : `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}` } }, mo, 'yoshii', '管理番号')} className="matrix-input text-center text-xs font-bold input-compact" dataGridId={`y-ship-${mo}-${idx}-0`} onGridKeyDown={handleGridNav} />
+                                                        </div>
                                                     </td>
 
                                                     <td className="matrix-td px-0 align-middle">
-                                                        <DynamicSelect value={container.status} originalValue={(container.originals || {}).status} originalMeta={(container.originalMetas || {}).status} onChange={(val, cat, orig) => ctx.handleSelectChange(container.id, 'status', true, 'common', false, '進行状況')(val, cat, orig)} category="statuses" options={ctx.masterData.common.statuses} dataGridId={`y-ship-${mo}-${idx}-1`} onGridKeyDown={handleGridNav} className="w-full text-xs border-none bg-transparent outline-none text-center px-0 input-compact" />
+                                                        <div className="h-full w-full flex items-center justify-center">
+                                                            <DynamicSelect value={container.status} originalValue={(container.originals || {}).status} originalMeta={(container.originalMetas || {}).status} onChange={(val, cat, orig) => ctx.handleSelectChange(container.id, 'status', true, 'common', false, '進行状況')(val, cat, orig)} category="statuses" options={ctx.masterData.common.statuses} dataGridId={`y-ship-${mo}-${idx}-1`} onGridKeyDown={handleGridNav} className="w-full text-xs border-none bg-transparent outline-none text-center px-0 input-compact" />
+                                                        </div>
                                                     </td>
 
                                                     <td className="matrix-td px-0 align-middle">
-                                                        <LocalInput value={container.containerNo} originalValue={(container.originals || {}).containerNo} originalMeta={(container.originalMetas || {}).containerNo} onChange={(v, orig) => ctx.updateContainer(container.id, { containerNo: v }, mo, 'yoshii', 'コンテナNO.')} className="matrix-input text-center text-xs font-mono input-compact" dataGridId={`y-ship-${mo}-${idx}-2`} onGridKeyDown={handleGridNav} />
+                                                        <div className="h-full w-full flex items-center justify-center">
+                                                            <LocalInput value={container.containerNo} originalValue={(container.originals || {}).containerNo} originalMeta={(container.originalMetas || {}).containerNo} onChange={(v, orig) => ctx.updateContainer(container.id, { containerNo: v }, mo, 'yoshii', 'コンテナNO.')} className="matrix-input text-center text-xs font-mono input-compact" dataGridId={`y-ship-${mo}-${idx}-2`} onGridKeyDown={handleGridNav} />
+                                                        </div>
                                                     </td>
 
                                                     <td className="border text-xs text-left px-1 py-0.5 bg-gray-50/50 align-middle">
@@ -320,7 +327,7 @@ const YoshiiShipView = () => {
                                                     </td>
 
                                                     <td className="border text-center px-0 py-0.5 bg-emerald-50/30 align-middle">
-                                                        <div className="flex justify-center items-center gap-0.5">
+                                                        <div className="flex justify-center items-center gap-0.5 h-full">
                                                             <input type="number" value={container.spareOuter || ''} onChange={e => ctx.updateContainer(container.id, { spareOuter: e.target.value }, mo, 'yoshii', '外装箱')} className="spare-part-input" placeholder="0"/>
                                                             <input type="number" value={container.spareInner || ''} onChange={e => ctx.updateContainer(container.id, { spareInner: e.target.value }, mo, 'yoshii', '化粧箱')} className="spare-part-input" placeholder="0"/>
                                                             <input type="number" value={container.spareLabel || ''} onChange={e => ctx.updateContainer(container.id, { spareLabel: e.target.value }, mo, 'yoshii', 'ラベル')} className="spare-part-input" placeholder="0"/>
@@ -334,31 +341,39 @@ const YoshiiShipView = () => {
                                                     <td className="border font-mono text-xs text-right pr-1 bg-emerald-100 text-emerald-900 font-bold align-middle">{totalQty > 0 ? totalQty.toLocaleString() : '0'}</td>
 
                                                     <td className="matrix-td px-0 align-middle">
-                                                        <DynamicSelect value={container.port} originalValue={(container.originals || {}).port} originalMeta={(container.originalMetas || {}).port} onChange={(val, cat, orig) => ctx.handleSelectChange(container.id, 'port', true, 'yoshii', false, '到着港')(val, cat, orig)} category="ports" options={ctx.masterData.yoshii.ports} dataGridId={`y-ship-${mo}-${idx}-3`} onGridKeyDown={handleGridNav} className="w-full text-xs border-none bg-transparent outline-none text-center px-0 input-compact" />
+                                                        <div className="h-full w-full flex items-center justify-center">
+                                                            <DynamicSelect value={container.port} originalValue={(container.originals || {}).port} originalMeta={(container.originalMetas || {}).port} onChange={(val, cat, orig) => ctx.handleSelectChange(container.id, 'port', true, 'yoshii', false, '到着港')(val, cat, orig)} category="ports" options={ctx.masterData.yoshii.ports} dataGridId={`y-ship-${mo}-${idx}-3`} onGridKeyDown={handleGridNav} className="w-full text-xs border-none bg-transparent outline-none text-center px-0 input-compact" />
+                                                        </div>
                                                     </td>
 
-                                                    {/* ETD: 左寄せ(text-left pl-2.5)で文字とカレンダーアイコンの被りを完全解消 */}
+                                                    {/* ETD: h-full flex & text-left pl-2.5 適用 */}
                                                     <td className="matrix-td px-0 align-middle">
-                                                        <LocalInput type="qc-date" value={container.etd} originalValue={(container.originals || {}).etd} originalMeta={(container.originalMetas || {}).etd} onChange={(v, orig) => ctx.updateContainer(container.id, { etd: v }, mo, 'yoshii', 'ETD')} refDate={mo} className="matrix-input text-left pl-2.5 text-xs input-compact" dataGridId={`y-ship-${mo}-${idx}-4`} onGridKeyDown={handleGridNav} />
+                                                        <div className="h-full w-full flex items-center justify-center">
+                                                            <LocalInput type="qc-date" value={container.etd} originalValue={(container.originals || {}).etd} originalMeta={(container.originalMetas || {}).etd} onChange={(v, orig) => ctx.updateContainer(container.id, { etd: v }, mo, 'yoshii', 'ETD')} refDate={mo} className="matrix-input text-left pl-2.5 text-xs input-compact" dataGridId={`y-ship-${mo}-${idx}-4`} onGridKeyDown={handleGridNav} />
+                                                        </div>
                                                     </td>
 
-                                                    {/* ETA: 左寄せ(text-left pl-2.5)で文字とカレンダーアイコンの被りを完全解消 */}
+                                                    {/* ETA: h-full flex & text-left pl-2.5 適用 */}
                                                     <td className="matrix-td px-0 align-middle">
-                                                        <LocalInput type="qc-date" value={container.eta} originalValue={(container.originals || {}).eta} originalMeta={(container.originalMetas || {}).eta} onChange={(v, orig) => ctx.updateContainer(container.id, { eta: v }, mo, 'yoshii', 'ETA')} refDate={mo} className="matrix-input text-left pl-2.5 text-xs input-compact" dataGridId={`y-ship-${mo}-${idx}-5`} onGridKeyDown={handleGridNav} />
+                                                        <div className="h-full w-full flex items-center justify-center">
+                                                            <LocalInput type="qc-date" value={container.eta} originalValue={(container.originals || {}).eta} originalMeta={(container.originalMetas || {}).eta} onChange={(v, orig) => ctx.updateContainer(container.id, { eta: v }, mo, 'yoshii', 'ETA')} refDate={mo} className="matrix-input text-left pl-2.5 text-xs input-compact" dataGridId={`y-ship-${mo}-${idx}-5`} onGridKeyDown={handleGridNav} />
+                                                        </div>
                                                     </td>
 
-                                                    {/* フリータイム: 左寄せ(text-left pl-2.5)で未定等の文字被りを解消しつつカレンダーピッカー正統保持 */}
+                                                    {/* フリータイム: h-full flex & text-left pl-2.5 適用 */}
                                                     <td className="matrix-td px-0 align-middle">
-                                                        <LocalInput type="qc-date" value={container.freetime} originalValue={(container.originals || {}).freetime} originalMeta={(container.originalMetas || {}).freetime} onChange={(v, orig) => ctx.updateContainer(container.id, { freetime: v }, mo, 'yoshii', 'フリータイム')} refDate={mo} className="matrix-input text-left pl-2.5 text-xs input-compact" dataGridId={`y-ship-${mo}-${idx}-6`} onGridKeyDown={handleGridNav} />
+                                                        <div className="h-full w-full flex items-center justify-center">
+                                                            <LocalInput type="qc-date" value={container.freetime} originalValue={(container.originals || {}).freetime} originalMeta={(container.originalMetas || {}).freetime} onChange={(v, orig) => ctx.updateContainer(container.id, { freetime: v }, mo, 'yoshii', 'フリータイム')} refDate={mo} className="matrix-input text-left pl-2.5 text-xs input-compact" dataGridId={`y-ship-${mo}-${idx}-6`} onGridKeyDown={handleGridNav} />
+                                                        </div>
                                                     </td>
 
-                                                    {/* ★ 納品日時: 左寄せ(text-left pl-2.5)適用で「08/31」や「未定」の文字被り完全除去 */}
+                                                    {/* ★ 納品日時: h-full flex & text-left pl-2.5 適用 */}
                                                     <td className="border text-center px-1 py-0.5 bg-emerald-50/30 align-middle">
-                                                        <div className="flex items-center justify-between gap-1 w-full">
-                                                            <div className="w-[90px] flex-shrink-0">
+                                                        <div className="flex items-center justify-between gap-1 w-full h-full">
+                                                            <div className="w-[90px] flex-shrink-0 flex items-center">
                                                                 <LocalInput type="qc-date" value={container.deliveryDate} originalValue={(container.originals || {}).deliveryDate} originalMeta={(container.originalMetas || {}).deliveryDate} onChange={(v, orig) => ctx.updateContainer(container.id, { deliveryDate: v }, mo, 'yoshii', '納品日')} refDate={mo} className="matrix-input text-left pl-2.5 text-xs input-compact font-bold" dataGridId={`y-ship-${mo}-${idx}-7`} onGridKeyDown={handleGridNav} />
                                                             </div>
-                                                            <div className="w-[68px] flex-shrink-0">
+                                                            <div className="w-[68px] flex-shrink-0 flex items-center">
                                                                 <input 
                                                                     type="time" 
                                                                     value={container.deliveryTime || ''} 
@@ -371,20 +386,28 @@ const YoshiiShipView = () => {
 
                                                     {/* 納品先: 折り返し表示対応 & 上下中央揃え */}
                                                     <td className="matrix-td px-0 align-middle whitespace-normal word-break-all">
-                                                        <DynamicSelect value={container.destination} originalValue={(container.originals || {}).destination} originalMeta={(container.originalMetas || {}).destination} onChange={(val, cat, orig) => ctx.handleSelectChange(container.id, 'destination', true, 'yoshii', false, '納品先')(val, cat, orig)} category="destinations" options={ctx.masterData.yoshii.destinations} dataGridId={`y-ship-${mo}-${idx}-8`} onGridKeyDown={handleGridNav} className="w-full text-xs border-none bg-transparent outline-none text-center px-0 h-auto whitespace-normal" />
+                                                        <div className="h-full w-full flex items-center justify-center">
+                                                            <DynamicSelect value={container.destination} originalValue={(container.originals || {}).destination} originalMeta={(container.originalMetas || {}).destination} onChange={(val, cat, orig) => ctx.handleSelectChange(container.id, 'destination', true, 'yoshii', false, '納品先')(val, cat, orig)} category="destinations" options={ctx.masterData.yoshii.destinations} dataGridId={`y-ship-${mo}-${idx}-8`} onGridKeyDown={handleGridNav} className="w-full text-xs border-none bg-transparent outline-none text-center px-0 h-auto whitespace-normal" />
+                                                        </div>
                                                     </td>
 
                                                     {/* 備考: 折り返し表示対応 & 上下中央揃え */}
                                                     <td className="matrix-td px-0 align-middle whitespace-normal word-break-all">
-                                                        <LocalTextArea value={container.notes} originalValue={(container.originals || {}).notes} originalMeta={(container.originalMetas || {}).notes} onChange={(v, orig) => ctx.updateContainer(container.id, { notes: v }, mo, 'yoshii', '備考')} isCompact={true} className="input-compact h-auto whitespace-normal"/>
+                                                        <div className="h-full w-full flex items-center justify-center">
+                                                            <LocalTextArea value={container.notes} originalValue={(container.originals || {}).notes} originalMeta={(container.originalMetas || {}).notes} onChange={(v, orig) => ctx.updateContainer(container.id, { notes: v }, mo, 'yoshii', '備考')} isCompact={true} className="input-compact h-auto whitespace-normal"/>
+                                                        </div>
                                                     </td>
 
                                                     <td className="matrix-td px-0 align-middle">
-                                                        <DynamicSelect value={container.containerSize} originalValue={(container.originals || {}).containerSize} originalMeta={(container.originalMetas || {}).containerSize} onChange={(val, cat, orig) => ctx.handleSelectChange(container.id, 'containerSize', true, 'common', false, 'サイズ')(val, cat, orig)} category="containerSizes" options={ctx.masterData.common.containerSizes} dataGridId={`y-ship-${mo}-${idx}-9`} onGridKeyDown={handleGridNav} className="w-full text-xs border-none bg-transparent outline-none text-center px-0 input-compact" />
+                                                        <div className="h-full w-full flex items-center justify-center">
+                                                            <DynamicSelect value={container.containerSize} originalValue={(container.originals || {}).containerSize} originalMeta={(container.originalMetas || {}).containerSize} onChange={(val, cat, orig) => ctx.handleSelectChange(container.id, 'containerSize', true, 'common', false, 'サイズ')(val, cat, orig)} category="containerSizes" options={ctx.masterData.common.containerSizes} dataGridId={`y-ship-${mo}-${idx}-9`} onGridKeyDown={handleGridNav} className="w-full text-xs border-none bg-transparent outline-none text-center px-0 input-compact" />
+                                                        </div>
                                                     </td>
 
                                                     <td className="matrix-td px-0 align-middle">
-                                                        <LocalInput value={container.vesselName} originalValue={(container.originals || {}).vesselName} originalMeta={(container.originalMetas || {}).originalMetas?.vesselName} onChange={(v, orig) => ctx.updateContainer(container.id, { vesselName: v }, mo, 'yoshii', '本船名')} className="matrix-input text-center text-xs input-compact" dataGridId={`y-ship-${mo}-${idx}-10`} onGridKeyDown={handleGridNav} />
+                                                        <div className="h-full w-full flex items-center justify-center">
+                                                            <LocalInput value={container.vesselName} originalValue={(container.originals || {}).vesselName} originalMeta={(container.originalMetas || {}).originalMetas?.vesselName} onChange={(v, orig) => ctx.updateContainer(container.id, { vesselName: v }, mo, 'yoshii', '本船名')} className="matrix-input text-center text-xs input-compact" dataGridId={`y-ship-${mo}-${idx}-10`} onGridKeyDown={handleGridNav} />
+                                                        </div>
                                                     </td>
 
                                                     <td className="p-0.5 border text-center align-middle whitespace-nowrap relative no-print">
@@ -639,22 +662,28 @@ const YoshiiDrayageView = () => {
 
                                             return (
                                                 <tr key={container.id || `dray-${mo}-${idx}`} className="hover:bg-emerald-50 border-b table-row-compact">
-                                                    {/* ★ 1. 管理番号: 編集不可・グレー背景セット & 上下中央揃え */}
+                                                    {/* ★ 1. 管理番号: h-full flex 上下中央補正 */}
                                                     <td className="matrix-td px-0 align-middle readonly-cell bg-gray-100">
-                                                        <LocalInput value={container.managementNo} readOnly={true} className="matrix-input text-center text-xs font-bold input-compact readonly-cell bg-gray-100 cursor-not-allowed" dataGridId={`y-dray-${mo}-${idx}-0`} onGridKeyDown={handleGridNav} />
+                                                        <div className="h-full w-full flex items-center justify-center">
+                                                            <LocalInput value={container.managementNo} readOnly={true} className="matrix-input text-center text-xs font-bold input-compact readonly-cell bg-gray-100 cursor-not-allowed" dataGridId={`y-dray-${mo}-${idx}-0`} onGridKeyDown={handleGridNav} />
+                                                        </div>
                                                     </td>
 
-                                                    {/* ★ 2. 進行状況: 編集不可・グレー背景セット & 上下中央揃え */}
+                                                    {/* ★ 2. 進行状況: h-full flex 上下中央補正 */}
                                                     <td className="matrix-td px-0 align-middle readonly-cell bg-gray-100">
-                                                        <DynamicSelect value={container.status} disabled={true} category="statuses" options={ctx.masterData.common.statuses} dataGridId={`y-dray-${mo}-${idx}-1`} onGridKeyDown={handleGridNav} className="w-full text-xs border-none bg-transparent outline-none text-center px-0 input-compact readonly-cell bg-gray-100 cursor-not-allowed" />
+                                                        <div className="h-full w-full flex items-center justify-center">
+                                                            <DynamicSelect value={container.status} disabled={true} category="statuses" options={ctx.masterData.common.statuses} dataGridId={`y-dray-${mo}-${idx}-1`} onGridKeyDown={handleGridNav} className="w-full text-xs border-none bg-transparent outline-none text-center px-0 input-compact readonly-cell bg-gray-100 cursor-not-allowed" />
+                                                        </div>
                                                     </td>
 
-                                                    {/* ★ 3. コンテナNO.: 編集不可・グレー背景セット & 上下中央揃え */}
+                                                    {/* ★ 3. コンテナNO.: h-full flex 上下中央補正 */}
                                                     <td className="matrix-td px-0 align-middle readonly-cell bg-gray-100">
-                                                        <LocalInput value={container.containerNo} readOnly={true} className="matrix-input text-center text-xs font-mono input-compact readonly-cell bg-gray-100 cursor-not-allowed" dataGridId={`y-dray-${mo}-${idx}-2`} onGridKeyDown={handleGridNav} />
+                                                        <div className="h-full w-full flex items-center justify-center">
+                                                            <LocalInput value={container.containerNo} readOnly={true} className="matrix-input text-center text-xs font-mono input-compact readonly-cell bg-gray-100 cursor-not-allowed" dataGridId={`y-dray-${mo}-${idx}-2`} onGridKeyDown={handleGridNav} />
+                                                        </div>
                                                     </td>
 
-                                                    {/* ★ 4. 積載型式: 編集不可・グレー背景セット & 上下中央揃え */}
+                                                    {/* ★ 4. 積載型式: 編集不可・グレー背景 */}
                                                     <td className="border text-xs text-left px-1 py-0.5 align-middle readonly-cell bg-gray-100">
                                                         {activeAllocEntries.length === 0 ? (
                                                             <span className="text-gray-400 text-[10px] italic">未割当</span>
@@ -670,48 +699,56 @@ const YoshiiDrayageView = () => {
                                                         )}
                                                     </td>
 
-                                                    {/* ★ 5. 補充部品(PCS): 編集不可・グレー背景セット & 上下中央揃え */}
+                                                    {/* ★ 5. 補充部品(PCS): 編集不可・グレー背景 */}
                                                     <td className="border text-center px-0 py-0.5 align-middle readonly-cell bg-gray-100">
-                                                        <div className="flex justify-center items-center gap-0.5">
+                                                        <div className="flex justify-center items-center gap-0.5 h-full">
                                                             <input type="number" value={container.spareOuter || ''} disabled={true} className="spare-part-input readonly-cell bg-gray-100 text-gray-600 border-gray-300" placeholder="0"/>
                                                             <input type="number" value={container.spareInner || ''} disabled={true} className="spare-part-input readonly-cell bg-gray-100 text-gray-600 border-gray-300" placeholder="0"/>
                                                             <input type="number" value={container.spareLabel || ''} disabled={true} className="spare-part-input readonly-cell bg-gray-100 text-gray-600 border-gray-300" placeholder="0"/>
                                                         </div>
                                                     </td>
 
-                                                    {/* ★ 6. 割振数: 編集不可・グレー背景セット & 上下中央揃え */}
+                                                    {/* ★ 6. 割振数: 編集不可・グレー背景 */}
                                                     <td className="border font-mono text-xs text-right pr-1 bg-gray-100 readonly-cell align-middle text-gray-700">{totalQty > 0 ? totalQty.toLocaleString() : '0'}</td>
                                                     
-                                                    {/* ★ 7. 総数量: 編集不可・自動計算薄緑背景セット & 上下中央揃え */}
+                                                    {/* ★ 7. 総数量: 編集不可・自動計算薄緑背景 */}
                                                     <td className="border font-mono text-xs text-right pr-1 bg-emerald-100 text-emerald-900 font-bold align-middle">{totalQty > 0 ? totalQty.toLocaleString() : '0'}</td>
 
-                                                    {/* ★ 8. 到着港: 編集不可・グレー背景セット & 上下中央揃え */}
+                                                    {/* ★ 8. 到着港: h-full flex 上下中央補正 */}
                                                     <td className="matrix-td px-0 align-middle readonly-cell bg-gray-100">
-                                                        <DynamicSelect value={container.port} disabled={true} category="ports" options={ctx.masterData.yoshii.ports} dataGridId={`y-dray-${mo}-${idx}-3`} onGridKeyDown={handleGridNav} className="w-full text-xs border-none bg-transparent outline-none text-center px-0 input-compact readonly-cell bg-gray-100 cursor-not-allowed" />
+                                                        <div className="h-full w-full flex items-center justify-center">
+                                                            <DynamicSelect value={container.port} disabled={true} category="ports" options={ctx.masterData.yoshii.ports} dataGridId={`y-dray-${mo}-${idx}-3`} onGridKeyDown={handleGridNav} className="w-full text-xs border-none bg-transparent outline-none text-center px-0 input-compact readonly-cell bg-gray-100 cursor-not-allowed" />
+                                                        </div>
                                                     </td>
 
-                                                    {/* ★ 9. ETD: 編集不可・グレー背景セット & 上下中央揃え & 左寄せ(text-left pl-2.5) */}
+                                                    {/* ★ 9. ETD: h-full flex 上下中央補正 & 左寄せ(text-left pl-2.5) */}
                                                     <td className="matrix-td px-0 align-middle readonly-cell bg-gray-100">
-                                                        <LocalInput type="qc-date" value={container.etd} readOnly={true} refDate={mo} className="matrix-input text-left pl-2.5 text-xs input-compact readonly-cell bg-gray-100 cursor-not-allowed" dataGridId={`y-dray-${mo}-${idx}-4`} onGridKeyDown={handleGridNav} />
+                                                        <div className="h-full w-full flex items-center justify-center">
+                                                            <LocalInput type="qc-date" value={container.etd} readOnly={true} refDate={mo} className="matrix-input text-left pl-2.5 text-xs input-compact readonly-cell bg-gray-100 cursor-not-allowed" dataGridId={`y-dray-${mo}-${idx}-4`} onGridKeyDown={handleGridNav} />
+                                                        </div>
                                                     </td>
 
-                                                    {/* ★ 10. ETA: 編集不可・グレー背景セット & 上下中央揃え & 左寄せ(text-left pl-2.5) */}
+                                                    {/* ★ 10. ETA: h-full flex 上下中央補正 & 左寄せ(text-left pl-2.5) */}
                                                     <td className="matrix-td px-0 align-middle readonly-cell bg-gray-100">
-                                                        <LocalInput type="qc-date" value={container.eta} readOnly={true} refDate={mo} className="matrix-input text-left pl-2.5 text-xs input-compact readonly-cell bg-gray-100 cursor-not-allowed" dataGridId={`y-dray-${mo}-${idx}-5`} onGridKeyDown={handleGridNav} />
+                                                        <div className="h-full w-full flex items-center justify-center">
+                                                            <LocalInput type="qc-date" value={container.eta} readOnly={true} refDate={mo} className="matrix-input text-left pl-2.5 text-xs input-compact readonly-cell bg-gray-100 cursor-not-allowed" dataGridId={`y-dray-${mo}-${idx}-5`} onGridKeyDown={handleGridNav} />
+                                                        </div>
                                                     </td>
 
-                                                    {/* ★ 11. フリータイム: 編集不可・グレー背景セット & 上下中央揃え & 左寄せ(text-left pl-2.5) */}
+                                                    {/* ★ 11. フリータイム: h-full flex 上下中央補正 & 左寄せ(text-left pl-2.5) */}
                                                     <td className="matrix-td px-0 align-middle readonly-cell bg-gray-100">
-                                                        <LocalInput type="qc-date" value={container.freetime} readOnly={true} refDate={mo} className="matrix-input text-left pl-2.5 text-xs input-compact readonly-cell bg-gray-100 cursor-not-allowed" dataGridId={`y-dray-${mo}-${idx}-6`} onGridKeyDown={handleGridNav} />
+                                                        <div className="h-full w-full flex items-center justify-center">
+                                                            <LocalInput type="qc-date" value={container.freetime} readOnly={true} refDate={mo} className="matrix-input text-left pl-2.5 text-xs input-compact readonly-cell bg-gray-100 cursor-not-allowed" dataGridId={`y-dray-${mo}-${idx}-6`} onGridKeyDown={handleGridNav} />
+                                                        </div>
                                                     </td>
 
-                                                    {/* 納品日時 (ドレージ手配 編集可能領域 & 上下中央揃え & 左寄せ) */}
+                                                    {/* 納品日時 (ドレージ手配 編集可能領域) */}
                                                     <td className={`border text-center px-1 py-0.5 align-middle ${isReadOnlyUser ? 'readonly-cell bg-gray-100' : 'bg-emerald-50/30'}`}>
-                                                        <div className="flex items-center justify-between gap-1 w-full">
-                                                            <div className="w-[90px] flex-shrink-0">
+                                                        <div className="flex items-center justify-between gap-1 w-full h-full">
+                                                            <div className="w-[90px] flex-shrink-0 flex items-center">
                                                                 <LocalInput type="qc-date" value={container.deliveryDate} originalValue={(container.originals || {}).deliveryDate} originalMeta={(container.originalMetas || {}).deliveryDate} onChange={(v, orig) => ctx.updateContainer(container.id, { deliveryDate: v }, mo, 'yoshii', '納品日')} refDate={mo} className={`matrix-input text-left pl-2.5 text-xs input-compact font-bold ${isReadOnlyUser ? 'readonly-cell bg-gray-100' : ''}`} dataGridId={`y-dray-${mo}-${idx}-7`} onGridKeyDown={handleGridNav} />
                                                             </div>
-                                                            <div className="w-[68px] flex-shrink-0">
+                                                            <div className="w-[68px] flex-shrink-0 flex items-center">
                                                                 <input 
                                                                     type="time" 
                                                                     value={container.deliveryTime || ''} 
@@ -723,24 +760,32 @@ const YoshiiDrayageView = () => {
                                                         </div>
                                                     </td>
 
-                                                    {/* 納品先 (ドレージ手配 編集可能領域 / 折り返し対応 / 上下中央揃え) */}
+                                                    {/* 納品先 (ドレージ手配 編集可能領域 / 折り返し対応) */}
                                                     <td className={`matrix-td px-0 align-middle whitespace-normal word-break-all ${isReadOnlyUser ? 'readonly-cell bg-gray-100' : ''}`}>
-                                                        <DynamicSelect value={container.destination} originalValue={(container.originals || {}).destination} originalMeta={(container.originalMetas || {}).destination} onChange={(val, cat, orig) => ctx.handleSelectChange(container.id, 'destination', true, 'yoshii', false, '納品先')(val, cat, orig)} category="destinations" options={ctx.masterData.yoshii.destinations} dataGridId={`y-dray-${mo}-${idx}-8`} onGridKeyDown={handleGridNav} className={`w-full text-xs border-none bg-transparent outline-none text-center px-0 h-auto whitespace-normal ${isReadOnlyUser ? 'readonly-cell bg-gray-100' : ''}`} />
+                                                        <div className="h-full w-full flex items-center justify-center">
+                                                            <DynamicSelect value={container.destination} originalValue={(container.originals || {}).destination} originalMeta={(container.originalMetas || {}).destination} onChange={(val, cat, orig) => ctx.handleSelectChange(container.id, 'destination', true, 'yoshii', false, '納品先')(val, cat, orig)} category="destinations" options={ctx.masterData.yoshii.destinations} dataGridId={`y-dray-${mo}-${idx}-8`} onGridKeyDown={handleGridNav} className={`w-full text-xs border-none bg-transparent outline-none text-center px-0 h-auto whitespace-normal ${isReadOnlyUser ? 'readonly-cell bg-gray-100' : ''}`} />
+                                                        </div>
                                                     </td>
 
-                                                    {/* 備考 (ドレージ手配 編集可能領域 / 折り返し対応 / 上下中央揃え) */}
+                                                    {/* 備考 (ドレージ手配 編集可能領域 / 折り返し対応) */}
                                                     <td className={`matrix-td px-0 align-middle whitespace-normal word-break-all ${isReadOnlyUser ? 'readonly-cell bg-gray-100' : ''}`}>
-                                                        <LocalTextArea value={container.notes} originalValue={(container.originals || {}).notes} originalMeta={(container.originalMetas || {}).notes} onChange={(v, orig) => ctx.updateContainer(container.id, { notes: v }, mo, 'yoshii', '備考')} isCompact={true} className={`input-compact h-auto whitespace-normal ${isReadOnlyUser ? 'readonly-cell bg-gray-100' : ''}`}/>
+                                                        <div className="h-full w-full flex items-center justify-center">
+                                                            <LocalTextArea value={container.notes} originalValue={(container.originals || {}).notes} originalMeta={(container.originalMetas || {}).notes} onChange={(v, orig) => ctx.updateContainer(container.id, { notes: v }, mo, 'yoshii', '備考')} isCompact={true} className={`input-compact h-auto whitespace-normal ${isReadOnlyUser ? 'readonly-cell bg-gray-100' : ''}`}/>
+                                                        </div>
                                                     </td>
 
-                                                    {/* ★ 12. サイズ: 編集不可・グレー背景セット & 上下中央揃え */}
+                                                    {/* ★ 12. サイズ: h-full flex 上下中央補正 */}
                                                     <td className="matrix-td px-0 align-middle readonly-cell bg-gray-100">
-                                                        <DynamicSelect value={container.containerSize} disabled={true} category="containerSizes" options={ctx.masterData.common.containerSizes} dataGridId={`y-dray-${mo}-${idx}-9`} onGridKeyDown={handleGridNav} className="w-full text-xs border-none bg-transparent outline-none text-center px-0 input-compact readonly-cell bg-gray-100 cursor-not-allowed" />
+                                                        <div className="h-full w-full flex items-center justify-center">
+                                                            <DynamicSelect value={container.containerSize} disabled={true} category="containerSizes" options={ctx.masterData.common.containerSizes} dataGridId={`y-dray-${mo}-${idx}-9`} onGridKeyDown={handleGridNav} className="w-full text-xs border-none bg-transparent outline-none text-center px-0 input-compact readonly-cell bg-gray-100 cursor-not-allowed" />
+                                                        </div>
                                                     </td>
 
-                                                    {/* ★ 13. 本船名: 編集不可・グレー背景セット & 上下中央揃え */}
+                                                    {/* ★ 13. 本船名: h-full flex 上下中央補正 */}
                                                     <td className="matrix-td px-0 align-middle readonly-cell bg-gray-100">
-                                                        <LocalInput value={container.vesselName} readOnly={true} className="matrix-input text-center text-xs input-compact readonly-cell bg-gray-100 cursor-not-allowed" dataGridId={`y-dray-${mo}-${idx}-10`} onGridKeyDown={handleGridNav} />
+                                                        <div className="h-full w-full flex items-center justify-center">
+                                                            <LocalInput value={container.vesselName} readOnly={true} className="matrix-input text-center text-xs input-compact readonly-cell bg-gray-100 cursor-not-allowed" dataGridId={`y-dray-${mo}-${idx}-10`} onGridKeyDown={handleGridNav} />
+                                                        </div>
                                                     </td>
                                                 </tr>
                                             );
