@@ -1,4 +1,4 @@
-const JS_SHIP_VERSION = '_js009';
+const JS_SHIP_VERSION = '_js010';
 
 // 【ヘルパー: コンテナ内割振り総数量の動的自動計算】
 const calculateContainerTotalQty = (allocationsObj) => {
@@ -239,10 +239,10 @@ const YoshiiShipView = () => {
                             <th className="p-0.5 border w-[70px] min-w-[70px] text-xs">ETD</th>
                             <th className="p-0.5 border w-[70px] min-w-[70px] text-xs">ETA</th>
                             <th className="p-0.5 border w-[70px] min-w-[70px] text-xs">フリータイム</th>
-                            <th className="p-0.5 border w-[130px] min-w-[130px] bg-emerald-50 text-xs text-emerald-900">
+                            <th className="p-0.5 border w-[155px] min-w-[155px] bg-emerald-50 text-xs text-emerald-900">
                                 納品日時<br/>
-                                <span className="inline-block w-14 text-center">納品日</span>
-                                <span className="inline-block w-14 text-center">時間</span>
+                                <span className="inline-block w-16 text-center">納品日</span>
+                                <span className="inline-block w-16 text-center">時間</span>
                             </th>
                             <th className="p-0.5 border w-[140px] min-w-[140px] text-xs">納品先</th>
                             <th className="p-0.5 border min-w-[160px] text-xs">備考</th>
@@ -337,13 +337,20 @@ const YoshiiShipView = () => {
                                                         <LocalInput value={container.freetime} originalValue={(container.originals || {}).freetime} originalMeta={(container.originalMetas || {}).freetime} onChange={(v, orig) => ctx.updateContainer(container.id, { freetime: v }, mo, 'yoshii', 'フリータイム')} className="matrix-input text-center text-xs input-compact" dataGridId={`y-ship-${mo}-${idx}-6`} onGridKeyDown={handleGridNav} />
                                                     </td>
 
-                                                    {/* ★ 構文修復: deliveryTime タグ記述エラー解消 */}
-                                                    <td className="border text-center px-0 py-0.5 bg-emerald-50/30">
-                                                        <div className="flex items-center justify-center gap-0.5">
-                                                            <div className="w-[68px]">
-                                                                <LocalInput type="qc-date" value={container.deliveryDate} originalValue={(container.originals || {}).deliveryDate} originalMeta={(container.originalMetas || {}).deliveryDate} onChange={(v, orig) => ctx.updateContainer(container.id, { deliveryDate: v }, mo, 'yoshii', '納品日')} refDate={mo} className="text-center text-xs input-compact" dataGridId={`y-ship-${mo}-${idx}-7`} onGridKeyDown={handleGridNav} />
+                                                    {/* ★ 納品日時セル完全修復 (日付左配置・時間選択ピッカー正常化) */}
+                                                    <td className="border text-center px-0.5 py-0.5 bg-emerald-50/30">
+                                                        <div className="flex items-center justify-between gap-1 w-full">
+                                                            <div className="w-[68px] flex-shrink-0">
+                                                                <LocalInput type="qc-date" value={container.deliveryDate} originalValue={(container.originals || {}).deliveryDate} originalMeta={(container.originalMetas || {}).deliveryDate} onChange={(v, orig) => ctx.updateContainer(container.id, { deliveryDate: v }, mo, 'yoshii', '納品日')} refDate={mo} className="text-center text-xs input-compact font-bold" dataGridId={`y-ship-${mo}-${idx}-7`} onGridKeyDown={handleGridNav} />
                                                             </div>
-                                                            <input type="time" value={container.deliveryTime || ''} onChange={e => ctx.updateContainer(container.id, { deliveryTime: e.target.value }, mo, 'yoshii', '納品時間')} className="border rounded px-0.5 py-0 text-[10px] font-bold bg-white text-center w-[52px] h-[18px]"/>
+                                                            <div className="w-[72px] flex-shrink-0 relative flex items-center">
+                                                                <input 
+                                                                    type="time" 
+                                                                    value={container.deliveryTime || ''} 
+                                                                    onChange={e => ctx.updateContainer(container.id, { deliveryTime: e.target.value }, mo, 'yoshii', '納品時間')} 
+                                                                    className="border rounded px-1 py-0 text-[11px] font-bold bg-white text-center w-full h-[20px] cursor-pointer outline-none focus:ring-1 focus:ring-indigo-500"
+                                                                />
+                                                            </div>
                                                         </div>
                                                     </td>
 
@@ -581,10 +588,10 @@ const YoshiiDrayageView = () => {
                             <th className="p-0.5 border w-[70px] min-w-[70px] text-xs">ETD</th>
                             <th className="p-0.5 border w-[70px] min-w-[70px] text-xs">ETA</th>
                             <th className="p-0.5 border w-[70px] min-w-[70px] text-xs">フリータイム</th>
-                            <th className="p-0.5 border w-[130px] min-w-[130px] bg-emerald-50 text-xs text-emerald-900">
+                            <th className="p-0.5 border w-[155px] min-w-[155px] bg-emerald-50 text-xs text-emerald-900">
                                 納品日時<br/>
-                                <span className="inline-block w-14 text-center">納品日</span>
-                                <span className="inline-block w-14 text-center">時間</span>
+                                <span className="inline-block w-16 text-center">納品日</span>
+                                <span className="inline-block w-16 text-center">時間</span>
                             </th>
                             <th className="p-0.5 border w-[140px] min-w-[140px] text-xs">納品先</th>
                             <th className="p-0.5 border min-w-[160px] text-xs">備考</th>
@@ -670,12 +677,20 @@ const YoshiiDrayageView = () => {
                                                         <LocalInput value={container.freetime} originalValue={(container.originals || {}).freetime} originalMeta={(container.originalMetas || {}).freetime} onChange={(v, orig) => ctx.updateContainer(container.id, { freetime: v }, mo, 'yoshii', 'フリータイム')} className="matrix-input text-center text-xs input-compact" dataGridId={`y-dray-${mo}-${idx}-6`} onGridKeyDown={handleGridNav} />
                                                     </td>
 
-                                                    <td className="border text-center px-0 py-0.5 bg-emerald-50/30">
-                                                        <div className="flex items-center justify-center gap-0.5">
-                                                            <div className="w-[68px]">
-                                                                <LocalInput type="qc-date" value={container.deliveryDate} originalValue={(container.originals || {}).deliveryDate} originalMeta={(container.originalMetas || {}).deliveryDate} onChange={(v, orig) => ctx.updateContainer(container.id, { deliveryDate: v }, mo, 'yoshii', '納品日')} refDate={mo} className="text-center text-xs input-compact" dataGridId={`y-dray-${mo}-${idx}-7`} onGridKeyDown={handleGridNav} />
+                                                    {/* ★ 納品日時セル完全修復 (日付左配置・時間選択ピッカー正常化) */}
+                                                    <td className="border text-center px-0.5 py-0.5 bg-emerald-50/30">
+                                                        <div className="flex items-center justify-between gap-1 w-full">
+                                                            <div className="w-[68px] flex-shrink-0">
+                                                                <LocalInput type="qc-date" value={container.deliveryDate} originalValue={(container.originals || {}).deliveryDate} originalMeta={(container.originalMetas || {}).deliveryDate} onChange={(v, orig) => ctx.updateContainer(container.id, { deliveryDate: v }, mo, 'yoshii', '納品日')} refDate={mo} className="text-center text-xs input-compact font-bold" dataGridId={`y-dray-${mo}-${idx}-7`} onGridKeyDown={handleGridNav} />
                                                             </div>
-                                                            <input type="time" value={container.deliveryTime || ''} onChange={e => ctx.updateContainer(container.id, { deliveryTime: e.target.value }, mo, 'yoshii', '納品時間')} className="border rounded px-0.5 py-0 text-[10px] font-bold bg-white text-center w-[52px] h-[18px]"/>
+                                                            <div className="w-[72px] flex-shrink-0 relative flex items-center">
+                                                                <input 
+                                                                    type="time" 
+                                                                    value={container.deliveryTime || ''} 
+                                                                    onChange={e => ctx.updateContainer(container.id, { deliveryTime: e.target.value }, mo, 'yoshii', '納品時間')} 
+                                                                    className="border rounded px-1 py-0 text-[11px] font-bold bg-white text-center w-full h-[20px] cursor-pointer outline-none focus:ring-1 focus:ring-indigo-500"
+                                                                />
+                                                            </div>
                                                         </div>
                                                     </td>
 
