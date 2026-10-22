@@ -1,16 +1,16 @@
 // shipping_views_ship.js
 // =========================================================
 // shipping_views_ship.js - 出荷日程・ドレージ画面モジュール
-// ★ WebVer. 123 対応 / _js030 補充部品(font-mono/標準ウェイト化)スタイル調整版
+// ★ WebVer. 123 対応 / _js031 補充部品(36px均等・12px等幅太字・中央寄せ)スタイル統一版
 // ★ 最上行ファイル名識別コメント保持 (// shipping_views_ship.js)
 // ★ 1. 補充部品データ: 実データ構造(spareParts[m].outerBox/innerBox/label)に基づく完全読み書き
-// ★ 2. 補充部品スタイル: font-mono / font-normal 指定により他セルとフォント統一
+// ★ 2. 補充部品スタイル: w-[36px] / text-xs / font-mono / font-bold 指定により他セルとデザイン・幅統一
 // ★ 3. 月タイトル: <td> タグへ bg-emerald-100 text-emerald-900 を直接適用
 // ★ 4. 納品時間: w-[66px] 幅で 時計アイコン・末尾数字の見切れを解消
 // ★ 5. 連番キー(sortOrder)による割振り画面(親)の並び順100%継承
 // =========================================================
 
-const JS_SHIP_VERSION = '_js030';
+const JS_SHIP_VERSION = '_js031';
 
 // 【ヘルパー: コンテナ内割振り製品総数量の動的自動計算】
 const calculateContainerTotalQty = (allocationsObj) => {
@@ -207,9 +207,9 @@ const YoshiiShipView = () => {
                             <th className="p-0.5 border w-[65px] text-xs align-middle">割振数</th>
                             <th className="p-0.5 border w-[125px] bg-emerald-50 text-[10px] text-emerald-900 align-middle">
                                 補充部品 (PCS)<br/>
-                                <span className="inline-block w-[38px] text-center">外装箱</span>
-                                <span className="inline-block w-[38px] text-center">個装箱</span>
-                                <span className="inline-block w-[34px] text-center">ラベル</span>
+                                <span className="inline-block w-[36px] text-center">外装箱</span>
+                                <span className="inline-block w-[36px] text-center">個装箱</span>
+                                <span className="inline-block w-[36px] text-center">ラベル</span>
                             </th>
                             <th className="p-0.5 border w-[70px] text-xs align-middle">到着港</th>
                             <th className="p-0.5 border w-[80px] text-xs align-middle">ETD</th>
@@ -284,7 +284,7 @@ const YoshiiShipView = () => {
 
                                                     <td className="border font-mono text-xs text-right pr-1 bg-emerald-50/50 text-emerald-900 font-bold align-middle">{totalQty > 0 ? totalQty.toLocaleString() : '0'}</td>
 
-                                                    {/* ★ 補充部品: font-mono & font-normal 指定によるスタイル修正 */}
+                                                    {/* ★ 補充部品: 36px均等・12px等幅太字・中央寄せスタイル */}
                                                     <td className="border text-center px-0 py-0.5 bg-emerald-50/30 align-middle">
                                                         {activeAllocEntries.length === 0 ? (
                                                             <div className="flex justify-center items-center gap-0.5 h-[20px]">
@@ -325,21 +325,21 @@ const YoshiiShipView = () => {
                                                                                 type="number" 
                                                                                 value={outerVal} 
                                                                                 onChange={e => updateSpareField('outerBox', e.target.value)} 
-                                                                                className="spare-part-input w-[34px] text-center text-[10px] font-mono font-normal border rounded" 
+                                                                                className="spare-part-input w-[36px] text-center text-xs font-mono font-bold border rounded px-1" 
                                                                                 placeholder="0"
                                                                             />
                                                                             <input 
                                                                                 type="number" 
                                                                                 value={innerVal} 
                                                                                 onChange={e => updateSpareField('innerBox', e.target.value)} 
-                                                                                className="spare-part-input w-[34px] text-center text-[10px] font-mono font-normal border rounded" 
+                                                                                className="spare-part-input w-[36px] text-center text-xs font-mono font-bold border rounded px-1" 
                                                                                 placeholder="0"
                                                                             />
                                                                             <input 
                                                                                 type="number" 
                                                                                 value={labelVal} 
                                                                                 onChange={e => updateSpareField('label', e.target.value)} 
-                                                                                className="spare-part-input w-[30px] text-center text-[10px] font-mono font-normal border rounded" 
+                                                                                className="spare-part-input w-[36px] text-center text-xs font-mono font-bold border rounded px-1" 
                                                                                 placeholder="0"
                                                                             />
                                                                         </div>
@@ -562,7 +562,7 @@ const YoshiiDrayageView = () => {
     return (
         <div className="p-4 bg-white flex-grow flex flex-col h-full">
             <div className="hidden print:block font-bold text-sm text-black mb-1 border-b pb-0.5 text-left w-full">
-                吉井電気 ドレージ手配 [仕入先: \${ctx.selectedVendorFilter || 'ALL'}]
+                吉井電気 ドレージ手配 [仕入先: {ctx.selectedVendorFilter || 'ALL'}]
             </div>
 
             <div className="flex justify-between items-center mb-2 no-print flex-shrink-0">
@@ -629,9 +629,9 @@ const YoshiiDrayageView = () => {
                             <th className="p-0.5 border w-[65px] text-xs align-middle">割振数</th>
                             <th className="p-0.5 border w-[125px] bg-emerald-50 text-[10px] text-emerald-900 align-middle">
                                 補充部品 (PCS)<br/>
-                                <span className="inline-block w-[38px] text-center">外装箱</span>
-                                <span className="inline-block w-[38px] text-center">個装箱</span>
-                                <span className="inline-block w-[34px] text-center">ラベル</span>
+                                <span className="inline-block w-[36px] text-center">外装箱</span>
+                                <span className="inline-block w-[36px] text-center">個装箱</span>
+                                <span className="inline-block w-[36px] text-center">ラベル</span>
                             </th>
                             <th className="p-0.5 border w-[70px] text-xs align-middle">到着港</th>
                             <th className="p-0.5 border w-[80px] text-xs align-middle">ETD</th>
@@ -706,6 +706,7 @@ const YoshiiDrayageView = () => {
 
                                                     <td className="border font-mono text-xs text-right pr-1 bg-gray-100 readonly-cell align-middle text-gray-700">{totalQty > 0 ? totalQty.toLocaleString() : '0'}</td>
 
+                                                    {/* ★ 補充部品 (ドレージ手配): 36px均等・12px等幅太字・中央寄せスタイル */}
                                                     <td className="border text-center px-0 py-0.5 align-middle readonly-cell bg-gray-100">
                                                         {activeAllocEntries.length === 0 ? (
                                                             <div className="flex justify-center items-center gap-0.5 h-[20px]">
@@ -723,9 +724,9 @@ const YoshiiDrayageView = () => {
 
                                                                     return (
                                                                         <div key={m} className="flex justify-center items-center gap-0.5 h-[20px]">
-                                                                            <input type="number" value={outerVal} disabled={true} className="spare-part-input w-[34px] text-center text-[10px] font-mono font-normal readonly-cell bg-gray-100 text-gray-600 border-gray-300 rounded" placeholder="0"/>
-                                                                            <input type="number" value={innerVal} disabled={true} className="spare-part-input w-[34px] text-center text-[10px] font-mono font-normal readonly-cell bg-gray-100 text-gray-600 border-gray-300 rounded" placeholder="0"/>
-                                                                            <input type="number" value={labelVal} disabled={true} className="spare-part-input w-[30px] text-center text-[10px] font-mono font-normal readonly-cell bg-gray-100 text-gray-600 border-gray-300 rounded" placeholder="0"/>
+                                                                            <input type="number" value={outerVal} disabled={true} className="spare-part-input w-[36px] text-center text-xs font-mono font-bold readonly-cell bg-gray-100 text-gray-600 border-gray-300 rounded px-1" placeholder="0"/>
+                                                                            <input type="number" value={innerVal} disabled={true} className="spare-part-input w-[36px] text-center text-xs font-mono font-bold readonly-cell bg-gray-100 text-gray-600 border-gray-300 rounded px-1" placeholder="0"/>
+                                                                            <input type="number" value={labelVal} disabled={true} className="spare-part-input w-[36px] text-center text-xs font-mono font-bold readonly-cell bg-gray-100 text-gray-600 border-gray-300 rounded px-1" placeholder="0"/>
                                                                         </div>
                                                                     );
                                                                 })}
