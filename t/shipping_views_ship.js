@@ -1,15 +1,15 @@
 // shipping_views_ship.js
 // =========================================================
 // shipping_views_ship.js - 出荷日程・ドレージ画面モジュール
-// ★ WebVer. 123 対応 / _js029 V94コード解析完全修復版
+// ★ WebVer. 123 対応 / _js030 spareParts(outerBox/innerBox/label)完全修復版
 // ★ 最上行ファイル名識別コメント保持 (// shipping_views_ship.js)
-// ★ 1. 補充部品データ: V94ソース解析に基づき allocDetails[m].spareOuter / spareInner / spareLabel を直連動
-// ★ 2. 月タイトル: <td> タグへ bg-emerald-100 text-emerald-900 を直接適用し薄緑色を確定
-// ★ 3. 納品時間: w-[66px] 幅で 時計アイコン・末尾数字の見切れを全解消
+// ★ 1. 補充部品データ: 実データ構造(spareParts[m].outerBox/innerBox/label)に基づく完全読み書き
+// ★ 2. 月タイトル: <td> タグへ bg-emerald-100 text-emerald-900 を直接適用
+// ★ 3. 納品時間: w-[66px] 幅で 時計アイコン・末尾数字の見切れを解消
 // ★ 4. 連番キー(sortOrder)による割振り画面(親)の並び順100%継承
 // =========================================================
 
-const JS_SHIP_VERSION = '_js029';
+const JS_SHIP_VERSION = '_js030';
 
 // 【ヘルパー: コンテナ内割振り製品総数量の動的自動計算】
 const calculateContainerTotalQty = (allocationsObj) => {
@@ -235,7 +235,6 @@ const YoshiiShipView = () => {
 
                                 return (
                                     <React.Fragment key={mo}>
-                                        {/* ★ 月タイトル: <td> タグへ直書きクラスで確実に薄緑色を適用 */}
                                         <tr id={`ship-month-hdr-${mo}`}>
                                             <td colSpan="15" className="bg-emerald-100 text-emerald-900 font-bold text-xs px-2 py-1 text-left border-y border-emerald-300">
                                                 ■ {mo.replace('-', '年')}月 納品分 {mo === ctx.currentMonthStr && <span className="ml-2 bg-emerald-700 text-white text-[10px] px-1.5 py-0.5 rounded shadow-sm">★当月</span>}
@@ -284,7 +283,7 @@ const YoshiiShipView = () => {
 
                                                     <td className="border font-mono text-xs text-right pr-1 bg-emerald-50/50 text-emerald-900 font-bold align-middle">{totalQty > 0 ? totalQty.toLocaleString() : '0'}</td>
 
-                                                    {/* ★ 補充部品: V94ソース完全準拠のプロパティ直接参照 (spareOuter/spareInner/spareLabel) */}
+                                                    {/* ★ 補充部品: 実構造(spareParts[m].outerBox/innerBox/label)との完全バインディング */}
                                                     <td className="border text-center px-0 py-0.5 bg-emerald-50/30 align-middle">
                                                         {activeAllocEntries.length === 0 ? (
                                                             <div className="flex justify-center items-center gap-0.5 h-[20px]">
@@ -293,22 +292,31 @@ const YoshiiShipView = () => {
                                                         ) : (
                                                             <div className="space-y-0.5">
                                                                 {activeAllocEntries.map(([m, _]) => {
-                                                                    const details = container.allocDetails || {};
-                                                                    const modelDetail = details[m] || {};
+                                                                    const sparePartsObj = container.spareParts || {};
+                                                                    const modelSpare = sparePartsObj[m] || {};
 
-                                                                    // V94ソースと100%同一のデータ取得ロジック
-                                                                    const outerVal = modelDetail.spareOuter !== undefined ? modelDetail.spareOuter : (container.spareOuter !== undefined ? container.spareOuter : '');
-                                                                    const innerVal = modelDetail.spareInner !== undefined ? modelDetail.spareInner : (container.spareInner !== undefined ? container.spareInner : '');
-                                                                    const labelVal = modelDetail.spareLabel !== undefined ? modelDetail.spareLabel : (container.spareLabel !== undefined ? container.spareLabel : '');
+                                                                    const outerVal = modelSpare.outerBox !== undefined ? modelSpare.outerBox : (container.spareOuter !== undefined ? container.spareOuter : '');
+                                                                    const innerVal = modelSpare.innerBox !== undefined ? modelSpare.innerBox : (container.spareInner !== undefined ? container.spareInner : '');
+                                                                    const labelVal = modelSpare.label !== undefined ? modelSpare.label : (container.spareLabel !== undefined ? container.spareLabel : '');
 
-                                                                    const updateSpareField = (key, val) => {
-                                                                        const updatedAllocDetails = { ...(container.allocDetails || {}) };
-                                                                        if (!updatedAllocDetails[m]) updatedAllocDetails[m] = {};
-                                                                        updatedAllocDetails[m][key] = val;
+                                                                    const updateSpareField = (fieldKey, val) => {
+                                                                        const updatedSpareParts = { ...(container.spareParts || {}) };
+                                                                        if (!updatedSpareParts[m]) updatedSpareParts[m] = { outerBox: '', innerBox: '', label: '' };
+                                                                        
+                                                                        updatedSpareParts[m] = {
+                                                                            ...updatedSpareParts[m],
+                                                                            [fieldKey]: val
+                                                                        };
 
-                                                                        ctx.updateContainer(container.id, { 
-                                                                            allocDetails: updatedAllocDetails
-                                                                        }, mo, 'yoshii', `${m} 補充部品(${key})`);
+                                                                        // 同時にコンテナ直下プロパティ（Excel互換用）も同期更新
+                                                                        const updatePayload = {
+                                                                            spareParts: updatedSpareParts
+                                                                        };
+                                                                        if (fieldKey === 'outerBox') updatePayload.spareOuter = val;
+                                                                        if (fieldKey === 'innerBox') updatePayload.spareInner = val;
+                                                                        if (fieldKey === 'label') updatePayload.spareLabel = val;
+
+                                                                        ctx.updateContainer(container.id, updatePayload, mo, 'yoshii', `${m} 補充部品(${fieldKey})`);
                                                                     };
 
                                                                     return (
@@ -316,21 +324,21 @@ const YoshiiShipView = () => {
                                                                             <input 
                                                                                 type="number" 
                                                                                 value={outerVal} 
-                                                                                onChange={e => updateSpareField('spareOuter', e.target.value)} 
+                                                                                onChange={e => updateSpareField('outerBox', e.target.value)} 
                                                                                 className="spare-part-input w-[34px] text-center text-[10px] border rounded" 
                                                                                 placeholder="0"
                                                                             />
                                                                             <input 
                                                                                 type="number" 
                                                                                 value={innerVal} 
-                                                                                onChange={e => updateSpareField('spareInner', e.target.value)} 
+                                                                                onChange={e => updateSpareField('innerBox', e.target.value)} 
                                                                                 className="spare-part-input w-[34px] text-center text-[10px] border rounded" 
                                                                                 placeholder="0"
                                                                             />
                                                                             <input 
                                                                                 type="number" 
                                                                                 value={labelVal} 
-                                                                                onChange={e => updateSpareField('spareLabel', e.target.value)} 
+                                                                                onChange={e => updateSpareField('label', e.target.value)} 
                                                                                 className="spare-part-input w-[30px] text-center text-[10px] border rounded" 
                                                                                 placeholder="0"
                                                                             />
@@ -357,7 +365,6 @@ const YoshiiShipView = () => {
                                                         <LocalInput type="qc-date" value={container.freetime} originalValue={(container.originals || {}).freetime} originalMeta={(container.originalMetas || {}).freetime} onChange={(v, orig) => ctx.updateContainer(container.id, { freetime: v }, mo, 'yoshii', 'フリータイム')} refDate={mo} className="text-left pl-2 text-xs" dataGridId={`y-ship-${mo}-${idx}-6`} onGridKeyDown={handleGridNav} />
                                                     </td>
 
-                                                    {/* ★ 納品時間: w-[66px] 幅で 時計アイコン・数字末尾の見切れを解消 */}
                                                     <td className="border text-center px-1 py-0.5 bg-emerald-50/30 align-middle">
                                                         <div className="flex items-center justify-between gap-0.5 w-full">
                                                             <div className="w-[85px] flex-shrink-0">
@@ -707,11 +714,12 @@ const YoshiiDrayageView = () => {
                                                         ) : (
                                                             <div className="space-y-0.5">
                                                                 {activeAllocEntries.map(([m, _]) => {
-                                                                    const details = container.allocDetails || {};
-                                                                    const modelDetail = details[m] || {};
-                                                                    const outerVal = modelDetail.spareOuter !== undefined ? modelDetail.spareOuter : (container.spareOuter !== undefined ? container.spareOuter : '');
-                                                                    const innerVal = modelDetail.spareInner !== undefined ? modelDetail.spareInner : (container.spareInner !== undefined ? container.spareInner : '');
-                                                                    const labelVal = modelDetail.spareLabel !== undefined ? modelDetail.spareLabel : (container.spareLabel !== undefined ? container.spareLabel : '');
+                                                                    const sparePartsObj = container.spareParts || {};
+                                                                    const modelSpare = sparePartsObj[m] || {};
+
+                                                                    const outerVal = modelSpare.outerBox !== undefined ? modelSpare.outerBox : (container.spareOuter !== undefined ? container.spareOuter : '');
+                                                                    const innerVal = modelSpare.innerBox !== undefined ? modelSpare.innerBox : (container.spareInner !== undefined ? container.spareInner : '');
+                                                                    const labelVal = modelSpare.label !== undefined ? modelSpare.label : (container.spareLabel !== undefined ? container.spareLabel : '');
 
                                                                     return (
                                                                         <div key={m} className="flex justify-center items-center gap-0.5 h-[20px]">
