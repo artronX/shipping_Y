@@ -1,12 +1,13 @@
 // shipping_views_ship.js
 // =========================================================
 // shipping_views_ship.js - 出荷日程・ドレージ画面モジュール
-// ★ WebVer. 123 対応 / _js030 spareParts(outerBox/innerBox/label)完全修復版
+// ★ WebVer. 123 対応 / _js030 補充部品(font-mono/標準ウェイト化)スタイル調整版
 // ★ 最上行ファイル名識別コメント保持 (// shipping_views_ship.js)
 // ★ 1. 補充部品データ: 実データ構造(spareParts[m].outerBox/innerBox/label)に基づく完全読み書き
-// ★ 2. 月タイトル: <td> タグへ bg-emerald-100 text-emerald-900 を直接適用
-// ★ 3. 納品時間: w-[66px] 幅で 時計アイコン・末尾数字の見切れを解消
-// ★ 4. 連番キー(sortOrder)による割振り画面(親)の並び順100%継承
+// ★ 2. 補充部品スタイル: font-mono / font-normal 指定により他セルとフォント統一
+// ★ 3. 月タイトル: <td> タグへ bg-emerald-100 text-emerald-900 を直接適用
+// ★ 4. 納品時間: w-[66px] 幅で 時計アイコン・末尾数字の見切れを解消
+// ★ 5. 連番キー(sortOrder)による割振り画面(親)の並び順100%継承
 // =========================================================
 
 const JS_SHIP_VERSION = '_js030';
@@ -283,7 +284,7 @@ const YoshiiShipView = () => {
 
                                                     <td className="border font-mono text-xs text-right pr-1 bg-emerald-50/50 text-emerald-900 font-bold align-middle">{totalQty > 0 ? totalQty.toLocaleString() : '0'}</td>
 
-                                                    {/* ★ 補充部品: 実構造(spareParts[m].outerBox/innerBox/label)との完全バインディング */}
+                                                    {/* ★ 補充部品: font-mono & font-normal 指定によるスタイル修正 */}
                                                     <td className="border text-center px-0 py-0.5 bg-emerald-50/30 align-middle">
                                                         {activeAllocEntries.length === 0 ? (
                                                             <div className="flex justify-center items-center gap-0.5 h-[20px]">
@@ -308,7 +309,6 @@ const YoshiiShipView = () => {
                                                                             [fieldKey]: val
                                                                         };
 
-                                                                        // 同時にコンテナ直下プロパティ（Excel互換用）も同期更新
                                                                         const updatePayload = {
                                                                             spareParts: updatedSpareParts
                                                                         };
@@ -325,21 +325,21 @@ const YoshiiShipView = () => {
                                                                                 type="number" 
                                                                                 value={outerVal} 
                                                                                 onChange={e => updateSpareField('outerBox', e.target.value)} 
-                                                                                className="spare-part-input w-[34px] text-center text-[10px] border rounded" 
+                                                                                className="spare-part-input w-[34px] text-center text-[10px] font-mono font-normal border rounded" 
                                                                                 placeholder="0"
                                                                             />
                                                                             <input 
                                                                                 type="number" 
                                                                                 value={innerVal} 
                                                                                 onChange={e => updateSpareField('innerBox', e.target.value)} 
-                                                                                className="spare-part-input w-[34px] text-center text-[10px] border rounded" 
+                                                                                className="spare-part-input w-[34px] text-center text-[10px] font-mono font-normal border rounded" 
                                                                                 placeholder="0"
                                                                             />
                                                                             <input 
                                                                                 type="number" 
                                                                                 value={labelVal} 
                                                                                 onChange={e => updateSpareField('label', e.target.value)} 
-                                                                                className="spare-part-input w-[30px] text-center text-[10px] border rounded" 
+                                                                                className="spare-part-input w-[30px] text-center text-[10px] font-mono font-normal border rounded" 
                                                                                 placeholder="0"
                                                                             />
                                                                         </div>
@@ -723,9 +723,9 @@ const YoshiiDrayageView = () => {
 
                                                                     return (
                                                                         <div key={m} className="flex justify-center items-center gap-0.5 h-[20px]">
-                                                                            <input type="number" value={outerVal} disabled={true} className="spare-part-input w-[34px] text-center text-[10px] readonly-cell bg-gray-100 text-gray-600 border-gray-300 rounded" placeholder="0"/>
-                                                                            <input type="number" value={innerVal} disabled={true} className="spare-part-input w-[34px] text-center text-[10px] readonly-cell bg-gray-100 text-gray-600 border-gray-300 rounded" placeholder="0"/>
-                                                                            <input type="number" value={labelVal} disabled={true} className="spare-part-input w-[30px] text-center text-[10px] readonly-cell bg-gray-100 text-gray-600 border-gray-300 rounded" placeholder="0"/>
+                                                                            <input type="number" value={outerVal} disabled={true} className="spare-part-input w-[34px] text-center text-[10px] font-mono font-normal readonly-cell bg-gray-100 text-gray-600 border-gray-300 rounded" placeholder="0"/>
+                                                                            <input type="number" value={innerVal} disabled={true} className="spare-part-input w-[34px] text-center text-[10px] font-mono font-normal readonly-cell bg-gray-100 text-gray-600 border-gray-300 rounded" placeholder="0"/>
+                                                                            <input type="number" value={labelVal} disabled={true} className="spare-part-input w-[30px] text-center text-[10px] font-mono font-normal readonly-cell bg-gray-100 text-gray-600 border-gray-300 rounded" placeholder="0"/>
                                                                         </div>
                                                                     );
                                                                 })}
