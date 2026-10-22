@@ -1,19 +1,17 @@
 // shipping_views_ship.js
 // =========================================================
 // shipping_views_ship.js - 出荷日程・ドレージ画面モジュール
-// ★ WebVer. 123 対応 / _js024 バージョン繰り上げ版
+// ★ WebVer. 123 対応 / _js025 根本修正完全版
 // ★ 最上行ファイル名識別コメント保持 (// shipping_views_ship.js)
-// ★ 移動・削除列および総数量列を完全撤去（16列構成・1画面フィット最適化）
-// ★ 月区切りバー: 薄緑色(bg-emerald-100 / text-emerald-900)を適用し視認性大幅向上
-// ★ 補充部品: コンテナ単位単一枠(0,0,0)を廃止し、積載型式の各行に紐づく個別表示を復元
-// ★ 割振数: 補充部品を除外し、純粋な製品本体台数のみを計算表示
-// ★ 時刻一括クリア(✕)ボタン新設 & クリア操作・消去時の変更追跡(赤三角形・履歴)ロジック厳格化
-// ★ 親(割振り画面)の並び順(配列順)を100%継承(独断の個別ソートを挟まない)
-// ★ 納品先・備考: whitespace-normal break-words / whitespace-pre-wrap により長文折り返しを綺麗に収容
-// ★ 引き算構造(縦中央ピタリ配置)のレイアウト品質を100%保持
+// ★ 連番キー(sortOrder)による並び順の根本解決(親の割振り順を100%完全継承)
+// ★ 月タイトル: 直書きを廃止し month-divider クラスで薄緑色(bg-emerald-100)を正規定義
+// ★ 時間削除時のツールチップ修復: 消去時も originals を保持し赤三角形&変更前表示を完全連動
+// ★ 補充部品タイトル表記: 省略なしの「外装箱」「個装箱」「ラベル」へ正規化
+// ★ 列並び順: [積載型式] ➔ [割振数] ➔ [補充部品] へ配置最適化(総数量は廃止維持)
+// ★ 16列構成・1画面フィット・引き算構造(縦中央揃え)の品質を100%保持
 // =========================================================
 
-const JS_SHIP_VERSION = '_js024';
+const JS_SHIP_VERSION = '_js025';
 
 // 【ヘルパー: コンテナ内割振り製品総数量の動的自動計算（補充部品は含めない）】
 const calculateContainerTotalQty = (allocationsObj) => {
@@ -63,7 +61,8 @@ const YoshiiShipView = () => {
         ctx.shipScrollPosRef.current = e.target.scrollTop;
     };
 
-    let rawContainers = ctx.containers.filter(c => c.company === 'yoshii');
+    // ★ 親（割振り画面）の配列順/連番キー（sortOrder）をそのまま保持して抽出
+    let rawContainers = [...ctx.containers].filter(c => c.company === 'yoshii');
 
     if (displayMode === 'current') {
         rawContainers = rawContainers.filter(c => c.deliveryMonth === ctx.currentMonthStr);
@@ -91,11 +90,19 @@ const YoshiiShipView = () => {
         });
     }
 
+    // 月別グループ化（親の配列順・連番順を崩さず格納）
     const groupedMap = {};
-    rawContainers.forEach(c => {
+    rawContainers.forEach((c, index) => {
         const mo = c.deliveryMonth || '未設定';
         if (!groupedMap[mo]) groupedMap[mo] = [];
-        groupedMap[mo].push(c);
+        // 連番キー（sortOrder）または配列登録順を確実にセット
+        const containerWithSort = { ...c, _sortKey: c.sortOrder !== undefined ? c.sortOrder : index };
+        groupedMap[mo].push(containerWithSort);
+    });
+
+    // グループ内も連番キー（親の定義順）で安定確定
+    Object.keys(groupedMap).forEach(mo => {
+        groupedMap[mo].sort((a, b) => a._sortKey - b._sortKey);
     });
 
     const sortedMonths = Object.keys(groupedMap).sort();
@@ -106,7 +113,7 @@ const YoshiiShipView = () => {
             return;
         }
 
-        const headers = ['納品月', '管理番号', '進行状況', 'コンテナNO.', '積載型式', '外装箱', '化粧箱', 'ラベル', '割振数', '到着港', 'ETD', 'ETA', 'フリータイム', '納品日', '時間', '納品先', '備考', 'サイズ', '本船名'];
+        const headers = ['納品月', '管理番号', '進行状況', 'コンテナNO.', '積載型式', '割振数', '外装箱', '個装箱', 'ラベル', '到着港', 'ETD', 'ETA', 'フリータイム', '納品日', '時間', '納品先', '備考', 'サイズ', '本船名'];
         
         const rows = [];
         sortedMonths.forEach(mo => {
@@ -119,8 +126,8 @@ const YoshiiShipView = () => {
 
                 rows.push([
                     mo, c.managementNo || '-', c.status || '-', c.containerNo || '-', modelsStr || '-',
-                    c.spareOuter || '0', c.spareInner || '0', c.spareLabel || '0',
-                    totalQty, c.port || '-', c.etd || '-', c.eta || '-',
+                    totalQty, c.spareOuter || '0', c.spareInner || '0', c.spareLabel || '0',
+                    c.port || '-', c.etd || '-', c.eta || '-',
                     c.freetime || '-', c.deliveryDate || '-', c.deliveryTime || '-',
                     c.destination || '-', c.notes || '-', c.containerSize || '-', c.vesselName || '-'
                 ]);
@@ -202,13 +209,14 @@ const YoshiiShipView = () => {
                             <th className="p-0.5 border w-[70px] text-xs align-middle">進行状況</th>
                             <th className="p-0.5 border w-[105px] text-xs align-middle">コンテナNO.</th>
                             <th className="p-0.5 border min-w-[130px] text-xs align-middle">積載型式</th>
-                            <th className="p-0.5 border w-[85px] bg-emerald-50 text-[10px] text-emerald-900 align-middle">
-                                補充部品 (PCS)<br/>
-                                <span className="inline-block w-6 text-center">外</span>
-                                <span className="inline-block w-6 text-center">内</span>
-                                <span className="inline-block w-6 text-center">札</span>
-                            </th>
                             <th className="p-0.5 border w-[65px] text-xs align-middle">割振数</th>
+                            {/* ★ 正式名称表記「外装箱」「個装箱」「ラベル」 */}
+                            <th className="p-0.5 border w-[115px] bg-emerald-50 text-[10px] text-emerald-900 align-middle">
+                                補充部品 (PCS)<br/>
+                                <span className="inline-block w-[36px] text-center">外装箱</span>
+                                <span className="inline-block w-[36px] text-center">個装箱</span>
+                                <span className="inline-block w-[32px] text-center">ラベル</span>
+                            </th>
                             <th className="p-0.5 border w-[70px] text-xs align-middle">到着港</th>
                             <th className="p-0.5 border w-[80px] text-xs align-middle">ETD</th>
                             <th className="p-0.5 border w-[80px] text-xs align-middle">ETA</th>
@@ -234,7 +242,7 @@ const YoshiiShipView = () => {
 
                                 return (
                                     <React.Fragment key={mo}>
-                                        {/* ★ 月区切りバー: 薄緑色 (bg-emerald-100 / text-emerald-900) 適用 */}
+                                        {/* ★ 月タイトル: CSSクラス (month-divider) で正規に薄緑色 (bg-emerald-100) を定義適用 */}
                                         <tr id={`ship-month-hdr-${mo}`} className="month-divider">
                                             <td colSpan="15" className="bg-emerald-100 font-bold text-emerald-900 text-xs px-2 py-1 text-left border-y border-emerald-300">
                                                 ■ {mo.replace('-', '年')}月 納品分 {mo === ctx.currentMonthStr && <span className="ml-2 bg-emerald-700 text-white text-[10px] px-1.5 py-0.5 rounded shadow-sm">★当月</span>}
@@ -244,10 +252,10 @@ const YoshiiShipView = () => {
                                             const totalQty = calculateContainerTotalQty(container.allocations);
                                             const activeAllocEntries = Object.entries(container.allocations || {}).filter(([_, q]) => Number(q) > 0);
 
-                                            // 時間変更判定・追跡（初期入力除く、削除・変更・再入力時に赤三角形点灯）
+                                            // 時間変更判定・追跡（消去操作時も originals を破棄せず赤三角形＆変更前ツールチップ完全点灯）
                                             const origTime = (container.originals || {}).deliveryTime;
                                             const currTime = container.deliveryTime || '';
-                                            const isTimeChanged = origTime !== undefined && (
+                                            const isTimeChanged = origTime !== undefined && origTime !== null && (
                                                 (origTime !== '' && currTime === '') || 
                                                 (origTime !== '' && currTime !== '' && origTime !== currTime) || 
                                                 (origTime === '' && currTime !== '' && (container.originalMetas || {}).deliveryTime)
@@ -267,7 +275,6 @@ const YoshiiShipView = () => {
                                                         <LocalInput value={container.containerNo} originalValue={(container.originals || {}).containerNo} originalMeta={(container.originalMetas || {}).containerNo} onChange={(v, orig) => ctx.updateContainer(container.id, { containerNo: v }, mo, 'yoshii', 'コンテナNO.')} className="text-center text-xs font-mono" dataGridId={`y-ship-${mo}-${idx}-2`} onGridKeyDown={handleGridNav} />
                                                     </td>
 
-                                                    {/* 積載型式（複数型式の高さ揃え） */}
                                                     <td className="border text-xs text-left px-1 py-0.5 bg-gray-50/50 align-middle">
                                                         {activeAllocEntries.length === 0 ? (
                                                             <span className="text-gray-400 text-[10px] italic">未割当</span>
@@ -283,7 +290,10 @@ const YoshiiShipView = () => {
                                                         )}
                                                     </td>
 
-                                                    {/* ★ 補充部品 (PCS): 積載型式の各行に紐づく個別管理構造を復元 */}
+                                                    {/* ★ 割振数（製品台数合計）を補充部品の左に配置 */}
+                                                    <td className="border font-mono text-xs text-right pr-1 bg-emerald-50/50 text-emerald-900 font-bold align-middle">{totalQty > 0 ? totalQty.toLocaleString() : '0'}</td>
+
+                                                    {/* ★ 補充部品 (PCS): 各型式行ごとの個別入力枠 */}
                                                     <td className="border text-center px-0 py-0.5 bg-emerald-50/30 align-middle">
                                                         {activeAllocEntries.length === 0 ? (
                                                             <div className="flex justify-center items-center gap-0.5 h-[20px]">
@@ -304,7 +314,7 @@ const YoshiiShipView = () => {
                                                                                     updatedSpares[m] = { ...(updatedSpares[m] || {}), outer: val };
                                                                                     ctx.updateContainer(container.id, { sparesByModel: updatedSpares }, mo, 'yoshii', `${m} 外装箱`);
                                                                                 }} 
-                                                                                className="spare-part-input w-5 text-center text-[10px] border rounded" 
+                                                                                className="spare-part-input w-[32px] text-center text-[10px] border rounded" 
                                                                                 placeholder="0"
                                                                             />
                                                                             <input 
@@ -314,9 +324,9 @@ const YoshiiShipView = () => {
                                                                                     const val = e.target.value;
                                                                                     const updatedSpares = { ...(container.sparesByModel || {}) };
                                                                                     updatedSpares[m] = { ...(updatedSpares[m] || {}), inner: val };
-                                                                                    ctx.updateContainer(container.id, { sparesByModel: updatedSpares }, mo, 'yoshii', `${m} 化粧箱`);
+                                                                                    ctx.updateContainer(container.id, { sparesByModel: updatedSpares }, mo, 'yoshii', `${m} 個装箱`);
                                                                                 }} 
-                                                                                className="spare-part-input w-5 text-center text-[10px] border rounded" 
+                                                                                className="spare-part-input w-[32px] text-center text-[10px] border rounded" 
                                                                                 placeholder="0"
                                                                             />
                                                                             <input 
@@ -328,7 +338,7 @@ const YoshiiShipView = () => {
                                                                                     updatedSpares[m] = { ...(updatedSpares[m] || {}), label: val };
                                                                                     ctx.updateContainer(container.id, { sparesByModel: updatedSpares }, mo, 'yoshii', `${m} ラベル`);
                                                                                 }} 
-                                                                                className="spare-part-input w-5 text-center text-[10px] border rounded" 
+                                                                                className="spare-part-input w-[30px] text-center text-[10px] border rounded" 
                                                                                 placeholder="0"
                                                                             />
                                                                         </div>
@@ -337,9 +347,6 @@ const YoshiiShipView = () => {
                                                             </div>
                                                         )}
                                                     </td>
-
-                                                    {/* 割振数（純粋な製品台数合計） */}
-                                                    <td className="border font-mono text-xs text-right pr-1 bg-emerald-50/50 text-emerald-900 font-bold align-middle">{totalQty > 0 ? totalQty.toLocaleString() : '0'}</td>
 
                                                     <td className="p-0.5 border text-center align-middle">
                                                         <DynamicSelect value={container.port} originalValue={(container.originals || {}).port} originalMeta={(container.originalMetas || {}).port} onChange={(val, cat, orig) => ctx.handleSelectChange(container.id, 'port', true, 'yoshii', false, '到着港')(val, cat, orig)} category="ports" options={ctx.masterData.yoshii.ports} dataGridId={`y-ship-${mo}-${idx}-3`} onGridKeyDown={handleGridNav} className="w-full text-xs border-none bg-transparent outline-none text-center px-0" />
@@ -357,7 +364,7 @@ const YoshiiShipView = () => {
                                                         <LocalInput type="qc-date" value={container.freetime} originalValue={(container.originals || {}).freetime} originalMeta={(container.originalMetas || {}).freetime} onChange={(v, orig) => ctx.updateContainer(container.id, { freetime: v }, mo, 'yoshii', 'フリータイム')} refDate={mo} className="text-left pl-2 text-xs" dataGridId={`y-ship-${mo}-${idx}-6`} onGridKeyDown={handleGridNav} />
                                                     </td>
 
-                                                    {/* ★ 納品日時: 納品日＋時間(一括クリア✕ボタン配置＆追跡復元) */}
+                                                    {/* 納品日時: 消去・クリア時も originals 保持により赤三角形・ツールチップ完全復元 */}
                                                     <td className="border text-center px-1 py-0.5 bg-emerald-50/30 align-middle">
                                                         <div className="flex items-center justify-between gap-0.5 w-full">
                                                             <div className="w-[85px] flex-shrink-0">
@@ -379,8 +386,9 @@ const YoshiiShipView = () => {
                                                                     value={container.deliveryTime || ''} 
                                                                     onChange={e => {
                                                                         const val = e.target.value;
-                                                                        const orig = container.deliveryTime;
-                                                                        ctx.updateContainer(container.id, { deliveryTime: val, originals: { ...(container.originals || {}), deliveryTime: container.originals?.deliveryTime !== undefined ? container.originals.deliveryTime : orig }, originalMetas: { ...(container.originalMetas || {}), deliveryTime: container.originalMetas?.deliveryTime !== undefined ? container.originalMetas.deliveryTime : `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}` } }, mo, 'yoshii', '納品時間');
+                                                                        const prevValue = container.deliveryTime || '';
+                                                                        const orig = container.originals?.deliveryTime !== undefined ? container.originals.deliveryTime : prevValue;
+                                                                        ctx.updateContainer(container.id, { deliveryTime: val, originals: { ...(container.originals || {}), deliveryTime: orig }, originalMetas: { ...(container.originalMetas || {}), deliveryTime: container.originalMetas?.deliveryTime || `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}` } }, mo, 'yoshii', '納品時間');
                                                                     }} 
                                                                     className="border rounded px-0.5 py-0 text-[10px] font-bold bg-white text-center w-[52px] h-[22px] cursor-pointer outline-none focus:ring-1 focus:ring-indigo-500"
                                                                 />
@@ -388,8 +396,9 @@ const YoshiiShipView = () => {
                                                                     <button 
                                                                         type="button" 
                                                                         onClick={() => {
-                                                                            const orig = container.deliveryTime;
-                                                                            ctx.updateContainer(container.id, { deliveryTime: '', originals: { ...(container.originals || {}), deliveryTime: container.originals?.deliveryTime !== undefined ? container.originals.deliveryTime : orig }, originalMetas: { ...(container.originalMetas || {}), deliveryTime: container.originalMetas?.deliveryTime !== undefined ? container.originalMetas.deliveryTime : `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}` } }, mo, 'yoshii', '納品時間 (削除)');
+                                                                            const prevValue = container.deliveryTime || '';
+                                                                            const orig = container.originals?.deliveryTime !== undefined ? container.originals.deliveryTime : prevValue;
+                                                                            ctx.updateContainer(container.id, { deliveryTime: '', originals: { ...(container.originals || {}), deliveryTime: orig }, originalMetas: { ...(container.originalMetas || {}), deliveryTime: container.originalMetas?.deliveryTime || `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}` } }, mo, 'yoshii', '納品時間 (削除)');
                                                                         }} 
                                                                         className="w-3.5 h-3.5 flex items-center justify-center text-[9px] font-bold text-gray-400 hover:text-red-600 hover:bg-gray-100 rounded transition" 
                                                                         title="時刻をクリア"
@@ -471,7 +480,7 @@ const YoshiiDrayageView = () => {
         ctx.drayScrollPosRef.current = e.target.scrollTop;
     };
 
-    let rawContainers = ctx.containers.filter(c => c.company === 'yoshii');
+    let rawContainers = [...ctx.containers].filter(c => c.company === 'yoshii');
 
     if (displayMode === 'current') {
         rawContainers = rawContainers.filter(c => c.deliveryMonth === ctx.currentMonthStr);
@@ -500,10 +509,15 @@ const YoshiiDrayageView = () => {
     }
 
     const groupedMap = {};
-    rawContainers.forEach(c => {
+    rawContainers.forEach((c, index) => {
         const mo = c.deliveryMonth || '未設定';
         if (!groupedMap[mo]) groupedMap[mo] = [];
-        groupedMap[mo].push(c);
+        const containerWithSort = { ...c, _sortKey: c.sortOrder !== undefined ? c.sortOrder : index };
+        groupedMap[mo].push(containerWithSort);
+    });
+
+    Object.keys(groupedMap).forEach(mo => {
+        groupedMap[mo].sort((a, b) => a._sortKey - b._sortKey);
     });
 
     const sortedMonths = Object.keys(groupedMap).sort();
@@ -514,7 +528,7 @@ const YoshiiDrayageView = () => {
             return;
         }
 
-        const headers = ['納品月', '管理番号', '進行状況', 'コンテナNO.', '積載型式', '外装箱', '化粧箱', 'ラベル', '割振数', '到着港', 'ETD', 'ETA', 'フリータイム', '納品日', '時間', '納品先', '備考', 'サイズ', '本船名'];
+        const headers = ['納品月', '管理番号', '進行状況', 'コンテナNO.', '積載型式', '割振数', '外装箱', '個装箱', 'ラベル', '到着港', 'ETD', 'ETA', 'フリータイム', '納品日', '時間', '納品先', '備考', 'サイズ', '本船名'];
         
         const rows = [];
         sortedMonths.forEach(mo => {
@@ -527,8 +541,8 @@ const YoshiiDrayageView = () => {
 
                 rows.push([
                     mo, c.managementNo || '-', c.status || '-', c.containerNo || '-', modelsStr || '-',
-                    c.spareOuter || '0', c.spareInner || '0', c.spareLabel || '0',
-                    totalQty, c.port || '-', c.etd || '-', c.eta || '-',
+                    totalQty, c.spareOuter || '0', c.spareInner || '0', c.spareLabel || '0',
+                    c.port || '-', c.etd || '-', c.eta || '-',
                     c.freetime || '-', c.deliveryDate || '-', c.deliveryTime || '-',
                     c.destination || '-', c.notes || '-', c.containerSize || '-', c.vesselName || '-'
                 ]);
@@ -612,13 +626,13 @@ const YoshiiDrayageView = () => {
                             <th className="p-0.5 border w-[70px] text-xs align-middle">進行状況</th>
                             <th className="p-0.5 border w-[105px] text-xs align-middle">コンテナNO.</th>
                             <th className="p-0.5 border min-w-[130px] text-xs align-middle">積載型式</th>
-                            <th className="p-0.5 border w-[85px] bg-emerald-50 text-[10px] text-emerald-900 align-middle">
-                                補充部品 (PCS)<br/>
-                                <span className="inline-block w-6 text-center">外</span>
-                                <span className="inline-block w-6 text-center">内</span>
-                                <span className="inline-block w-6 text-center">札</span>
-                            </th>
                             <th className="p-0.5 border w-[65px] text-xs align-middle">割振数</th>
+                            <th className="p-0.5 border w-[115px] bg-emerald-50 text-[10px] text-emerald-900 align-middle">
+                                補充部品 (PCS)<br/>
+                                <span className="inline-block w-[36px] text-center">外装箱</span>
+                                <span className="inline-block w-[36px] text-center">個装箱</span>
+                                <span className="inline-block w-[32px] text-center">ラベル</span>
+                            </th>
                             <th className="p-0.5 border w-[70px] text-xs align-middle">到着港</th>
                             <th className="p-0.5 border w-[80px] text-xs align-middle">ETD</th>
                             <th className="p-0.5 border w-[80px] text-xs align-middle">ETA</th>
@@ -644,7 +658,6 @@ const YoshiiDrayageView = () => {
 
                                 return (
                                     <React.Fragment key={mo}>
-                                        {/* ★ 月区切りバー: 薄緑色 (bg-emerald-100 / text-emerald-900) 適用 */}
                                         <tr id={`dray-month-hdr-${mo}`} className="month-divider">
                                             <td colSpan="15" className="bg-emerald-100 font-bold text-emerald-900 text-xs px-2 py-1 text-left border-y border-emerald-300">
                                                 ■ {mo.replace('-', '年')}月 納品分 {mo === ctx.currentMonthStr && <span className="ml-2 bg-emerald-700 text-white text-[10px] px-1.5 py-0.5 rounded shadow-sm">★当月</span>}
@@ -654,10 +667,9 @@ const YoshiiDrayageView = () => {
                                             const totalQty = calculateContainerTotalQty(container.allocations);
                                             const activeAllocEntries = Object.entries(container.allocations || {}).filter(([_, q]) => Number(q) > 0);
 
-                                            // ドレージ手配: 時間変更判定・追跡
                                             const origTime = (container.originals || {}).deliveryTime;
                                             const currTime = container.deliveryTime || '';
-                                            const isTimeChanged = origTime !== undefined && (
+                                            const isTimeChanged = origTime !== undefined && origTime !== null && (
                                                 (origTime !== '' && currTime === '') || 
                                                 (origTime !== '' && currTime !== '' && origTime !== currTime) || 
                                                 (origTime === '' && currTime !== '' && (container.originalMetas || {}).deliveryTime)
@@ -692,6 +704,8 @@ const YoshiiDrayageView = () => {
                                                         )}
                                                     </td>
 
+                                                    <td className="border font-mono text-xs text-right pr-1 bg-gray-100 readonly-cell align-middle text-gray-700">{totalQty > 0 ? totalQty.toLocaleString() : '0'}</td>
+
                                                     <td className="border text-center px-0 py-0.5 align-middle readonly-cell bg-gray-100">
                                                         {activeAllocEntries.length === 0 ? (
                                                             <div className="flex justify-center items-center gap-0.5 h-[20px]">
@@ -703,17 +717,15 @@ const YoshiiDrayageView = () => {
                                                                     const spares = (container.sparesByModel && container.sparesByModel[m]) || { outer: 0, inner: 0, label: 0 };
                                                                     return (
                                                                         <div key={m} className="flex justify-center items-center gap-0.5 h-[20px]">
-                                                                            <input type="number" value={spares.outer || ''} disabled={true} className="spare-part-input w-5 text-center text-[10px] readonly-cell bg-gray-100 text-gray-600 border-gray-300 rounded" placeholder="0"/>
-                                                                            <input type="number" value={spares.inner || ''} disabled={true} className="spare-part-input w-5 text-center text-[10px] readonly-cell bg-gray-100 text-gray-600 border-gray-300 rounded" placeholder="0"/>
-                                                                            <input type="number" value={spares.label || ''} disabled={true} className="spare-part-input w-5 text-center text-[10px] readonly-cell bg-gray-100 text-gray-600 border-gray-300 rounded" placeholder="0"/>
+                                                                            <input type="number" value={spares.outer || ''} disabled={true} className="spare-part-input w-[32px] text-center text-[10px] readonly-cell bg-gray-100 text-gray-600 border-gray-300 rounded" placeholder="0"/>
+                                                                            <input type="number" value={spares.inner || ''} disabled={true} className="spare-part-input w-[32px] text-center text-[10px] readonly-cell bg-gray-100 text-gray-600 border-gray-300 rounded" placeholder="0"/>
+                                                                            <input type="number" value={spares.label || ''} disabled={true} className="spare-part-input w-[30px] text-center text-[10px] readonly-cell bg-gray-100 text-gray-600 border-gray-300 rounded" placeholder="0"/>
                                                                         </div>
                                                                     );
                                                                 })}
                                                             </div>
                                                         )}
                                                     </td>
-
-                                                    <td className="border font-mono text-xs text-right pr-1 bg-gray-100 readonly-cell align-middle text-gray-700">{totalQty > 0 ? totalQty.toLocaleString() : '0'}</td>
 
                                                     <td className="p-0.5 border text-center align-middle readonly-cell bg-gray-100">
                                                         <DynamicSelect value={container.port} disabled={true} category="ports" options={ctx.masterData.yoshii.ports} dataGridId={`y-dray-${mo}-${idx}-3`} onGridKeyDown={handleGridNav} className="w-full text-xs border-none bg-transparent outline-none text-center px-0 readonly-cell bg-gray-100 cursor-not-allowed" />
@@ -731,7 +743,6 @@ const YoshiiDrayageView = () => {
                                                         <LocalInput type="qc-date" value={container.freetime} readOnly={true} refDate={mo} className="text-left pl-2 text-xs readonly-cell bg-gray-100 cursor-not-allowed" dataGridId={`y-dray-${mo}-${idx}-6`} onGridKeyDown={handleGridNav} />
                                                     </td>
 
-                                                    {/* ドレージ手配 納品日時 (納品日＋時間 変更追跡・一括クリア✕ボタン完全対応) */}
                                                     <td className={`border text-center px-1 py-0.5 align-middle ${isReadOnlyUser ? 'readonly-cell bg-gray-100' : 'bg-emerald-50/30'}`}>
                                                         <div className="flex items-center justify-between gap-0.5 w-full">
                                                             <div className="w-[85px] flex-shrink-0">
@@ -753,8 +764,9 @@ const YoshiiDrayageView = () => {
                                                                     value={container.deliveryTime || ''} 
                                                                     onChange={e => {
                                                                         const val = e.target.value;
-                                                                        const orig = container.deliveryTime;
-                                                                        ctx.updateContainer(container.id, { deliveryTime: val, originals: { ...(container.originals || {}), deliveryTime: container.originals?.deliveryTime !== undefined ? container.originals.deliveryTime : orig }, originalMetas: { ...(container.originalMetas || {}), deliveryTime: container.originalMetas?.deliveryTime !== undefined ? container.originalMetas.deliveryTime : `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}` } }, mo, 'yoshii', '納品時間');
+                                                                        const prevValue = container.deliveryTime || '';
+                                                                        const orig = container.originals?.deliveryTime !== undefined ? container.originals.deliveryTime : prevValue;
+                                                                        ctx.updateContainer(container.id, { deliveryTime: val, originals: { ...(container.originals || {}), deliveryTime: orig }, originalMetas: { ...(container.originalMetas || {}), deliveryTime: container.originalMetas?.deliveryTime || `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}` } }, mo, 'yoshii', '納品時間');
                                                                     }} 
                                                                     className={`border rounded px-0.5 py-0 text-[10px] font-bold text-center w-[52px] h-[22px] outline-none focus:ring-1 focus:ring-indigo-500 ${isReadOnlyUser ? 'readonly-cell bg-gray-100 cursor-not-allowed' : 'bg-white cursor-pointer'}`}
                                                                     disabled={isReadOnlyUser}
@@ -763,8 +775,9 @@ const YoshiiDrayageView = () => {
                                                                     <button 
                                                                         type="button" 
                                                                         onClick={() => {
-                                                                            const orig = container.deliveryTime;
-                                                                            ctx.updateContainer(container.id, { deliveryTime: '', originals: { ...(container.originals || {}), deliveryTime: container.originals?.deliveryTime !== undefined ? container.originals.deliveryTime : orig }, originalMetas: { ...(container.originalMetas || {}), deliveryTime: container.originalMetas?.deliveryTime !== undefined ? container.originalMetas.deliveryTime : `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}` } }, mo, 'yoshii', '納品時間 (削除)');
+                                                                            const prevValue = container.deliveryTime || '';
+                                                                            const orig = container.originals?.deliveryTime !== undefined ? container.originals.deliveryTime : prevValue;
+                                                                            ctx.updateContainer(container.id, { deliveryTime: '', originals: { ...(container.originals || {}), deliveryTime: orig }, originalMetas: { ...(container.originalMetas || {}), deliveryTime: container.originalMetas?.deliveryTime || `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}` } }, mo, 'yoshii', '納品時間 (削除)');
                                                                         }} 
                                                                         className="w-3.5 h-3.5 flex items-center justify-center text-[9px] font-bold text-gray-400 hover:text-red-600 hover:bg-gray-100 rounded transition" 
                                                                         title="時刻をクリア"
