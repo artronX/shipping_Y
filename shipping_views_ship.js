@@ -1,16 +1,16 @@
 // shipping_views_ship.js
 // =========================================================
 // shipping_views_ship.js - 出荷日程・ドレージ画面モジュール
-// ★ WebVer. 123 対応 / _js030 補充部品(font-mono/標準ウェイト化)スタイル調整版
+// ★ WebVer. 123 対応 / _js034 補充部品＆積載型式数値のbold（太字）除去・標準ウェイト化調整版
 // ★ 最上行ファイル名識別コメント保持 (// shipping_views_ship.js)
 // ★ 1. 補充部品データ: 実データ構造(spareParts[m].outerBox/innerBox/label)に基づく完全読み書き
-// ★ 2. 補充部品スタイル: font-mono / font-normal 指定により他セルとフォント統一
-// ★ 3. 月タイトル: <td> タグへ bg-emerald-100 text-emerald-900 を直接適用
-// ★ 4. 納品時間: w-[66px] 幅で 時計アイコン・末尾数字の見切れを解消
-// ★ 5. 連番キー(sortOrder)による割振り画面(親)の並び順100%継承
+// ★ 2. スタイル調整: インラインstyle/クラス指定からfontWeight:'bold'を除去し、36px均等・12px等幅・標準ウェイト・中央寄せで描画
+// ★ 3. 積載型式数値: 12px等幅・標準ウェイトへ調整し、文字のくっきり感を保持しつつ太さを標準化
+// ★ 4. 月タイトル: <td> タグへ bg-emerald-100 text-emerald-900 を直接適用
+// ★ 5. 納品時間: w-[66px] 幅で 時計アイコン・末尾数字の見切れを解消
 // =========================================================
 
-const JS_SHIP_VERSION = '_js030';
+const JS_SHIP_VERSION = '_js034';
 
 // 【ヘルパー: コンテナ内割振り製品総数量の動的自動計算】
 const calculateContainerTotalQty = (allocationsObj) => {
@@ -207,9 +207,9 @@ const YoshiiShipView = () => {
                             <th className="p-0.5 border w-[65px] text-xs align-middle">割振数</th>
                             <th className="p-0.5 border w-[125px] bg-emerald-50 text-[10px] text-emerald-900 align-middle">
                                 補充部品 (PCS)<br/>
-                                <span className="inline-block w-[38px] text-center">外装箱</span>
-                                <span className="inline-block w-[38px] text-center">個装箱</span>
-                                <span className="inline-block w-[34px] text-center">ラベル</span>
+                                <span className="inline-block w-[36px] text-center">外装箱</span>
+                                <span className="inline-block w-[36px] text-center">個装箱</span>
+                                <span className="inline-block w-[36px] text-center">ラベル</span>
                             </th>
                             <th className="p-0.5 border w-[70px] text-xs align-middle">到着港</th>
                             <th className="p-0.5 border w-[80px] text-xs align-middle">ETD</th>
@@ -267,15 +267,16 @@ const YoshiiShipView = () => {
                                                         <LocalInput value={container.containerNo} originalValue={(container.originals || {}).containerNo} originalMeta={(container.originalMetas || {}).containerNo} onChange={(v, orig) => ctx.updateContainer(container.id, { containerNo: v }, mo, 'yoshii', 'コンテナNO.')} className="text-center text-xs font-mono" dataGridId={`y-ship-${mo}-${idx}-2`} onGridKeyDown={handleGridNav} />
                                                     </td>
 
+                                                    {/* ★ 積載型式: 右側の数値表示を 12px / font-mono / font-normal (標準ウェイト) へ調整 */}
                                                     <td className="border text-xs text-left px-1 py-0.5 bg-gray-50/50 align-middle">
                                                         {activeAllocEntries.length === 0 ? (
                                                             <span className="text-gray-400 text-[10px] italic">未割当</span>
                                                         ) : (
                                                             <div className="space-y-0.5">
                                                                 {activeAllocEntries.map(([m, q]) => (
-                                                                    <div key={m} className="flex justify-between items-center text-[11px] h-[20px]">
+                                                                    <div key={m} className="flex justify-between items-center text-xs h-[20px]">
                                                                         <span className="font-bold text-gray-800">{m}</span>
-                                                                        <span className="font-mono text-emerald-800 font-bold ml-1">{Number(q).toLocaleString()}</span>
+                                                                        <span className="font-mono text-emerald-800 font-normal ml-1">{Number(q).toLocaleString()}</span>
                                                                     </div>
                                                                 ))}
                                                             </div>
@@ -284,7 +285,7 @@ const YoshiiShipView = () => {
 
                                                     <td className="border font-mono text-xs text-right pr-1 bg-emerald-50/50 text-emerald-900 font-bold align-middle">{totalQty > 0 ? totalQty.toLocaleString() : '0'}</td>
 
-                                                    {/* ★ 補充部品: font-mono & font-normal 指定によるスタイル修正 */}
+                                                    {/* ★ 補充部品: fontWeight:'normal' (標準ウェイト) に変更し bold 除去 */}
                                                     <td className="border text-center px-0 py-0.5 bg-emerald-50/30 align-middle">
                                                         {activeAllocEntries.length === 0 ? (
                                                             <div className="flex justify-center items-center gap-0.5 h-[20px]">
@@ -319,27 +320,39 @@ const YoshiiShipView = () => {
                                                                         ctx.updateContainer(container.id, updatePayload, mo, 'yoshii', `${m} 補充部品(${fieldKey})`);
                                                                     };
 
+                                                                    const spareInputStyle = {
+                                                                        width: '36px',
+                                                                        height: '20px',
+                                                                        fontSize: '12px',
+                                                                        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+                                                                        fontWeight: 'normal',
+                                                                        textAlign: 'center',
+                                                                        border: 'none',
+                                                                        background: 'transparent',
+                                                                        outline: 'none'
+                                                                    };
+
                                                                     return (
                                                                         <div key={m} className="flex justify-center items-center gap-0.5 h-[20px]">
                                                                             <input 
-                                                                                type="number" 
+                                                                                type="text" 
                                                                                 value={outerVal} 
                                                                                 onChange={e => updateSpareField('outerBox', e.target.value)} 
-                                                                                className="spare-part-input w-[34px] text-center text-[10px] font-mono font-normal border rounded" 
+                                                                                style={spareInputStyle} 
                                                                                 placeholder="0"
                                                                             />
                                                                             <input 
-                                                                                type="number" 
+                                                                                type="text" 
                                                                                 value={innerVal} 
                                                                                 onChange={e => updateSpareField('innerBox', e.target.value)} 
-                                                                                className="spare-part-input w-[34px] text-center text-[10px] font-mono font-normal border rounded" 
+                                                                                style={spareInputStyle} 
                                                                                 placeholder="0"
                                                                             />
                                                                             <input 
-                                                                                type="number" 
+                                                                                type="text" 
                                                                                 value={labelVal} 
                                                                                 onChange={e => updateSpareField('label', e.target.value)} 
-                                                                                className="spare-part-input w-[30px] text-center text-[10px] font-mono font-normal border rounded" 
+                                                                                style={spareInputStyle} 
                                                                                 placeholder="0"
                                                                             />
                                                                         </div>
@@ -562,7 +575,7 @@ const YoshiiDrayageView = () => {
     return (
         <div className="p-4 bg-white flex-grow flex flex-col h-full">
             <div className="hidden print:block font-bold text-sm text-black mb-1 border-b pb-0.5 text-left w-full">
-                吉井電気 ドレージ手配 [仕入先: \${ctx.selectedVendorFilter || 'ALL'}]
+                吉井電気 ドレージ手配 [仕入先: {ctx.selectedVendorFilter || 'ALL'}]
             </div>
 
             <div className="flex justify-between items-center mb-2 no-print flex-shrink-0">
@@ -629,9 +642,9 @@ const YoshiiDrayageView = () => {
                             <th className="p-0.5 border w-[65px] text-xs align-middle">割振数</th>
                             <th className="p-0.5 border w-[125px] bg-emerald-50 text-[10px] text-emerald-900 align-middle">
                                 補充部品 (PCS)<br/>
-                                <span className="inline-block w-[38px] text-center">外装箱</span>
-                                <span className="inline-block w-[38px] text-center">個装箱</span>
-                                <span className="inline-block w-[34px] text-center">ラベル</span>
+                                <span className="inline-block w-[36px] text-center">外装箱</span>
+                                <span className="inline-block w-[36px] text-center">個装箱</span>
+                                <span className="inline-block w-[36px] text-center">ラベル</span>
                             </th>
                             <th className="p-0.5 border w-[70px] text-xs align-middle">到着港</th>
                             <th className="p-0.5 border w-[80px] text-xs align-middle">ETD</th>
@@ -689,15 +702,16 @@ const YoshiiDrayageView = () => {
                                                         <LocalInput value={container.containerNo} readOnly={true} className="text-center text-xs font-mono readonly-cell bg-gray-100 cursor-not-allowed" dataGridId={`y-dray-${mo}-${idx}-2`} onGridKeyDown={handleGridNav} />
                                                     </td>
 
+                                                    {/* ★ 積載型式 (ドレージ): 右側の数値表示を 12px / font-mono / font-normal (標準ウェイト) へ調整 */}
                                                     <td className="border text-xs text-left px-1 py-0.5 align-middle readonly-cell bg-gray-100">
                                                         {activeAllocEntries.length === 0 ? (
                                                             <span className="text-gray-400 text-[10px] italic">未割当</span>
                                                         ) : (
                                                             <div className="space-y-0.5">
                                                                 {activeAllocEntries.map(([m, q]) => (
-                                                                    <div key={m} className="flex justify-between items-center text-[11px] h-[20px]">
+                                                                    <div key={m} className="flex justify-between items-center text-xs h-[20px]">
                                                                         <span className="font-bold text-gray-700">{m}</span>
-                                                                        <span className="font-mono text-slate-700 font-bold ml-1">{Number(q).toLocaleString()}</span>
+                                                                        <span className="font-mono text-slate-700 font-normal ml-1">{Number(q).toLocaleString()}</span>
                                                                     </div>
                                                                 ))}
                                                             </div>
@@ -706,6 +720,7 @@ const YoshiiDrayageView = () => {
 
                                                     <td className="border font-mono text-xs text-right pr-1 bg-gray-100 readonly-cell align-middle text-gray-700">{totalQty > 0 ? totalQty.toLocaleString() : '0'}</td>
 
+                                                    {/* ★ 補充部品 (ドレージ): fontWeight:'normal' (標準ウェイト) に変更し bold 除去 */}
                                                     <td className="border text-center px-0 py-0.5 align-middle readonly-cell bg-gray-100">
                                                         {activeAllocEntries.length === 0 ? (
                                                             <div className="flex justify-center items-center gap-0.5 h-[20px]">
@@ -721,11 +736,42 @@ const YoshiiDrayageView = () => {
                                                                     const innerVal = modelSpare.innerBox !== undefined ? modelSpare.innerBox : (container.spareInner !== undefined ? container.spareInner : '');
                                                                     const labelVal = modelSpare.label !== undefined ? modelSpare.label : (container.spareLabel !== undefined ? container.spareLabel : '');
 
+                                                                    const spareInputStyleReadOnly = {
+                                                                        width: '36px',
+                                                                        height: '20px',
+                                                                        fontSize: '12px',
+                                                                        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+                                                                        fontWeight: 'normal',
+                                                                        textAlign: 'center',
+                                                                        border: 'none',
+                                                                        background: 'transparent',
+                                                                        outline: 'none',
+                                                                        color: '#374151'
+                                                                    };
+
                                                                     return (
                                                                         <div key={m} className="flex justify-center items-center gap-0.5 h-[20px]">
-                                                                            <input type="number" value={outerVal} disabled={true} className="spare-part-input w-[34px] text-center text-[10px] font-mono font-normal readonly-cell bg-gray-100 text-gray-600 border-gray-300 rounded" placeholder="0"/>
-                                                                            <input type="number" value={innerVal} disabled={true} className="spare-part-input w-[34px] text-center text-[10px] font-mono font-normal readonly-cell bg-gray-100 text-gray-600 border-gray-300 rounded" placeholder="0"/>
-                                                                            <input type="number" value={labelVal} disabled={true} className="spare-part-input w-[30px] text-center text-[10px] font-mono font-normal readonly-cell bg-gray-100 text-gray-600 border-gray-300 rounded" placeholder="0"/>
+                                                                            <input 
+                                                                                type="text" 
+                                                                                value={outerVal} 
+                                                                                disabled={true} 
+                                                                                style={spareInputStyleReadOnly} 
+                                                                                placeholder="0"
+                                                                            />
+                                                                            <input 
+                                                                                type="text" 
+                                                                                value={innerVal} 
+                                                                                disabled={true} 
+                                                                                style={spareInputStyleReadOnly} 
+                                                                                placeholder="0"
+                                                                            />
+                                                                            <input 
+                                                                                type="text" 
+                                                                                value={labelVal} 
+                                                                                disabled={true} 
+                                                                                style={spareInputStyleReadOnly} 
+                                                                                placeholder="0"
+                                                                            />
                                                                         </div>
                                                                     );
                                                                 })}
