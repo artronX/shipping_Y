@@ -1,16 +1,16 @@
 // shipping_views_ship.js
 // =========================================================
 // shipping_views_ship.js - 出荷日程・ドレージ画面モジュール
-// ★ WebVer. 123 対応 / _js031 補充部品(36px均等・12px等幅太字・中央寄せ)スタイル統一版
+// ★ WebVer. 123 対応 / _js032 補充部品 LocalInput化(36px均等・12px等幅太字・中央寄せ・親CSS干渉遮断)完全統一版
 // ★ 最上行ファイル名識別コメント保持 (// shipping_views_ship.js)
 // ★ 1. 補充部品データ: 実データ構造(spareParts[m].outerBox/innerBox/label)に基づく完全読み書き
-// ★ 2. 補充部品スタイル: w-[36px] / text-xs / font-mono / font-bold 指定により他セルとデザイン・幅統一
+// ★ 2. 補充部品構造: LocalInput コンポーネント化により親HTML(.spare-part-input)のCSS干渉を遮断し、36px/12px/mono/bold/centerで統一
 // ★ 3. 月タイトル: <td> タグへ bg-emerald-100 text-emerald-900 を直接適用
 // ★ 4. 納品時間: w-[66px] 幅で 時計アイコン・末尾数字の見切れを解消
 // ★ 5. 連番キー(sortOrder)による割振り画面(親)の並び順100%継承
 // =========================================================
 
-const JS_SHIP_VERSION = '_js031';
+const JS_SHIP_VERSION = '_js032';
 
 // 【ヘルパー: コンテナ内割振り製品総数量の動的自動計算】
 const calculateContainerTotalQty = (allocationsObj) => {
@@ -284,7 +284,7 @@ const YoshiiShipView = () => {
 
                                                     <td className="border font-mono text-xs text-right pr-1 bg-emerald-50/50 text-emerald-900 font-bold align-middle">{totalQty > 0 ? totalQty.toLocaleString() : '0'}</td>
 
-                                                    {/* ★ 補充部品: 36px均等・12px等幅太字・中央寄せスタイル */}
+                                                    {/* ★ 補充部品: LocalInput化による他セルとの共通化 & 親CSS干渉回避 (36px均等・12px等幅太字・中央寄せ) */}
                                                     <td className="border text-center px-0 py-0.5 bg-emerald-50/30 align-middle">
                                                         {activeAllocEntries.length === 0 ? (
                                                             <div className="flex justify-center items-center gap-0.5 h-[20px]">
@@ -321,25 +321,25 @@ const YoshiiShipView = () => {
 
                                                                     return (
                                                                         <div key={m} className="flex justify-center items-center gap-0.5 h-[20px]">
-                                                                            <input 
+                                                                            <LocalInput 
                                                                                 type="number" 
                                                                                 value={outerVal} 
-                                                                                onChange={e => updateSpareField('outerBox', e.target.value)} 
-                                                                                className="spare-part-input w-[36px] text-center text-xs font-mono font-bold border rounded px-1" 
+                                                                                onChange={(val) => updateSpareField('outerBox', val)} 
+                                                                                className="w-[36px] text-center text-xs font-mono font-bold border rounded px-1" 
                                                                                 placeholder="0"
                                                                             />
-                                                                            <input 
+                                                                            <LocalInput 
                                                                                 type="number" 
                                                                                 value={innerVal} 
-                                                                                onChange={e => updateSpareField('innerBox', e.target.value)} 
-                                                                                className="spare-part-input w-[36px] text-center text-xs font-mono font-bold border rounded px-1" 
+                                                                                onChange={(val) => updateSpareField('innerBox', val)} 
+                                                                                className="w-[36px] text-center text-xs font-mono font-bold border rounded px-1" 
                                                                                 placeholder="0"
                                                                             />
-                                                                            <input 
+                                                                            <LocalInput 
                                                                                 type="number" 
                                                                                 value={labelVal} 
-                                                                                onChange={e => updateSpareField('label', e.target.value)} 
-                                                                                className="spare-part-input w-[36px] text-center text-xs font-mono font-bold border rounded px-1" 
+                                                                                onChange={(val) => updateSpareField('label', val)} 
+                                                                                className="w-[36px] text-center text-xs font-mono font-bold border rounded px-1" 
                                                                                 placeholder="0"
                                                                             />
                                                                         </div>
@@ -706,7 +706,7 @@ const YoshiiDrayageView = () => {
 
                                                     <td className="border font-mono text-xs text-right pr-1 bg-gray-100 readonly-cell align-middle text-gray-700">{totalQty > 0 ? totalQty.toLocaleString() : '0'}</td>
 
-                                                    {/* ★ 補充部品 (ドレージ手配): 36px均等・12px等幅太字・中央寄せスタイル */}
+                                                    {/* ★ 補充部品 (ドレージ手配): LocalInput化による他セルとの共通化 & 親CSS干渉回避 (36px均等・12px等幅太字・中央寄せ) */}
                                                     <td className="border text-center px-0 py-0.5 align-middle readonly-cell bg-gray-100">
                                                         {activeAllocEntries.length === 0 ? (
                                                             <div className="flex justify-center items-center gap-0.5 h-[20px]">
@@ -724,9 +724,27 @@ const YoshiiDrayageView = () => {
 
                                                                     return (
                                                                         <div key={m} className="flex justify-center items-center gap-0.5 h-[20px]">
-                                                                            <input type="number" value={outerVal} disabled={true} className="spare-part-input w-[36px] text-center text-xs font-mono font-bold readonly-cell bg-gray-100 text-gray-600 border-gray-300 rounded px-1" placeholder="0"/>
-                                                                            <input type="number" value={innerVal} disabled={true} className="spare-part-input w-[36px] text-center text-xs font-mono font-bold readonly-cell bg-gray-100 text-gray-600 border-gray-300 rounded px-1" placeholder="0"/>
-                                                                            <input type="number" value={labelVal} disabled={true} className="spare-part-input w-[36px] text-center text-xs font-mono font-bold readonly-cell bg-gray-100 text-gray-600 border-gray-300 rounded px-1" placeholder="0"/>
+                                                                            <LocalInput 
+                                                                                type="number" 
+                                                                                value={outerVal} 
+                                                                                disabled={true} 
+                                                                                className="w-[36px] text-center text-xs font-mono font-bold readonly-cell bg-gray-100 text-gray-600 border-gray-300 rounded px-1" 
+                                                                                placeholder="0"
+                                                                            />
+                                                                            <LocalInput 
+                                                                                type="number" 
+                                                                                value={innerVal} 
+                                                                                disabled={true} 
+                                                                                className="w-[36px] text-center text-xs font-mono font-bold readonly-cell bg-gray-100 text-gray-600 border-gray-300 rounded px-1" 
+                                                                                placeholder="0"
+                                                                            />
+                                                                            <LocalInput 
+                                                                                type="number" 
+                                                                                value={labelVal} 
+                                                                                disabled={true} 
+                                                                                className="w-[36px] text-center text-xs font-mono font-bold readonly-cell bg-gray-100 text-gray-600 border-gray-300 rounded px-1" 
+                                                                                placeholder="0"
+                                                                            />
                                                                         </div>
                                                                     );
                                                                 })}
