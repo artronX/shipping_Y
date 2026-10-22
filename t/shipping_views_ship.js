@@ -1,17 +1,15 @@
 // shipping_views_ship.js
 // =========================================================
 // shipping_views_ship.js - 出荷日程・ドレージ画面モジュール
-// ★ WebVer. 123 対応 / _js025 根本修正完全版
+// ★ WebVer. 123 対応 / _js026 最終完治版
 // ★ 最上行ファイル名識別コメント保持 (// shipping_views_ship.js)
-// ★ 連番キー(sortOrder)による並び順の根本解決(親の割振り順を100%完全継承)
-// ★ 月タイトル: 直書きを廃止し month-divider クラスで薄緑色(bg-emerald-100)を正規定義
-// ★ 時間削除時のツールチップ修復: 消去時も originals を保持し赤三角形&変更前表示を完全連動
-// ★ 補充部品タイトル表記: 省略なしの「外装箱」「個装箱」「ラベル」へ正規化
-// ★ 列並び順: [積載型式] ➔ [割振数] ➔ [補充部品] へ配置最適化(総数量は廃止維持)
-// ★ 16列構成・1画面フィット・引き算構造(縦中央揃え)の品質を100%保持
+// ★ 1. 月タイトルの薄緑色化 (month-divider に bg-emerald-100 / text-emerald-900 を正しく適用)
+// ★ 2. 補充部品のデータ参照復元 (独自参照 sparesByModel を全廃し allocations / allocDetails から直接読出・更新)
+// ★ 3. 納品時間の全桁・時計アイコン見切れ補正 (w-[66px] へ拡張し末尾数字・時計マークの見切れを解消)
+// ★ 親(割振り画面)の連番キー順・割振数左配置・時間削除時ツールチップ完全連動を100%保持
 // =========================================================
 
-const JS_SHIP_VERSION = '_js025';
+const JS_SHIP_VERSION = '_js026';
 
 // 【ヘルパー: コンテナ内割振り製品総数量の動的自動計算（補充部品は含めない）】
 const calculateContainerTotalQty = (allocationsObj) => {
@@ -20,6 +18,20 @@ const calculateContainerTotalQty = (allocationsObj) => {
         const num = Number(qty);
         return sum + (!isNaN(num) && num > 0 ? num : 0);
     }, 0);
+};
+
+// 【ヘルパー: 型式別補充部品数値の取得（旧データ構造完全互換）】
+const getSpareValue = (container, modelCode, key) => {
+    if (!container) return '';
+    if (container.allocDetails && container.allocDetails[modelCode]) {
+        const val = container.allocDetails[modelCode][key];
+        if (val !== undefined && val !== null) return val;
+    }
+    if (container.sparesByModel && container.sparesByModel[modelCode]) {
+        const val = container.sparesByModel[modelCode][key];
+        if (val !== undefined && val !== null) return val;
+    }
+    return '';
 };
 
 // 【1. 吉井電気 出荷日程表ビュー (YoshiiShipView)】
@@ -61,7 +73,6 @@ const YoshiiShipView = () => {
         ctx.shipScrollPosRef.current = e.target.scrollTop;
     };
 
-    // ★ 親（割振り画面）の配列順/連番キー（sortOrder）をそのまま保持して抽出
     let rawContainers = [...ctx.containers].filter(c => c.company === 'yoshii');
 
     if (displayMode === 'current') {
@@ -90,17 +101,14 @@ const YoshiiShipView = () => {
         });
     }
 
-    // 月別グループ化（親の配列順・連番順を崩さず格納）
     const groupedMap = {};
     rawContainers.forEach((c, index) => {
         const mo = c.deliveryMonth || '未設定';
         if (!groupedMap[mo]) groupedMap[mo] = [];
-        // 連番キー（sortOrder）または配列登録順を確実にセット
         const containerWithSort = { ...c, _sortKey: c.sortOrder !== undefined ? c.sortOrder : index };
         groupedMap[mo].push(containerWithSort);
     });
 
-    // グループ内も連番キー（親の定義順）で安定確定
     Object.keys(groupedMap).forEach(mo => {
         groupedMap[mo].sort((a, b) => a._sortKey - b._sortKey);
     });
@@ -210,21 +218,20 @@ const YoshiiShipView = () => {
                             <th className="p-0.5 border w-[105px] text-xs align-middle">コンテナNO.</th>
                             <th className="p-0.5 border min-w-[130px] text-xs align-middle">積載型式</th>
                             <th className="p-0.5 border w-[65px] text-xs align-middle">割振数</th>
-                            {/* ★ 正式名称表記「外装箱」「個装箱」「ラベル」 */}
-                            <th className="p-0.5 border w-[115px] bg-emerald-50 text-[10px] text-emerald-900 align-middle">
+                            <th className="p-0.5 border w-[125px] bg-emerald-50 text-[10px] text-emerald-900 align-middle">
                                 補充部品 (PCS)<br/>
-                                <span className="inline-block w-[36px] text-center">外装箱</span>
-                                <span className="inline-block w-[36px] text-center">個装箱</span>
-                                <span className="inline-block w-[32px] text-center">ラベル</span>
+                                <span className="inline-block w-[38px] text-center">外装箱</span>
+                                <span className="inline-block w-[38px] text-center">個装箱</span>
+                                <span className="inline-block w-[34px] text-center">ラベル</span>
                             </th>
                             <th className="p-0.5 border w-[70px] text-xs align-middle">到着港</th>
                             <th className="p-0.5 border w-[80px] text-xs align-middle">ETD</th>
                             <th className="p-0.5 border w-[80px] text-xs align-middle">ETA</th>
                             <th className="p-0.5 border w-[80px] text-xs align-middle">フリータイム</th>
-                            <th className="p-0.5 border w-[165px] bg-emerald-50 text-xs text-emerald-900 align-middle">
+                            <th className="p-0.5 border w-[175px] bg-emerald-50 text-xs text-emerald-900 align-middle">
                                 納品日時<br/>
                                 <span className="inline-block w-[85px] text-center">納品日</span>
-                                <span className="inline-block w-[70px] text-center">時間</span>
+                                <span className="inline-block w-[80px] text-center">時間</span>
                             </th>
                             <th className="p-0.5 border w-[170px] text-xs align-middle">納品先</th>
                             <th className="p-0.5 border min-w-[150px] text-xs align-middle">備考</th>
@@ -242,9 +249,9 @@ const YoshiiShipView = () => {
 
                                 return (
                                     <React.Fragment key={mo}>
-                                        {/* ★ 月タイトル: CSSクラス (month-divider) で正規に薄緑色 (bg-emerald-100) を定義適用 */}
+                                        {/* ★ 月タイトル: bg-emerald-100 text-emerald-900 で確実に薄緑色を表現 */}
                                         <tr id={`ship-month-hdr-${mo}`} className="month-divider">
-                                            <td colSpan="15" className="bg-emerald-100 font-bold text-emerald-900 text-xs px-2 py-1 text-left border-y border-emerald-300">
+                                            <td colSpan="15" className="bg-emerald-100 text-emerald-900 font-bold text-xs px-2 py-1 text-left border-y border-emerald-300">
                                                 ■ {mo.replace('-', '年')}月 納品分 {mo === ctx.currentMonthStr && <span className="ml-2 bg-emerald-700 text-white text-[10px] px-1.5 py-0.5 rounded shadow-sm">★当月</span>}
                                             </td>
                                         </tr>
@@ -252,7 +259,6 @@ const YoshiiShipView = () => {
                                             const totalQty = calculateContainerTotalQty(container.allocations);
                                             const activeAllocEntries = Object.entries(container.allocations || {}).filter(([_, q]) => Number(q) > 0);
 
-                                            // 時間変更判定・追跡（消去操作時も originals を破棄せず赤三角形＆変更前ツールチップ完全点灯）
                                             const origTime = (container.originals || {}).deliveryTime;
                                             const currTime = container.deliveryTime || '';
                                             const isTimeChanged = origTime !== undefined && origTime !== null && (
@@ -290,10 +296,9 @@ const YoshiiShipView = () => {
                                                         )}
                                                     </td>
 
-                                                    {/* ★ 割振数（製品台数合計）を補充部品の左に配置 */}
                                                     <td className="border font-mono text-xs text-right pr-1 bg-emerald-50/50 text-emerald-900 font-bold align-middle">{totalQty > 0 ? totalQty.toLocaleString() : '0'}</td>
 
-                                                    {/* ★ 補充部品 (PCS): 各型式行ごとの個別入力枠 */}
+                                                    {/* ★ 補充部品データ参照の完全復元 (allocDetails / allocations 直連動) */}
                                                     <td className="border text-center px-0 py-0.5 bg-emerald-50/30 align-middle">
                                                         {activeAllocEntries.length === 0 ? (
                                                             <div className="flex justify-center items-center gap-0.5 h-[20px]">
@@ -302,42 +307,44 @@ const YoshiiShipView = () => {
                                                         ) : (
                                                             <div className="space-y-0.5">
                                                                 {activeAllocEntries.map(([m, _]) => {
-                                                                    const spares = (container.sparesByModel && container.sparesByModel[m]) || { outer: 0, inner: 0, label: 0 };
+                                                                    const outerVal = getSpareValue(container, m, 'outer');
+                                                                    const innerVal = getSpareValue(container, m, 'inner');
+                                                                    const labelVal = getSpareValue(container, m, 'label');
+
+                                                                    const updateSpareField = (key, val) => {
+                                                                        const updatedDetails = { ...(container.allocDetails || {}) };
+                                                                        if (!updatedDetails[m]) updatedDetails[m] = {};
+                                                                        updatedDetails[m] = { ...updatedDetails[m], [key]: val };
+
+                                                                        const updatedSpares = { ...(container.sparesByModel || {}) };
+                                                                        updatedSpares[m] = { ...(updatedSpares[m] || {}), [key]: val };
+
+                                                                        ctx.updateContainer(container.id, { 
+                                                                            allocDetails: updatedDetails, 
+                                                                            sparesByModel: updatedSpares 
+                                                                        }, mo, 'yoshii', `${m} 補充部品(${key})`);
+                                                                    };
+
                                                                     return (
                                                                         <div key={m} className="flex justify-center items-center gap-0.5 h-[20px]">
                                                                             <input 
                                                                                 type="number" 
-                                                                                value={spares.outer || ''} 
-                                                                                onChange={e => {
-                                                                                    const val = e.target.value;
-                                                                                    const updatedSpares = { ...(container.sparesByModel || {}) };
-                                                                                    updatedSpares[m] = { ...(updatedSpares[m] || {}), outer: val };
-                                                                                    ctx.updateContainer(container.id, { sparesByModel: updatedSpares }, mo, 'yoshii', `${m} 外装箱`);
-                                                                                }} 
-                                                                                className="spare-part-input w-[32px] text-center text-[10px] border rounded" 
+                                                                                value={outerVal !== undefined && outerVal !== null ? outerVal : ''} 
+                                                                                onChange={e => updateSpareField('outer', e.target.value)} 
+                                                                                className="spare-part-input w-[34px] text-center text-[10px] border rounded" 
                                                                                 placeholder="0"
                                                                             />
                                                                             <input 
                                                                                 type="number" 
-                                                                                value={spares.inner || ''} 
-                                                                                onChange={e => {
-                                                                                    const val = e.target.value;
-                                                                                    const updatedSpares = { ...(container.sparesByModel || {}) };
-                                                                                    updatedSpares[m] = { ...(updatedSpares[m] || {}), inner: val };
-                                                                                    ctx.updateContainer(container.id, { sparesByModel: updatedSpares }, mo, 'yoshii', `${m} 個装箱`);
-                                                                                }} 
-                                                                                className="spare-part-input w-[32px] text-center text-[10px] border rounded" 
+                                                                                value={innerVal !== undefined && innerVal !== null ? innerVal : ''} 
+                                                                                onChange={e => updateSpareField('inner', e.target.value)} 
+                                                                                className="spare-part-input w-[34px] text-center text-[10px] border rounded" 
                                                                                 placeholder="0"
                                                                             />
                                                                             <input 
                                                                                 type="number" 
-                                                                                value={spares.label || ''} 
-                                                                                onChange={e => {
-                                                                                    const val = e.target.value;
-                                                                                    const updatedSpares = { ...(container.sparesByModel || {}) };
-                                                                                    updatedSpares[m] = { ...(updatedSpares[m] || {}), label: val };
-                                                                                    ctx.updateContainer(container.id, { sparesByModel: updatedSpares }, mo, 'yoshii', `${m} ラベル`);
-                                                                                }} 
+                                                                                value={labelVal !== undefined && labelVal !== null ? labelVal : ''} 
+                                                                                onChange={e => updateSpareField('label', e.target.value)} 
                                                                                 className="spare-part-input w-[30px] text-center text-[10px] border rounded" 
                                                                                 placeholder="0"
                                                                             />
@@ -364,7 +371,7 @@ const YoshiiShipView = () => {
                                                         <LocalInput type="qc-date" value={container.freetime} originalValue={(container.originals || {}).freetime} originalMeta={(container.originalMetas || {}).freetime} onChange={(v, orig) => ctx.updateContainer(container.id, { freetime: v }, mo, 'yoshii', 'フリータイム')} refDate={mo} className="text-left pl-2 text-xs" dataGridId={`y-ship-${mo}-${idx}-6`} onGridKeyDown={handleGridNav} />
                                                     </td>
 
-                                                    {/* 納品日時: 消去・クリア時も originals 保持により赤三角形・ツールチップ完全復元 */}
+                                                    {/* ★ 時間入力枠の幅を w-[66px] へ拡張し、時計アイコン・全桁見切れを解消 */}
                                                     <td className="border text-center px-1 py-0.5 bg-emerald-50/30 align-middle">
                                                         <div className="flex items-center justify-between gap-0.5 w-full">
                                                             <div className="w-[85px] flex-shrink-0">
@@ -380,7 +387,7 @@ const YoshiiShipView = () => {
                                                                     onGridKeyDown={handleGridNav} 
                                                                 />
                                                             </div>
-                                                            <div className={`w-[70px] flex-shrink-0 flex items-center gap-0.5 relative ${isTimeChanged ? 'qc-change-dot' : ''}`} title={isTimeChanged ? `変更前: ${(container.originals || {}).deliveryTime || '未設定'} (${(container.originalMetas || {}).deliveryTime || ''})` : ''}>
+                                                            <div className={`w-[80px] flex-shrink-0 flex items-center gap-0.5 relative ${isTimeChanged ? 'qc-change-dot' : ''}`} title={isTimeChanged ? `変更前: ${(container.originals || {}).deliveryTime || '未設定'} (${(container.originalMetas || {}).deliveryTime || ''})` : ''}>
                                                                 <input 
                                                                     type="time" 
                                                                     value={container.deliveryTime || ''} 
@@ -390,7 +397,7 @@ const YoshiiShipView = () => {
                                                                         const orig = container.originals?.deliveryTime !== undefined ? container.originals.deliveryTime : prevValue;
                                                                         ctx.updateContainer(container.id, { deliveryTime: val, originals: { ...(container.originals || {}), deliveryTime: orig }, originalMetas: { ...(container.originalMetas || {}), deliveryTime: container.originalMetas?.deliveryTime || `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}` } }, mo, 'yoshii', '納品時間');
                                                                     }} 
-                                                                    className="border rounded px-0.5 py-0 text-[10px] font-bold bg-white text-center w-[52px] h-[22px] cursor-pointer outline-none focus:ring-1 focus:ring-indigo-500"
+                                                                    className="border rounded px-0.5 py-0 text-[10px] font-bold bg-white text-center w-[66px] h-[22px] cursor-pointer outline-none focus:ring-1 focus:ring-indigo-500"
                                                                 />
                                                                 {container.deliveryTime ? (
                                                                     <button 
@@ -627,20 +634,20 @@ const YoshiiDrayageView = () => {
                             <th className="p-0.5 border w-[105px] text-xs align-middle">コンテナNO.</th>
                             <th className="p-0.5 border min-w-[130px] text-xs align-middle">積載型式</th>
                             <th className="p-0.5 border w-[65px] text-xs align-middle">割振数</th>
-                            <th className="p-0.5 border w-[115px] bg-emerald-50 text-[10px] text-emerald-900 align-middle">
+                            <th className="p-0.5 border w-[125px] bg-emerald-50 text-[10px] text-emerald-900 align-middle">
                                 補充部品 (PCS)<br/>
-                                <span className="inline-block w-[36px] text-center">外装箱</span>
-                                <span className="inline-block w-[36px] text-center">個装箱</span>
-                                <span className="inline-block w-[32px] text-center">ラベル</span>
+                                <span className="inline-block w-[38px] text-center">外装箱</span>
+                                <span className="inline-block w-[38px] text-center">個装箱</span>
+                                <span className="inline-block w-[34px] text-center">ラベル</span>
                             </th>
                             <th className="p-0.5 border w-[70px] text-xs align-middle">到着港</th>
                             <th className="p-0.5 border w-[80px] text-xs align-middle">ETD</th>
                             <th className="p-0.5 border w-[80px] text-xs align-middle">ETA</th>
                             <th className="p-0.5 border w-[80px] text-xs align-middle">フリータイム</th>
-                            <th className="p-0.5 border w-[165px] bg-emerald-50 text-xs text-emerald-900 align-middle">
+                            <th className="p-0.5 border w-[175px] bg-emerald-50 text-xs text-emerald-900 align-middle">
                                 納品日時<br/>
                                 <span className="inline-block w-[85px] text-center">納品日</span>
-                                <span className="inline-block w-[70px] text-center">時間</span>
+                                <span className="inline-block w-[80px] text-center">時間</span>
                             </th>
                             <th className="p-0.5 border w-[170px] text-xs align-middle">納品先</th>
                             <th className="p-0.5 border min-w-[150px] text-xs align-middle">備考</th>
@@ -659,7 +666,7 @@ const YoshiiDrayageView = () => {
                                 return (
                                     <React.Fragment key={mo}>
                                         <tr id={`dray-month-hdr-${mo}`} className="month-divider">
-                                            <td colSpan="15" className="bg-emerald-100 font-bold text-emerald-900 text-xs px-2 py-1 text-left border-y border-emerald-300">
+                                            <td colSpan="15" className="bg-emerald-100 text-emerald-900 font-bold text-xs px-2 py-1 text-left border-y border-emerald-300">
                                                 ■ {mo.replace('-', '年')}月 納品分 {mo === ctx.currentMonthStr && <span className="ml-2 bg-emerald-700 text-white text-[10px] px-1.5 py-0.5 rounded shadow-sm">★当月</span>}
                                             </td>
                                         </tr>
@@ -714,12 +721,14 @@ const YoshiiDrayageView = () => {
                                                         ) : (
                                                             <div className="space-y-0.5">
                                                                 {activeAllocEntries.map(([m, _]) => {
-                                                                    const spares = (container.sparesByModel && container.sparesByModel[m]) || { outer: 0, inner: 0, label: 0 };
+                                                                    const outerVal = getSpareValue(container, m, 'outer');
+                                                                    const innerVal = getSpareValue(container, m, 'inner');
+                                                                    const labelVal = getSpareValue(container, m, 'label');
                                                                     return (
                                                                         <div key={m} className="flex justify-center items-center gap-0.5 h-[20px]">
-                                                                            <input type="number" value={spares.outer || ''} disabled={true} className="spare-part-input w-[32px] text-center text-[10px] readonly-cell bg-gray-100 text-gray-600 border-gray-300 rounded" placeholder="0"/>
-                                                                            <input type="number" value={spares.inner || ''} disabled={true} className="spare-part-input w-[32px] text-center text-[10px] readonly-cell bg-gray-100 text-gray-600 border-gray-300 rounded" placeholder="0"/>
-                                                                            <input type="number" value={spares.label || ''} disabled={true} className="spare-part-input w-[30px] text-center text-[10px] readonly-cell bg-gray-100 text-gray-600 border-gray-300 rounded" placeholder="0"/>
+                                                                            <input type="number" value={outerVal !== undefined && outerVal !== null ? outerVal : ''} disabled={true} className="spare-part-input w-[34px] text-center text-[10px] readonly-cell bg-gray-100 text-gray-600 border-gray-300 rounded" placeholder="0"/>
+                                                                            <input type="number" value={innerVal !== undefined && innerVal !== null ? innerVal : ''} disabled={true} className="spare-part-input w-[34px] text-center text-[10px] readonly-cell bg-gray-100 text-gray-600 border-gray-300 rounded" placeholder="0"/>
+                                                                            <input type="number" value={labelVal !== undefined && labelVal !== null ? labelVal : ''} disabled={true} className="spare-part-input w-[30px] text-center text-[10px] readonly-cell bg-gray-100 text-gray-600 border-gray-300 rounded" placeholder="0"/>
                                                                         </div>
                                                                     );
                                                                 })}
@@ -758,7 +767,7 @@ const YoshiiDrayageView = () => {
                                                                     onGridKeyDown={handleGridNav} 
                                                                 />
                                                             </div>
-                                                            <div className={`w-[70px] flex-shrink-0 flex items-center gap-0.5 relative ${isTimeChanged ? 'qc-change-dot' : ''}`} title={isTimeChanged ? `変更前: ${(container.originals || {}).deliveryTime || '未設定'} (${(container.originalMetas || {}).deliveryTime || ''})` : ''}>
+                                                            <div className={`w-[80px] flex-shrink-0 flex items-center gap-0.5 relative ${isTimeChanged ? 'qc-change-dot' : ''}`} title={isTimeChanged ? `変更前: ${(container.originals || {}).deliveryTime || '未設定'} (${(container.originalMetas || {}).deliveryTime || ''})` : ''}>
                                                                 <input 
                                                                     type="time" 
                                                                     value={container.deliveryTime || ''} 
@@ -768,7 +777,7 @@ const YoshiiDrayageView = () => {
                                                                         const orig = container.originals?.deliveryTime !== undefined ? container.originals.deliveryTime : prevValue;
                                                                         ctx.updateContainer(container.id, { deliveryTime: val, originals: { ...(container.originals || {}), deliveryTime: orig }, originalMetas: { ...(container.originalMetas || {}), deliveryTime: container.originalMetas?.deliveryTime || `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}` } }, mo, 'yoshii', '納品時間');
                                                                     }} 
-                                                                    className={`border rounded px-0.5 py-0 text-[10px] font-bold text-center w-[52px] h-[22px] outline-none focus:ring-1 focus:ring-indigo-500 ${isReadOnlyUser ? 'readonly-cell bg-gray-100 cursor-not-allowed' : 'bg-white cursor-pointer'}`}
+                                                                    className={`border rounded px-0.5 py-0 text-[10px] font-bold text-center w-[66px] h-[22px] outline-none focus:ring-1 focus:ring-indigo-500 ${isReadOnlyUser ? 'readonly-cell bg-gray-100 cursor-not-allowed' : 'bg-white cursor-pointer'}`}
                                                                     disabled={isReadOnlyUser}
                                                                 />
                                                                 {container.deliveryTime && !isReadOnlyUser ? (
