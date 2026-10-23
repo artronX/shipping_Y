@@ -1,14 +1,13 @@
 // shipping_views_plan.js
 // =========================================================
 // shipping_views_plan.js - 出荷計画・割振り画面モジュール
-// ★ WebVer. 123 対応 / _js042 計画画面「入数」追加 ＆ 割振り端数チェック実装
+// ★ WebVer. 123 対応 / _js043 「入数」正しい位置(型式の右)配置 ＆ 仕入先幅補正・端数チェック実装
 // ★ 最上行ファイル名識別コメント保持 (// shipping_views_plan.js)
-// ★ 1. 計画画面: 「入数(qtyPerCarton)」列を新設。仕入先・備考の幅を調整し横スクロールを維持。
-// ★ 2. 割振り画面: 入数を参照し、割り切れない場合に赤背景(#fee2e2)を適用(赤枠なし)。
-// ★ (注意) ホワイトアウトの原因となった自動スクロール処理は完全に排除した安全版。
+// ★ 1. 計画画面: 「入数(qtyPerCarton)」列を型式の右に配置。「仕入先▼」が途切れないよう幅55px確保。
+// ★ 2. 割振り画面: 入数を参照し、割振数が割り切れない場合に赤背景(#fee2e2)を適用(赤枠なし)。
 // =========================================================
 
-const JS_PLAN_VERSION = '_js042';
+const JS_PLAN_VERSION = '_js043';
 
 // 【型式編集・削除モーダル (V94完全移植)】
 const ModelEditModal = ({ isOpen, onClose, company='yoshii' }) => {
@@ -218,10 +217,10 @@ const YoshiiPlanView = () => {
             return;
         }
 
-        const headers = ['仕入先コード', '型式', '品名', 'JANコード', '入数', '合計', ...displayMonths.map(mo => mo.replace('-', '/')), '備考 / 出荷調整状況'];
+        const headers = ['仕入先コード', '型式', '入数', '品名', 'JANコード', '合計', ...displayMonths.map(mo => mo.replace('-', '/')), '備考 / 出荷調整状況'];
         
         const monthTotals = displayMonths.map(mo => calculateColTotal(mo));
-        const totalRow = ['-', '-', '月間合計', '-', '-', totalGrandTotal, ...monthTotals, '-'];
+        const totalRow = ['-', '-', '-', '月間合計', '-', totalGrandTotal, ...monthTotals, '-'];
 
         const dataRows = visibleModels.map(m => {
             const matchModelDetails = ctx.masterData.yoshii?.modelDetails?.[m] || {};
@@ -240,7 +239,7 @@ const YoshiiPlanView = () => {
                 return qty !== undefined && qty !== '' ? Number(qty) : 0;
             });
 
-            return [currentVendorCode, m, currentProdName, currentJanCode, currentQtyPer, rowTot, ...monthQtys, currentNotes];
+            return [currentVendorCode, m, currentQtyPer, currentProdName, currentJanCode, rowTot, ...monthQtys, currentNotes];
         });
 
         const dateTag = mode === 'current' ? formatYYMM(ctx.currentMonthStr) : mode === 'year' ? `${selYr}年度` : mode === 'single' ? formatYYMM(sgMo) : `${formatYYMM(sMo)}_${formatYYMM(eMo)}`;
@@ -600,11 +599,12 @@ const YoshiiPlanView = () => {
                     <thead className="sticky top-0 z-30 bg-gray-200">
                         <tr className="table-row-compact">
                             <th className="p-0.5 border w-8 sticky left-0 bg-gray-200 z-40 text-xs no-print">順</th>
-                            {/* ★ 修復＆調整: 仕入先を60px→40pxに縮小し横スクロールを維持 */}
-                            <th className="p-0.5 border w-[40px] min-w-[40px] sticky left-[32px] bg-gray-200 z-40 text-xs text-center align-middle">
+                            
+                            {/* ★ 補正: 「仕入先▼」テキストが途切れないよう w-[55px] に調整 */}
+                            <th className="p-0.5 border w-[55px] min-w-[55px] sticky left-[32px] bg-gray-200 z-40 text-xs text-center align-middle">
                                 <div className="relative flex items-center justify-center w-full h-full">
                                     <div className="flex items-center justify-center gap-0.5 w-full cursor-pointer hover:text-emerald-700">
-                                        <span className="text-[11px] font-bold text-gray-800 truncate">{ctx.selectedVendorFilter === 'ALL' ? '仕入' : ctx.selectedVendorFilter}</span>
+                                        <span className="text-[11px] font-bold text-gray-800 truncate">{ctx.selectedVendorFilter === 'ALL' ? '仕入先' : ctx.selectedVendorFilter}</span>
                                         <span className="text-[9px] text-gray-500 no-print">▼</span>
                                         <select value={ctx.selectedVendorFilter} onChange={e => ctx.setSelectedVendorFilter(e.target.value)} className="no-print absolute inset-0 w-full h-full opacity-0 cursor-pointer text-xs font-bold" title="仕入先コードで絞り込み">
                                             <option value="ALL">全体 (全表示)</option>
@@ -615,27 +615,31 @@ const YoshiiPlanView = () => {
                                     </div>
                                 </div>
                             </th>
-                            {/* ★ 修復＆調整: 仕入先が縮小したため、型式のsticky位置を 92px → 72px に補正 */}
-                            <th className="p-0.5 border w-[110px] min-w-[110px] sticky left-[72px] bg-gray-200 z-40 text-xs">型式</th>
+                            
+                            {/* ★ 補正: 仕入先が幅55pxとなったため sticky left を 87px に配置 */}
+                            <th className="p-0.5 border w-[110px] min-w-[110px] sticky left-[87px] bg-gray-200 z-40 text-xs">型式</th>
+                            
+                            {/* ★ 正しい配置: 型式のすぐ右（型式と品名の間）に「入数」を配置 */}
+                            <th className="p-0.5 border w-[45px] min-w-[45px] max-w-[45px] sticky left-[197px] bg-gray-200 z-40 text-xs">入数</th>
+                            
                             <th className="p-0.5 border min-w-[220px] text-xs whitespace-nowrap">品名</th>
                             <th className="p-0.5 border min-w-[95px] max-w-[100px] text-xs">JANコード</th>
-                            {/* ★ 新設: 入数を45pxで追加 */}
-                            <th className="p-0.5 border w-[45px] min-w-[45px] max-w-[45px] text-xs">入数</th>
                             <th className="p-0.5 border w-[65px] min-w-[65px] bg-emerald-100 text-xs font-bold text-emerald-900">合計</th>
                             {displayMonths.map(mo => {
                                 const yr = mo.split('-')[0].slice(-2);
                                 const m = mo.split('-')[1];
                                 return <th key={mo} className="p-0.5 border w-[58px] min-w-[58px] max-w-[58px] text-xs font-bold bg-gray-200 text-center">{yr}/{m}</th>;
                             })}
-                            {/* ★ 修復＆調整: 備考を180px→155pxに縮小し横スクロールを維持 */}
-                            <th className="p-0.5 border min-w-[155px] text-xs font-bold bg-gray-200">備考 / 出荷調整状況</th>
+                            
+                            {/* ★ 補正: 全体のバランスを整え min-w-[150px] に設定 */}
+                            <th className="p-0.5 border min-w-[150px] text-xs font-bold bg-gray-200">備考 / 出荷調整状況</th>
                         </tr>
 
                         <tr className="bg-emerald-50 text-xs text-emerald-900 border-b-2 border-emerald-300 table-row-compact">
                             <td className="p-0.5 border sticky left-0 bg-emerald-100 z-40 text-center no-print">-</td>
                             <td className="p-0.5 border sticky left-[32px] bg-emerald-100 z-40 text-center">-</td>
-                            <td className="p-0.5 border sticky left-[72px] bg-emerald-100 z-40 text-center font-bold">月間合計</td>
-                            <td className="p-0.5 border text-center">-</td>
+                            <td className="p-0.5 border sticky left-[87px] bg-emerald-100 z-40 text-center font-bold">月間合計</td>
+                            <td className="p-0.5 border sticky left-[197px] bg-emerald-100 z-40 text-center">-</td>
                             <td className="p-0.5 border text-center">-</td>
                             <td className="p-0.5 border text-center">-</td>
                             <td className="p-0.5 border text-right pr-1 font-mono text-xs text-emerald-900 bg-emerald-200">{totalGrandTotal.toLocaleString()}</td>
@@ -662,20 +666,30 @@ const YoshiiPlanView = () => {
                             return (
                                 <tr key={model} onDragOver={e => handleModelDragOver(e, model)} onDrop={e => handleModelDrop(e, model)} className={`hover:bg-emerald-50 border-b table-row-compact ${dragOverModel === model ? 'border-t-2 border-t-emerald-600 bg-emerald-100' : ''}`}>
                                     <td draggable onDragStart={e => handleModelDragStart(e, model)} className="border font-bold text-xs sticky left-0 bg-white z-10 text-center drag-handle text-gray-400 hover:text-emerald-600 cursor-grab active:cursor-grabbing p-0">≡</td>
-                                    <td className="border text-xs text-center sticky left-[32px] bg-white z-10 w-[40px] min-w-[40px] p-0">
+                                    
+                                    {/* 仕入先 */}
+                                    <td className="border text-xs text-center sticky left-[32px] bg-white z-10 w-[55px] min-w-[55px] p-0">
                                         <LocalInput value={currentVendorCode} originalValue={(matchModelDetails.originals || {}).vendorCode} originalMeta={(matchModelDetails.originalMetas || {}).vendorCode} onChange={(v, orig) => handleModelDetailChange(model, 'vendorCode', v)} className="w-full text-xs text-center font-mono input-compact"/>
                                     </td>
-                                    <td className="border text-xs sticky left-[72px] bg-white z-10 text-left pl-2 p-0">{model}</td>
+                                    
+                                    {/* 型式 */}
+                                    <td className="border text-xs sticky left-[87px] bg-white z-10 text-left pl-2 p-0">{model}</td>
+                                    
+                                    {/* ★ 正しい配置: 入数 (型式の右) */}
+                                    <td className="border text-xs text-center sticky left-[197px] bg-white z-10 w-[45px] min-w-[45px] p-0">
+                                        <LocalInput type="number" value={currentQtyPer} originalValue={(matchModelDetails.originals || {}).qtyPerCarton} originalMeta={(matchModelDetails.originalMetas || {}).qtyPerCarton} onChange={(v, orig) => handleModelDetailChange(model, 'qtyPerCarton', v)} className="w-full text-xs text-center font-mono input-compact bg-transparent" placeholder="-" />
+                                    </td>
+
+                                    {/* 品名 */}
                                     <td className="border text-xs text-left min-w-[220px] whitespace-nowrap p-0">
                                         <LocalInput value={currentProdName} originalValue={(matchModelDetails.originals || {}).productName} originalMeta={(matchModelDetails.originalMetas || {}).productName} onChange={(v, orig) => handleModelDetailChange(model, 'productName', v)} listId="auto_yoshii_productNames" className="w-full text-xs text-left px-1 input-compact"/>
                                     </td>
+
+                                    {/* JANコード */}
                                     <td className="border text-xs text-center min-w-[95px] max-w-[100px] p-0">
                                         <LocalInput value={currentJanCode} originalValue={(matchModelDetails.originals || {}).janCode} originalMeta={(matchModelDetails.originalMetas || {}).janCode} onChange={(v, orig) => handleModelDetailChange(model, 'janCode', v)} className="w-full text-xs text-center font-mono input-compact"/>
                                     </td>
-                                    {/* ★ 新設: 入数を描画 */}
-                                    <td className="border text-xs text-center w-[45px] min-w-[45px] p-0">
-                                        <LocalInput type="number" value={currentQtyPer} originalValue={(matchModelDetails.originals || {}).qtyPerCarton} originalMeta={(matchModelDetails.originalMetas || {}).qtyPerCarton} onChange={(v, orig) => handleModelDetailChange(model, 'qtyPerCarton', v)} className="w-full text-xs text-center font-mono input-compact bg-transparent" placeholder="-" />
-                                    </td>
+
                                     <td className="border text-xs font-mono text-right pr-1 bg-emerald-50 text-emerald-900 p-0">{rowTot > 0 ? rowTot.toLocaleString() : '0'}</td>
                                     
                                     {displayMonths.map((mo, colIdx) => {
@@ -709,7 +723,7 @@ const YoshiiPlanView = () => {
                                         );
                                     })}
 
-                                    <td className="border text-xs text-left min-w-[155px] p-0">
+                                    <td className="border text-xs text-left min-w-[150px] p-0">
                                         <LocalTextArea value={currentNotes} originalValue={(matchModelDetails.originals || {}).notes} originalMeta={(matchModelDetails.originalMetas || {}).notes} onChange={(v, orig) => handleModelDetailChange(model, 'notes', v)} isCompact={!showHistory}/>
                                     </td>
                                 </tr>
