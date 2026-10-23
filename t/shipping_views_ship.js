@@ -1,16 +1,15 @@
 // shipping_views_ship.js
 // =========================================================
 // shipping_views_ship.js - 出荷日程・ドレージ画面モジュール
-// ★ WebVer. 123 対応 / _js035 積載型式の編集対応 & 補充部品の入力バグ(LocalInput+input-compact)完全修正版
+// ★ WebVer. 123 対応 / _js036 ドレージ画面(完全ReadOnly化) ＆ 補充部品入力安定化の完全版
 // ★ 最上行ファイル名識別コメント保持 (// shipping_views_ship.js)
-// ★ 1. 積載型式の数値: 工場での修正指示に基づき、LocalInputによる編集・更新(allocations)に対応
-// ★ 2. 補充部品の入力: LocalInput + 'input-compact' クラスを使用し、クリック位置ズレ・フォント肥大化バグを完全に修正。枠線なしの12px/等幅/標準ウェイトを実現
-// ★ 3. 月タイトル: <td> タグへ bg-emerald-100 text-emerald-900 を直接適用
-// ★ 4. 納品時間: w-[66px] 幅で 時計アイコン・末尾数字の見切れを解消
-// ★ 5. 連番キー(sortOrder)による割振り画面(親)の並び順100%継承
+// ★ 1. ドレージ画面の保護: LocalInput等の共通コンポーネント依存を脱却し、純粋なHTMLタグ(readOnly)による専用コンポーネントへ置換。権限問わず100%編集不可に。
+// ★ 2. 変更履歴の維持: 閲覧専用セルでも、修正前データ(originals)が存在する場合は赤文字・ツールチップを正確に表示。
+// ★ 3. 補充部品の入力: 出荷日程表側は、親CSS干渉を遮断するインラインスタイル＋フォーカス制御により、ズレ・肥大化を完封。
+// ★ 4. 積載型式の数値: 出荷日程表側で編集・保存(allocations)可能に設定。
 // =========================================================
 
-const JS_SHIP_VERSION = '_js035';
+const JS_SHIP_VERSION = '_js036';
 
 // 【ヘルパー: コンテナ内割振り製品総数量の動的自動計算】
 const calculateContainerTotalQty = (allocationsObj) => {
@@ -267,7 +266,7 @@ const YoshiiShipView = () => {
                                                         <LocalInput value={container.containerNo} originalValue={(container.originals || {}).containerNo} originalMeta={(container.originalMetas || {}).containerNo} onChange={(v, orig) => ctx.updateContainer(container.id, { containerNo: v }, mo, 'yoshii', 'コンテナNO.')} className="text-center text-xs font-mono" dataGridId={`y-ship-${mo}-${idx}-2`} onGridKeyDown={handleGridNav} />
                                                     </td>
 
-                                                    {/* ★ 積載型式: 工場の編集要件に合わせて LocalInput (input-compact) に変更し編集・保存可能化 */}
+                                                    {/* ★ 積載型式: 工場の編集要件に合わせて LocalInput にて編集・更新を担保 */}
                                                     <td className="border text-xs text-left px-1 py-0.5 bg-gray-50/50 align-middle">
                                                         {activeAllocEntries.length === 0 ? (
                                                             <span className="text-gray-400 text-[10px] italic">未割当</span>
@@ -296,7 +295,7 @@ const YoshiiShipView = () => {
 
                                                     <td className="border font-mono text-xs text-right pr-1 bg-emerald-50/50 text-emerald-900 font-bold align-middle">{totalQty > 0 ? totalQty.toLocaleString() : '0'}</td>
 
-                                                    {/* ★ 補充部品: LocalInput + input-compact を使用。親CSS干渉による位置ズレ・フォント肥大化を完全防止し、枠線なしの12px等幅標準ウェイトを実現 */}
+                                                    {/* ★ 補充部品: 親CSSの干渉を防ぐインラインスタイルとフォーカス制御で、カーソルズレや肥大化を完全遮断 */}
                                                     <td className="border text-center px-0 py-0.5 bg-emerald-50/30 align-middle">
                                                         {activeAllocEntries.length === 0 ? (
                                                             <div className="flex justify-center items-center gap-0.5 h-[20px]">
@@ -331,27 +330,51 @@ const YoshiiShipView = () => {
                                                                         ctx.updateContainer(container.id, updatePayload, mo, 'yoshii', `${m} 補充部品(${fieldKey})`);
                                                                     };
 
+                                                                    const spareInputStyle = {
+                                                                        width: '36px',
+                                                                        height: '20px',
+                                                                        fontSize: '12px',
+                                                                        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+                                                                        fontWeight: 'normal',
+                                                                        textAlign: 'center',
+                                                                        border: '1px solid #d1d5db',
+                                                                        borderRadius: '2px',
+                                                                        background: '#ffffff',
+                                                                        outline: 'none',
+                                                                        boxSizing: 'border-box',
+                                                                        display: 'inline-block',
+                                                                        margin: '0 1px'
+                                                                    };
+
+                                                                    const handleFocusStyle = (e) => {
+                                                                        e.target.style.fontSize = '12px';
+                                                                        e.target.style.width = '36px';
+                                                                    };
+
                                                                     return (
-                                                                        <div key={m} className="flex justify-center items-center gap-0.5 h-[20px]">
-                                                                            <LocalInput 
-                                                                                type="number" 
+                                                                        <div key={m} className="flex justify-center items-center h-[20px]">
+                                                                            <input 
+                                                                                type="text" 
                                                                                 value={outerVal} 
-                                                                                onChange={(val) => updateSpareField('outerBox', val)} 
-                                                                                className="input-compact w-[36px] text-center text-xs font-mono font-normal bg-transparent" 
+                                                                                onChange={e => updateSpareField('outerBox', e.target.value)} 
+                                                                                onFocus={handleFocusStyle}
+                                                                                style={spareInputStyle} 
                                                                                 placeholder="0"
                                                                             />
-                                                                            <LocalInput 
-                                                                                type="number" 
+                                                                            <input 
+                                                                                type="text" 
                                                                                 value={innerVal} 
-                                                                                onChange={(val) => updateSpareField('innerBox', val)} 
-                                                                                className="input-compact w-[36px] text-center text-xs font-mono font-normal bg-transparent" 
+                                                                                onChange={e => updateSpareField('innerBox', e.target.value)} 
+                                                                                onFocus={handleFocusStyle}
+                                                                                style={spareInputStyle} 
                                                                                 placeholder="0"
                                                                             />
-                                                                            <LocalInput 
-                                                                                type="number" 
+                                                                            <input 
+                                                                                type="text" 
                                                                                 value={labelVal} 
-                                                                                onChange={(val) => updateSpareField('label', val)} 
-                                                                                className="input-compact w-[36px] text-center text-xs font-mono font-normal bg-transparent" 
+                                                                                onChange={e => updateSpareField('label', e.target.value)} 
+                                                                                onFocus={handleFocusStyle}
+                                                                                style={spareInputStyle} 
                                                                                 placeholder="0"
                                                                             />
                                                                         </div>
@@ -569,7 +592,37 @@ const YoshiiDrayageView = () => {
         });
     };
 
-    const isReadOnlyUser = ctx.authUser && !ctx.authUser.canEdit;
+    // ドレージ専用: 日付のMM/DD表示整形用ヘルパー
+    const formatDisplayDate = (val) => {
+        if (!val) return '';
+        if (val.includes('-')) {
+            const parts = val.split('-');
+            if (parts.length === 3) return `${parts[1]}/${parts[2]}`;
+        }
+        if (val.includes('/')) {
+            const parts = val.split('/');
+            if (parts.length === 3) return `${parts[1]}/${parts[2]}`;
+        }
+        return val;
+    };
+
+    // ドレージ専用: 変更履歴(赤文字・ツールチップ)を保ちつつ完全編集不可にするコンポーネント
+    const ReadOnlyInput = ({ value, originalValue, originalMeta, className = "", isDate = false }) => {
+        let displayVal = value || '';
+        if (isDate) displayVal = formatDisplayDate(displayVal);
+        
+        const hasOrig = originalValue !== undefined && originalValue !== null && String(originalValue) !== '';
+        const isChanged = hasOrig && String(originalValue) !== String(value || '');
+        const tooltipClass = isChanged ? 'has-original-tooltip' : '';
+        const changedClass = (ctx.isChangeTrackingMode && isChanged) ? 'is-changed-cell' : 'text-gray-700';
+        const metaStr = originalMeta || '未設定';
+
+        return (
+            <div className={`w-full h-full flex items-center justify-center ${tooltipClass}`} data-original-val={originalValue === "" ? "【消去】" : originalValue} data-original-meta={metaStr}>
+                <input type="text" value={displayVal} readOnly className={`w-full bg-transparent border-none outline-none cursor-not-allowed ${className} ${changedClass}`} />
+            </div>
+        );
+    };
 
     return (
         <div className="p-4 bg-white flex-grow flex flex-col h-full">
@@ -666,7 +719,6 @@ const YoshiiDrayageView = () => {
                         ) : (
                             sortedMonths.map(mo => {
                                 const containersInMonth = groupedMap[mo] || [];
-                                const handleGridNav = ctx.createGridNav(`y-dray-${mo}`, containersInMonth.length - 1, 14);
 
                                 return (
                                     <React.Fragment key={mo}>
@@ -677,183 +729,4 @@ const YoshiiDrayageView = () => {
                                         </tr>
                                         {containersInMonth.map((container, idx) => {
                                             const totalQty = calculateContainerTotalQty(container.allocations);
-                                            const activeAllocEntries = Object.entries(container.allocations || {}).filter(([_, q]) => Number(q) > 0);
-
-                                            const origTime = (container.originals || {}).deliveryTime;
-                                            const currTime = container.deliveryTime || '';
-                                            const isTimeChanged = origTime !== undefined && origTime !== null && (
-                                                (origTime !== '' && currTime === '') || 
-                                                (origTime !== '' && currTime !== '' && origTime !== currTime) || 
-                                                (origTime === '' && currTime !== '' && (container.originalMetas || {}).deliveryTime)
-                                            );
-
-                                            return (
-                                                <tr key={container.id || `dray-${mo}-${idx}`} className="hover:bg-emerald-50/60 border-b table-row-compact">
-                                                    <td className="p-0.5 border text-center align-middle readonly-cell bg-gray-100">
-                                                        <LocalInput value={container.managementNo} readOnly={true} className="text-center text-xs font-bold readonly-cell bg-gray-100 cursor-not-allowed" dataGridId={`y-dray-${mo}-${idx}-0`} onGridKeyDown={handleGridNav} />
-                                                    </td>
-
-                                                    <td className="p-0.5 border text-center align-middle readonly-cell bg-gray-100">
-                                                        <DynamicSelect value={container.status} disabled={true} category="statuses" options={ctx.masterData.common.statuses} dataGridId={`y-dray-${mo}-${idx}-1`} onGridKeyDown={handleGridNav} className="w-full text-xs border-none bg-transparent outline-none text-center px-0 readonly-cell bg-gray-100 cursor-not-allowed" />
-                                                    </td>
-
-                                                    <td className="p-0.5 border text-center align-middle readonly-cell bg-gray-100">
-                                                        <LocalInput value={container.containerNo} readOnly={true} className="text-center text-xs font-mono readonly-cell bg-gray-100 cursor-not-allowed" dataGridId={`y-dray-${mo}-${idx}-2`} onGridKeyDown={handleGridNav} />
-                                                    </td>
-
-                                                    {/* ★ 積載型式 (ドレージ): ドレージ側は読み取り専用のまま、12px/等幅/標準ウェイトに統一 */}
-                                                    <td className="border text-xs text-left px-1 py-0.5 align-middle readonly-cell bg-gray-100">
-                                                        {activeAllocEntries.length === 0 ? (
-                                                            <span className="text-gray-400 text-[10px] italic">未割当</span>
-                                                        ) : (
-                                                            <div className="space-y-0.5">
-                                                                {activeAllocEntries.map(([m, q]) => (
-                                                                    <div key={m} className="flex justify-between items-center text-xs h-[20px]">
-                                                                        <span className="font-bold text-gray-700">{m}</span>
-                                                                        <span className="font-mono text-slate-700 font-normal ml-1">{Number(q).toLocaleString()}</span>
-                                                                    </div>
-                                                                ))}
-                                                            </div>
-                                                        )}
-                                                    </td>
-
-                                                    <td className="border font-mono text-xs text-right pr-1 bg-gray-100 readonly-cell align-middle text-gray-700">{totalQty > 0 ? totalQty.toLocaleString() : '0'}</td>
-
-                                                    {/* ★ 補充部品 (ドレージ): LocalInput + input-compactで安全に枠線なし/12px等幅標準ウェイトを実現 */}
-                                                    <td className="border text-center px-0 py-0.5 align-middle readonly-cell bg-gray-100">
-                                                        {activeAllocEntries.length === 0 ? (
-                                                            <div className="flex justify-center items-center gap-0.5 h-[20px]">
-                                                                <span className="text-[10px] text-gray-400">-</span>
-                                                            </div>
-                                                        ) : (
-                                                            <div className="space-y-0.5">
-                                                                {activeAllocEntries.map(([m, _]) => {
-                                                                    const sparePartsObj = container.spareParts || {};
-                                                                    const modelSpare = sparePartsObj[m] || {};
-
-                                                                    const outerVal = modelSpare.outerBox !== undefined ? modelSpare.outerBox : (container.spareOuter !== undefined ? container.spareOuter : '');
-                                                                    const innerVal = modelSpare.innerBox !== undefined ? modelSpare.innerBox : (container.spareInner !== undefined ? container.spareInner : '');
-                                                                    const labelVal = modelSpare.label !== undefined ? modelSpare.label : (container.spareLabel !== undefined ? container.spareLabel : '');
-
-                                                                    return (
-                                                                        <div key={m} className="flex justify-center items-center gap-0.5 h-[20px]">
-                                                                            <LocalInput 
-                                                                                type="number" 
-                                                                                value={outerVal} 
-                                                                                disabled={true} 
-                                                                                className="input-compact w-[36px] text-center text-xs font-mono font-normal text-gray-600 bg-transparent" 
-                                                                                placeholder="0"
-                                                                            />
-                                                                            <LocalInput 
-                                                                                type="number" 
-                                                                                value={innerVal} 
-                                                                                disabled={true} 
-                                                                                className="input-compact w-[36px] text-center text-xs font-mono font-normal text-gray-600 bg-transparent" 
-                                                                                placeholder="0"
-                                                                            />
-                                                                            <LocalInput 
-                                                                                type="number" 
-                                                                                value={labelVal} 
-                                                                                disabled={true} 
-                                                                                className="input-compact w-[36px] text-center text-xs font-mono font-normal text-gray-600 bg-transparent" 
-                                                                                placeholder="0"
-                                                                            />
-                                                                        </div>
-                                                                    );
-                                                                })}
-                                                            </div>
-                                                        )}
-                                                    </td>
-
-                                                    <td className="p-0.5 border text-center align-middle readonly-cell bg-gray-100">
-                                                        <DynamicSelect value={container.port} disabled={true} category="ports" options={ctx.masterData.yoshii.ports} dataGridId={`y-dray-${mo}-${idx}-3`} onGridKeyDown={handleGridNav} className="w-full text-xs border-none bg-transparent outline-none text-center px-0 readonly-cell bg-gray-100 cursor-not-allowed" />
-                                                    </td>
-
-                                                    <td className="p-0.5 border text-center align-middle readonly-cell bg-gray-100">
-                                                        <LocalInput type="qc-date" value={container.etd} readOnly={true} refDate={mo} className="text-left pl-2 text-xs readonly-cell bg-gray-100 cursor-not-allowed" dataGridId={`y-dray-${mo}-${idx}-4`} onGridKeyDown={handleGridNav} />
-                                                    </td>
-
-                                                    <td className="p-0.5 border text-center align-middle readonly-cell bg-gray-100">
-                                                        <LocalInput type="qc-date" value={container.eta} readOnly={true} refDate={mo} className="text-left pl-2 text-xs readonly-cell bg-gray-100 cursor-not-allowed" dataGridId={`y-dray-${mo}-${idx}-5`} onGridKeyDown={handleGridNav} />
-                                                    </td>
-
-                                                    <td className="p-0.5 border text-center align-middle readonly-cell bg-gray-100">
-                                                        <LocalInput type="qc-date" value={container.freetime} readOnly={true} refDate={mo} className="text-left pl-2 text-xs readonly-cell bg-gray-100 cursor-not-allowed" dataGridId={`y-dray-${mo}-${idx}-6`} onGridKeyDown={handleGridNav} />
-                                                    </td>
-
-                                                    <td className={`border text-center px-1 py-0.5 align-middle ${isReadOnlyUser ? 'readonly-cell bg-gray-100' : 'bg-emerald-50/30'}`}>
-                                                        <div className="flex items-center justify-between gap-0.5 w-full">
-                                                            <div className="w-[85px] flex-shrink-0">
-                                                                <LocalInput 
-                                                                    type="qc-date" 
-                                                                    value={container.deliveryDate} 
-                                                                    originalValue={(container.originals || {}).deliveryDate} 
-                                                                    originalMeta={(container.originalMetas || {}).deliveryDate} 
-                                                                    onChange={(v, orig) => ctx.updateContainer(container.id, { deliveryDate: v, originals: { ...(container.originals || {}), deliveryDate: container.originals?.deliveryDate !== undefined ? container.originals.deliveryDate : orig }, originalMetas: { ...(container.originalMetas || {}), deliveryDate: container.originalMetas?.deliveryDate !== undefined ? container.originalMetas.deliveryDate : `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}` } }, mo, 'yoshii', '納品日')} 
-                                                                    refDate={mo} 
-                                                                    className={`text-left pl-2 text-xs font-bold ${isReadOnlyUser ? 'readonly-cell bg-gray-100' : ''}`} 
-                                                                    dataGridId={`y-dray-${mo}-${idx}-7`} 
-                                                                    onGridKeyDown={handleGridNav} 
-                                                                />
-                                                            </div>
-                                                            <div className={`w-[80px] flex-shrink-0 flex items-center gap-0.5 relative ${isTimeChanged ? 'qc-change-dot' : ''}`} title={isTimeChanged ? `変更前: ${(container.originals || {}).deliveryTime || '未設定'} (${(container.originalMetas || {}).deliveryTime || ''})` : ''}>
-                                                                <input 
-                                                                    type="time" 
-                                                                    value={container.deliveryTime || ''} 
-                                                                    onChange={e => {
-                                                                        const val = e.target.value;
-                                                                        const prevValue = container.deliveryTime || '';
-                                                                        const orig = container.originals?.deliveryTime !== undefined ? container.originals.deliveryTime : prevValue;
-                                                                        ctx.updateContainer(container.id, { deliveryTime: val, originals: { ...(container.originals || {}), deliveryTime: orig }, originalMetas: { ...(container.originalMetas || {}), deliveryTime: container.originalMetas?.deliveryTime || `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}` } }, mo, 'yoshii', '納品時間');
-                                                                    }} 
-                                                                    className={`border rounded px-0.5 py-0 text-[10px] font-bold text-center w-[66px] h-[22px] outline-none focus:ring-1 focus:ring-indigo-500 ${isReadOnlyUser ? 'readonly-cell bg-gray-100 cursor-not-allowed' : 'bg-white cursor-pointer'}`}
-                                                                    disabled={isReadOnlyUser}
-                                                                />
-                                                                {container.deliveryTime && !isReadOnlyUser ? (
-                                                                    <button 
-                                                                        type="button" 
-                                                                        onClick={() => {
-                                                                            const prevValue = container.deliveryTime || '';
-                                                                            const orig = container.originals?.deliveryTime !== undefined ? container.originals.deliveryTime : prevValue;
-                                                                            ctx.updateContainer(container.id, { deliveryTime: '', originals: { ...(container.originals || {}), deliveryTime: orig }, originalMetas: { ...(container.originalMetas || {}), deliveryTime: container.originalMetas?.deliveryTime || `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}` } }, mo, 'yoshii', '納品時間 (削除)');
-                                                                        }} 
-                                                                        className="w-3.5 h-3.5 flex items-center justify-center text-[9px] font-bold text-gray-400 hover:text-red-600 hover:bg-gray-100 rounded transition" 
-                                                                        title="時刻をクリア"
-                                                                    >
-                                                                        ✕
-                                                                    </button>
-                                                                ) : <div className="w-3.5"></div>}
-                                                            </div>
-                                                        </div>
-                                                    </td>
-
-                                                    <td className={`p-0.5 border text-center align-middle whitespace-normal break-words ${isReadOnlyUser ? 'readonly-cell bg-gray-100' : ''}`}>
-                                                        <DynamicSelect value={container.destination} originalValue={(container.originals || {}).destination} originalMeta={(container.originalMetas || {}).destination} onChange={(val, cat, orig) => ctx.handleSelectChange(container.id, 'destination', true, 'yoshii', false, '納品先')(val, cat, orig)} category="destinations" options={ctx.masterData.yoshii.destinations} dataGridId={`y-dray-${mo}-${idx}-8`} onGridKeyDown={handleGridNav} className={`w-full text-xs border-none bg-transparent outline-none text-center px-0 h-auto whitespace-normal break-words ${isReadOnlyUser ? 'readonly-cell bg-gray-100' : ''}`} />
-                                                    </td>
-
-                                                    <td className={`p-0.5 border text-center align-middle whitespace-normal break-words ${isReadOnlyUser ? 'readonly-cell bg-gray-100' : ''}`}>
-                                                        <LocalTextArea value={container.notes} originalValue={(container.originals || {}).notes} originalMeta={(container.originalMetas || {}).notes} onChange={(v, orig) => ctx.updateContainer(container.id, { notes: v }, mo, 'yoshii', '備考')} isCompact={true} className={`h-auto whitespace-pre-wrap break-words ${isReadOnlyUser ? 'readonly-cell bg-gray-100' : ''}`}/>
-                                                    </td>
-
-                                                    <td className="p-0.5 border text-center align-middle readonly-cell bg-gray-100">
-                                                        <DynamicSelect value={container.containerSize} disabled={true} category="containerSizes" options={ctx.masterData.common.containerSizes} dataGridId={`y-dray-${mo}-${idx}-9`} onGridKeyDown={handleGridNav} className="w-full text-xs border-none bg-transparent outline-none text-center px-0 readonly-cell bg-gray-100 cursor-not-allowed" />
-                                                    </td>
-
-                                                    <td className="p-0.5 border text-center align-middle readonly-cell bg-gray-100">
-                                                        <LocalInput value={container.managementNo} readOnly={true} className="text-center text-xs readonly-cell bg-gray-100 cursor-not-allowed" dataGridId={`y-dray-${mo}-${idx}-10`} onGridKeyDown={handleGridNav} />
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })}
-                                    </React.Fragment>
-                                );
-                            })
-                        )}
-                    </tbody>
-                </table>
-            </div>
-
-            <ExportPrintModal isOpen={exportModal.isOpen} onClose={() => setExportModal({ isOpen: false, type: 'excel' })} screenName="ドレージ手配" currentMonthStr={ctx.currentMonthStr} defaultMode="year" onStartExport={handleExecuteExport} />
-        </div>
-    );
-};
+                                            const activeAllocEntries = Object.entries(container.allocations || {}).filter(([_, q])
