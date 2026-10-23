@@ -1,14 +1,14 @@
 // shipping_views_plan.js
 // =========================================================
 // shipping_views_plan.js - 出荷計画・割振り画面モジュール
-// ★ WebVer. 123 対応 / _js049 Ship画面仕様準拠・入力保持完全修復版
+// ★ WebVer. 123 対応 / _js050 計画画面 入力保存・数値保持完全修復版
 // ★ 最上行ファイル名識別コメント保持 (// shipping_views_plan.js)
-// ★ 1. 計画画面・割振り画面: Ship画面(shipping_views_ship.js)の入力値処理と同等に改修し入力保持を完全保証。
-// ★ 2. 計画画面: 「入数(qtyPerCarton)」を型式のすぐ右(幅45px)に配置、仕入先幅(55px)補正。
-// ★ 3. 割振り画面: 割振数が「入数」で割り切れない場合の薄赤背景(#fee2e2)判定を維持。
+// ★ 1. 計画画面: handleQuantityChange をShip画面仕様に完全統一。数値の入力・Enter保存・保持を徹底修復。
+// ★ 2. 割振り画面: OK確認済みの入力動作および端数赤背景チェック(#fee2e2)を完全維持。
+// ★ 3. レイアウト: 仕入先(55px)、型式、入数(45px・型式の右)の正位置を維持。
 // =========================================================
 
-const JS_PLAN_VERSION = '_js049';
+const JS_PLAN_VERSION = '_js050';
 
 // 【型式編集・削除モーダル (V94完全移植)】
 const ModelEditModal = ({ isOpen, onClose, company='yoshii' }) => {
@@ -447,10 +447,10 @@ const YoshiiPlanView = () => {
         setIsAddModalOpen(false);
     };
 
-    // ★ Ship画面準拠: 入力数値を即座に特定・反映する安定化処理
+    // ★ 完全修復: Ship画面仕様に揃えた超安定な計画数変更・保存ロジック
     const handleQuantityChange = async (model, month, value, orig) => {
         const targetPlan = getPlanData(model, month);
-        const newQty = value === '' ? 0 : Number(value);
+        const newQty = value === '' || value === null || value === undefined ? '' : Number(value);
         const todayYYMMDD = ctx.getFormattedShortDate();
 
         const matchModelDetails = ctx.masterData.yoshii?.modelDetails?.[model] || {};
@@ -464,11 +464,10 @@ const YoshiiPlanView = () => {
         const metaStr = `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}`;
 
         if (targetPlan) {
-            const currentQty = Number(targetPlan.quantity || 0);
-            if (currentQty === newQty) return;
+            if (targetPlan.quantity === newQty) return;
 
             const prevHist = targetPlan.qtyHistory || [];
-            const updatedHist = [{ qty: newQty, date: todayYYMMDD }, ...prevHist];
+            const updatedHist = [{ qty: newQty === '' ? 0 : newQty, date: todayYYMMDD }, ...prevHist];
 
             await ctx.updatePlan(targetPlan.id, { 
                 quantity: newQty, 
@@ -480,7 +479,7 @@ const YoshiiPlanView = () => {
                 originalMeta: orig !== undefined && orig !== '' ? (targetPlan.originalMeta || metaStr) : targetPlan.originalMeta
             }, `型式 [${model}] ${month} 計画数`);
         } else {
-            if (newQty === 0) return;
+            if (newQty === '') return;
             await ctx.updatePlan(null, {
                 company: 'yoshii',
                 model: model,
