@@ -1,16 +1,16 @@
 // shipping_views_ship.js
 // =========================================================
 // shipping_views_ship.js - 出荷日程・ドレージ画面モジュール
-// ★ WebVer. 123 対応 / _js034 補充部品＆積載型式数値のbold（太字）除去・標準ウェイト化調整版
+// ★ WebVer. 123 対応 / _js035 積載型式の編集対応 & 補充部品の入力バグ(LocalInput+input-compact)完全修正版
 // ★ 最上行ファイル名識別コメント保持 (// shipping_views_ship.js)
-// ★ 1. 補充部品データ: 実データ構造(spareParts[m].outerBox/innerBox/label)に基づく完全読み書き
-// ★ 2. スタイル調整: インラインstyle/クラス指定からfontWeight:'bold'を除去し、36px均等・12px等幅・標準ウェイト・中央寄せで描画
-// ★ 3. 積載型式数値: 12px等幅・標準ウェイトへ調整し、文字のくっきり感を保持しつつ太さを標準化
-// ★ 4. 月タイトル: <td> タグへ bg-emerald-100 text-emerald-900 を直接適用
-// ★ 5. 納品時間: w-[66px] 幅で 時計アイコン・末尾数字の見切れを解消
+// ★ 1. 積載型式の数値: 工場での修正指示に基づき、LocalInputによる編集・更新(allocations)に対応
+// ★ 2. 補充部品の入力: LocalInput + 'input-compact' クラスを使用し、クリック位置ズレ・フォント肥大化バグを完全に修正。枠線なしの12px/等幅/標準ウェイトを実現
+// ★ 3. 月タイトル: <td> タグへ bg-emerald-100 text-emerald-900 を直接適用
+// ★ 4. 納品時間: w-[66px] 幅で 時計アイコン・末尾数字の見切れを解消
+// ★ 5. 連番キー(sortOrder)による割振り画面(親)の並び順100%継承
 // =========================================================
 
-const JS_SHIP_VERSION = '_js034';
+const JS_SHIP_VERSION = '_js035';
 
 // 【ヘルパー: コンテナ内割振り製品総数量の動的自動計算】
 const calculateContainerTotalQty = (allocationsObj) => {
@@ -267,7 +267,7 @@ const YoshiiShipView = () => {
                                                         <LocalInput value={container.containerNo} originalValue={(container.originals || {}).containerNo} originalMeta={(container.originalMetas || {}).containerNo} onChange={(v, orig) => ctx.updateContainer(container.id, { containerNo: v }, mo, 'yoshii', 'コンテナNO.')} className="text-center text-xs font-mono" dataGridId={`y-ship-${mo}-${idx}-2`} onGridKeyDown={handleGridNav} />
                                                     </td>
 
-                                                    {/* ★ 積載型式: 右側の数値表示を 12px / font-mono / font-normal (標準ウェイト) へ調整 */}
+                                                    {/* ★ 積載型式: 工場の編集要件に合わせて LocalInput (input-compact) に変更し編集・保存可能化 */}
                                                     <td className="border text-xs text-left px-1 py-0.5 bg-gray-50/50 align-middle">
                                                         {activeAllocEntries.length === 0 ? (
                                                             <span className="text-gray-400 text-[10px] italic">未割当</span>
@@ -276,7 +276,18 @@ const YoshiiShipView = () => {
                                                                 {activeAllocEntries.map(([m, q]) => (
                                                                     <div key={m} className="flex justify-between items-center text-xs h-[20px]">
                                                                         <span className="font-bold text-gray-800">{m}</span>
-                                                                        <span className="font-mono text-emerald-800 font-normal ml-1">{Number(q).toLocaleString()}</span>
+                                                                        <div className="w-[42px] ml-1">
+                                                                            <LocalInput 
+                                                                                type="number"
+                                                                                value={q}
+                                                                                onChange={(v) => {
+                                                                                    const updatedAlloc = { ...(container.allocations || {}) };
+                                                                                    updatedAlloc[m] = Number(v) || 0;
+                                                                                    ctx.updateContainer(container.id, { allocations: updatedAlloc }, mo, 'yoshii', `${m} 割振数`);
+                                                                                }}
+                                                                                className="input-compact w-full text-right text-xs font-mono font-normal text-emerald-800 bg-transparent"
+                                                                            />
+                                                                        </div>
                                                                     </div>
                                                                 ))}
                                                             </div>
@@ -285,7 +296,7 @@ const YoshiiShipView = () => {
 
                                                     <td className="border font-mono text-xs text-right pr-1 bg-emerald-50/50 text-emerald-900 font-bold align-middle">{totalQty > 0 ? totalQty.toLocaleString() : '0'}</td>
 
-                                                    {/* ★ 補充部品: fontWeight:'normal' (標準ウェイト) に変更し bold 除去 */}
+                                                    {/* ★ 補充部品: LocalInput + input-compact を使用。親CSS干渉による位置ズレ・フォント肥大化を完全防止し、枠線なしの12px等幅標準ウェイトを実現 */}
                                                     <td className="border text-center px-0 py-0.5 bg-emerald-50/30 align-middle">
                                                         {activeAllocEntries.length === 0 ? (
                                                             <div className="flex justify-center items-center gap-0.5 h-[20px]">
@@ -320,39 +331,27 @@ const YoshiiShipView = () => {
                                                                         ctx.updateContainer(container.id, updatePayload, mo, 'yoshii', `${m} 補充部品(${fieldKey})`);
                                                                     };
 
-                                                                    const spareInputStyle = {
-                                                                        width: '36px',
-                                                                        height: '20px',
-                                                                        fontSize: '12px',
-                                                                        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-                                                                        fontWeight: 'normal',
-                                                                        textAlign: 'center',
-                                                                        border: 'none',
-                                                                        background: 'transparent',
-                                                                        outline: 'none'
-                                                                    };
-
                                                                     return (
                                                                         <div key={m} className="flex justify-center items-center gap-0.5 h-[20px]">
-                                                                            <input 
-                                                                                type="text" 
+                                                                            <LocalInput 
+                                                                                type="number" 
                                                                                 value={outerVal} 
-                                                                                onChange={e => updateSpareField('outerBox', e.target.value)} 
-                                                                                style={spareInputStyle} 
+                                                                                onChange={(val) => updateSpareField('outerBox', val)} 
+                                                                                className="input-compact w-[36px] text-center text-xs font-mono font-normal bg-transparent" 
                                                                                 placeholder="0"
                                                                             />
-                                                                            <input 
-                                                                                type="text" 
+                                                                            <LocalInput 
+                                                                                type="number" 
                                                                                 value={innerVal} 
-                                                                                onChange={e => updateSpareField('innerBox', e.target.value)} 
-                                                                                style={spareInputStyle} 
+                                                                                onChange={(val) => updateSpareField('innerBox', val)} 
+                                                                                className="input-compact w-[36px] text-center text-xs font-mono font-normal bg-transparent" 
                                                                                 placeholder="0"
                                                                             />
-                                                                            <input 
-                                                                                type="text" 
+                                                                            <LocalInput 
+                                                                                type="number" 
                                                                                 value={labelVal} 
-                                                                                onChange={e => updateSpareField('label', e.target.value)} 
-                                                                                style={spareInputStyle} 
+                                                                                onChange={(val) => updateSpareField('label', val)} 
+                                                                                className="input-compact w-[36px] text-center text-xs font-mono font-normal bg-transparent" 
                                                                                 placeholder="0"
                                                                             />
                                                                         </div>
@@ -702,7 +701,7 @@ const YoshiiDrayageView = () => {
                                                         <LocalInput value={container.containerNo} readOnly={true} className="text-center text-xs font-mono readonly-cell bg-gray-100 cursor-not-allowed" dataGridId={`y-dray-${mo}-${idx}-2`} onGridKeyDown={handleGridNav} />
                                                     </td>
 
-                                                    {/* ★ 積載型式 (ドレージ): 右側の数値表示を 12px / font-mono / font-normal (標準ウェイト) へ調整 */}
+                                                    {/* ★ 積載型式 (ドレージ): ドレージ側は読み取り専用のまま、12px/等幅/標準ウェイトに統一 */}
                                                     <td className="border text-xs text-left px-1 py-0.5 align-middle readonly-cell bg-gray-100">
                                                         {activeAllocEntries.length === 0 ? (
                                                             <span className="text-gray-400 text-[10px] italic">未割当</span>
@@ -720,7 +719,7 @@ const YoshiiDrayageView = () => {
 
                                                     <td className="border font-mono text-xs text-right pr-1 bg-gray-100 readonly-cell align-middle text-gray-700">{totalQty > 0 ? totalQty.toLocaleString() : '0'}</td>
 
-                                                    {/* ★ 補充部品 (ドレージ): fontWeight:'normal' (標準ウェイト) に変更し bold 除去 */}
+                                                    {/* ★ 補充部品 (ドレージ): LocalInput + input-compactで安全に枠線なし/12px等幅標準ウェイトを実現 */}
                                                     <td className="border text-center px-0 py-0.5 align-middle readonly-cell bg-gray-100">
                                                         {activeAllocEntries.length === 0 ? (
                                                             <div className="flex justify-center items-center gap-0.5 h-[20px]">
@@ -736,40 +735,27 @@ const YoshiiDrayageView = () => {
                                                                     const innerVal = modelSpare.innerBox !== undefined ? modelSpare.innerBox : (container.spareInner !== undefined ? container.spareInner : '');
                                                                     const labelVal = modelSpare.label !== undefined ? modelSpare.label : (container.spareLabel !== undefined ? container.spareLabel : '');
 
-                                                                    const spareInputStyleReadOnly = {
-                                                                        width: '36px',
-                                                                        height: '20px',
-                                                                        fontSize: '12px',
-                                                                        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-                                                                        fontWeight: 'normal',
-                                                                        textAlign: 'center',
-                                                                        border: 'none',
-                                                                        background: 'transparent',
-                                                                        outline: 'none',
-                                                                        color: '#374151'
-                                                                    };
-
                                                                     return (
                                                                         <div key={m} className="flex justify-center items-center gap-0.5 h-[20px]">
-                                                                            <input 
-                                                                                type="text" 
+                                                                            <LocalInput 
+                                                                                type="number" 
                                                                                 value={outerVal} 
                                                                                 disabled={true} 
-                                                                                style={spareInputStyleReadOnly} 
+                                                                                className="input-compact w-[36px] text-center text-xs font-mono font-normal text-gray-600 bg-transparent" 
                                                                                 placeholder="0"
                                                                             />
-                                                                            <input 
-                                                                                type="text" 
+                                                                            <LocalInput 
+                                                                                type="number" 
                                                                                 value={innerVal} 
                                                                                 disabled={true} 
-                                                                                style={spareInputStyleReadOnly} 
+                                                                                className="input-compact w-[36px] text-center text-xs font-mono font-normal text-gray-600 bg-transparent" 
                                                                                 placeholder="0"
                                                                             />
-                                                                            <input 
-                                                                                type="text" 
+                                                                            <LocalInput 
+                                                                                type="number" 
                                                                                 value={labelVal} 
                                                                                 disabled={true} 
-                                                                                style={spareInputStyleReadOnly} 
+                                                                                className="input-compact w-[36px] text-center text-xs font-mono font-normal text-gray-600 bg-transparent" 
                                                                                 placeholder="0"
                                                                             />
                                                                         </div>
