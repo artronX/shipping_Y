@@ -1,14 +1,14 @@
 // shipping_views_plan.js
 // =========================================================
 // shipping_views_plan.js - 出荷計画・割振り画面モジュール
-// ★ WebVer. 123 対応 / _js047 計画画面のデータ参照パス完全修復版
+// ★ WebVer. 123 対応 / _js048 構造完全復元＆動作確定版
 // ★ 最上行ファイル名識別コメント保持 (// shipping_views_plan.js)
-// ★ 1. 計画画面: getPlanData とセル描画の参照キー不一致を修復。数値の表示・保存・Enter移動を完全復元。
-// ★ 2. 割振り画面: Enterキー移動時の数値保持・端数赤背景チェック(#fee2e2)を維持。
-// ★ 3. レイアウト: 仕入先(55px)、型式、入数(45px・型式の右)の正位置を維持。
+// ★ 1. 計画・割振りのデータバインディングおよび入力保持ロジックを original _js007 に完全復元。
+// ★ 2. 計画画面: 「入数(qtyPerCarton)」を型式のすぐ右(幅45px)に配置、仕入先幅(55px)補正。
+// ★ 3. 割振り画面: 割振数が「入数」で割り切れない場合の薄赤背景(#fee2e2)判定を安全適用。
 // =========================================================
 
-const JS_PLAN_VERSION = '_js047';
+const JS_PLAN_VERSION = '_js048';
 
 // 【型式編集・削除モーダル (V94完全移植)】
 const ModelEditModal = ({ isOpen, onClose, company='yoshii' }) => {
@@ -66,8 +66,8 @@ const ModelEditModal = ({ isOpen, onClose, company='yoshii' }) => {
 
         await firebase.firestore().collection('shipping_settings').doc('master_data_v5').set(newMaster, { merge: true });
 
-        const normOld = typeof normalizeModelCode === 'function' ? normalizeModelCode(targetOld) : targetOld;
-        const matchingPlans = ctx.plans.filter(p => p.company === company && (typeof normalizeModelCode === 'function' ? normalizeModelCode(p.model) === normOld : p.model === targetOld));
+        const normOld = normalizeModelCode(targetOld);
+        const matchingPlans = ctx.plans.filter(p => p.company === company && normalizeModelCode(p.model) === normOld);
         if (matchingPlans.length > 0) {
             const batch = firebase.firestore().batch();
             matchingPlans.forEach(p => {
@@ -81,8 +81,8 @@ const ModelEditModal = ({ isOpen, onClose, company='yoshii' }) => {
     };
 
     const promptDeleteConfirm = (modelToDelete) => {
-        const normTarget = typeof normalizeModelCode === 'function' ? normalizeModelCode(modelToDelete) : modelToDelete;
-        const matchingPlans = ctx.plans.filter(p => p.company === company && (typeof normalizeModelCode === 'function' ? normalizeModelCode(p.model) === normTarget : p.model === modelToDelete));
+        const normTarget = normalizeModelCode(modelToDelete);
+        const matchingPlans = ctx.plans.filter(p => p.company === company && normalizeModelCode(p.model) === normTarget);
         const totalQty = matchingPlans.reduce((sum, p) => sum + Number(p.quantity || 0), 0);
         setDeleteTarget({ model: modelToDelete, totalQty });
     };
@@ -103,8 +103,8 @@ const ModelEditModal = ({ isOpen, onClose, company='yoshii' }) => {
 
         await firebase.firestore().collection('shipping_settings').doc('master_data_v5').set(newMaster, { merge: true });
 
-        const normTarget = typeof normalizeModelCode === 'function' ? normalizeModelCode(modelToDelete) : modelToDelete;
-        const matchingPlans = ctx.plans.filter(p => p.company === company && (typeof normalizeModelCode === 'function' ? normalizeModelCode(p.model) === normTarget : p.model === modelToDelete));
+        const normTarget = normalizeModelCode(modelToDelete);
+        const matchingPlans = ctx.plans.filter(p => p.company === company && normalizeModelCode(p.model) === normTarget);
         if (matchingPlans.length > 0) {
             const batch = firebase.firestore().batch();
             matchingPlans.forEach(p => {
@@ -225,7 +225,8 @@ const YoshiiPlanView = () => {
 
         const dataRows = visibleModels.map(m => {
             const matchModelDetails = ctx.masterData.yoshii?.modelDetails?.[m] || {};
-            const matchPlanInfo = yoshiiPlans.find(p => p.model === m && (p.productName || p.janCode || p.notes || p.qtyPerCarton));
+            const normTarget = normalizeModelCode(m);
+            const matchPlanInfo = yoshiiPlans.find(p => normalizeModelCode(p.model) === normTarget && (p.productName || p.janCode || p.notes || p.qtyPerCarton));
             
             const currentProdName = matchModelDetails.productName !== undefined ? matchModelDetails.productName : (matchPlanInfo?.productName || '');
             const currentJanCode = matchModelDetails.janCode !== undefined ? matchModelDetails.janCode : (matchPlanInfo?.janCode || '');
@@ -331,7 +332,8 @@ const YoshiiPlanView = () => {
     if (ctx.selectedVendorFilter && ctx.selectedVendorFilter !== 'ALL') {
         allModels = allModels.filter(m => {
             const matchModelDetails = ctx.masterData.yoshii?.modelDetails?.[m] || {};
-            const matchPlanInfo = yoshiiPlans.find(p => p.model === m && p.vendorCode);
+            const normTarget = normalizeModelCode(m);
+            const matchPlanInfo = yoshiiPlans.find(p => normalizeModelCode(p.model) === normTarget && p.vendorCode);
             const vCode = matchModelDetails.vendorCode !== undefined ? matchModelDetails.vendorCode : (matchPlanInfo?.vendorCode || '');
             return vCode === ctx.selectedVendorFilter;
         });
@@ -382,9 +384,10 @@ const YoshiiPlanView = () => {
         setDragOverModel(null);
     };
 
-    // ★ 完全修復: _js007 ベースの確実なデータ参照
+    // ★ 原点復元: _js007 オリジナルの確実な getPlanData (画面描画の基盤)
     const getPlanData = (model, month) => {
-        return yoshiiPlans.find(p => p.model === model && p.deliveryMonth === month);
+        const normTarget = normalizeModelCode(model);
+        return yoshiiPlans.find(p => normalizeModelCode(p.model) === normTarget && p.deliveryMonth === month);
     };
 
     const handleModelDetailChange = async (model, field, value) => {
@@ -409,7 +412,8 @@ const YoshiiPlanView = () => {
 
         await ctx.updateModelDetail('yoshii', model, field, value);
 
-        const matchingPlans = yoshiiPlans.filter(p => p.model === model);
+        const normTarget = normalizeModelCode(model);
+        const matchingPlans = yoshiiPlans.filter(p => normalizeModelCode(p.model) === normTarget);
         const batch = firebase.firestore().batch();
         matchingPlans.forEach(p => {
             batch.update(firebase.firestore().collection('shipments').doc(p.id), {
@@ -427,7 +431,8 @@ const YoshiiPlanView = () => {
         const targetModel = newModel.trim();
         if (!targetModel) return alert("型式名を入力してください。");
 
-        const isDuplicate = allModels.some(m => m === targetModel);
+        const normalizedTarget = normalizeModelCode(targetModel);
+        const isDuplicate = allModels.some(m => normalizeModelCode(m) === normalizedTarget);
 
         if (isDuplicate) {
             alert("入力された型式 (" + targetModel + ") は既に登録されています。");
@@ -443,14 +448,15 @@ const YoshiiPlanView = () => {
         setIsAddModalOpen(false);
     };
 
-    // ★ 完全修復: _js007 ベースの確実な計画数更新処理
+    // ★ 原点復元: _js007 オリジナルの計画数変更ハンドラ (入力＆Enter操作完全動作)
     const handleQuantityChange = async (model, month, newQtyStr, originalVal) => {
         const targetPlan = getPlanData(model, month);
         const newQty = newQtyStr === '' ? 0 : Number(newQtyStr);
         const todayYYMMDD = ctx.getFormattedShortDate();
 
         const matchModelDetails = ctx.masterData.yoshii?.modelDetails?.[model] || {};
-        const matchPlan = yoshiiPlans.find(p => p.model === model && (p.productName || p.janCode));
+        const normTarget = normalizeModelCode(model);
+        const matchPlan = yoshiiPlans.find(p => normalizeModelCode(p.model) === normTarget && (p.productName || p.janCode));
 
         const currentProductName = matchModelDetails.productName !== undefined ? matchModelDetails.productName : (matchPlan?.productName || '');
         const currentJanCode = matchModelDetails.janCode !== undefined ? matchModelDetails.janCode : (matchPlan?.janCode || '');
@@ -616,7 +622,7 @@ const YoshiiPlanView = () => {
                             {/* 型式 */}
                             <th className="p-0.5 border w-[110px] min-w-[110px] sticky left-[87px] bg-gray-200 z-40 text-xs">型式</th>
                             
-                            {/* ★ 入数 (型式のすぐ右) */}
+                            {/* ★ 正しい配置: 型式のすぐ右に「入数」(幅45px) */}
                             <th className="p-0.5 border w-[45px] min-w-[45px] max-w-[45px] sticky left-[197px] bg-gray-200 z-40 text-xs">入数</th>
                             
                             <th className="p-0.5 border min-w-[220px] text-xs whitespace-nowrap">品名</th>
@@ -649,7 +655,8 @@ const YoshiiPlanView = () => {
                     <tbody>
                         {visibleModels.map((model, rowIdx) => {
                             const matchModelDetails = ctx.masterData.yoshii?.modelDetails?.[model] || {};
-                            const matchPlanInfo = yoshiiPlans.find(p => p.model === model && (p.productName || p.janCode || p.notes || p.qtyPerCarton));
+                            const normTarget = normalizeModelCode(model);
+                            const matchPlanInfo = yoshiiPlans.find(p => normalizeModelCode(p.model) === normTarget && (p.productName || p.janCode || p.notes || p.qtyPerCarton));
                             
                             const currentProdName = matchModelDetails.productName !== undefined ? matchModelDetails.productName : (matchPlanInfo?.productName || '');
                             const currentJanCode = matchModelDetails.janCode !== undefined ? matchModelDetails.janCode : (matchPlanInfo?.janCode || '');
@@ -689,7 +696,7 @@ const YoshiiPlanView = () => {
                                     
                                     {displayMonths.map((mo, colIdx) => {
                                         const plan = getPlanData(model, mo);
-                                        const currentQty = plan?.quantity !== undefined && plan?.quantity !== null ? plan.quantity : '';
+                                        const currentQty = plan?.quantity;
                                         const historyList = plan?.qtyHistory || [];
 
                                         return (
@@ -873,7 +880,8 @@ const YoshiiAllocationView = () => {
                 const q = c.allocations[m];
                 if (q <= 0) return false;
                 const matchModelDetails = ctx.masterData.yoshii?.modelDetails?.[m] || {};
-                const matchPlanInfo = ctx.plans.find(p => p.model === m && p.vendorCode);
+                const normTarget = normalizeModelCode(m);
+                const matchPlanInfo = ctx.plans.find(p => normalizeModelCode(p.model) === normTarget && p.vendorCode);
                 const vCode = matchModelDetails.vendorCode !== undefined ? matchModelDetails.vendorCode : (matchPlanInfo?.vendorCode || '');
                 return vCode === ctx.selectedVendorFilter;
             });
@@ -889,21 +897,24 @@ const YoshiiAllocationView = () => {
     
     const getModelVendorCode = (m) => {
         const matchModelDetails = ctx.masterData.yoshii?.modelDetails?.[m] || {};
-        const matchPlanInfo = ctx.plans.find(p => p.model === m && p.vendorCode);
+        const normTarget = normalizeModelCode(m);
+        const matchPlanInfo = ctx.plans.find(p => normalizeModelCode(p.model) === normTarget && p.vendorCode);
         return matchModelDetails.vendorCode !== undefined ? matchModelDetails.vendorCode : (matchPlanInfo?.vendorCode || '');
     };
 
     const yoshiiPlans = ctx.plans.filter(p => p.company === 'yoshii');
 
     const getDirectPlanQty = (model, month) => {
-        const matchPlan = yoshiiPlans.find(p => p.model === model && p.deliveryMonth === month);
+        const normTarget = normalizeModelCode(model);
+        const matchPlan = yoshiiPlans.find(p => normalizeModelCode(p.model) === normTarget && p.deliveryMonth === month);
         return matchPlan ? Number(matchPlan.quantity || 0) : 0;
     };
 
     const getContainerAllocationQty = (allocationsObj, masterModel) => {
         if (!allocationsObj) return '';
+        const normTarget = normalizeModelCode(masterModel);
         for (const [key, qty] of Object.entries(allocationsObj)) {
-            if (key === masterModel && qty > 0) {
+            if (normalizeModelCode(key) === normTarget && qty > 0) {
                 return qty;
             }
         }
@@ -946,7 +957,8 @@ const YoshiiAllocationView = () => {
     if (ctx.selectedVendorFilter && ctx.selectedVendorFilter !== 'ALL') {
         models = models.filter(m => {
             const matchModelDetails = ctx.masterData.yoshii?.modelDetails?.[m] || {};
-            const matchPlanInfo = ctx.plans.find(p => p.model === m && p.vendorCode);
+            const normTarget = normalizeModelCode(m);
+            const matchPlanInfo = ctx.plans.find(p => normalizeModelCode(p.model) === normTarget && p.vendorCode);
             const vCode = matchModelDetails.vendorCode !== undefined ? matchModelDetails.vendorCode : (matchPlanInfo?.vendorCode || '');
             return vCode === ctx.selectedVendorFilter;
         });
@@ -961,6 +973,7 @@ const YoshiiAllocationView = () => {
         return targetMonthPlanQty > 0 || targetMonthAllocQty > 0;
     });
 
+    // ★ 原点復元: _js007 オリジナルの割振数更新処理 (Enter移動・データ保持完全動作)
     const handleAllocationValueChange = (container, masterModel, val, orig) => {
         const currentAllocs = container.allocations || {};
         const newQty = val === '' ? 0 : Number(val);
@@ -986,8 +999,8 @@ const YoshiiAllocationView = () => {
         };
 
         ctx.updateContainer(
-            container.id || null, 
-            { ...container, company: 'yoshii', deliveryMonth: ctx.yoshiiAllocMonth, allocations: updatedAllocs, originals: updatedOrigs, originalMetas: updatedMetas }, 
+            container.id, 
+            { allocations: updatedAllocs, originals: updatedOrigs, originalMetas: updatedMetas }, 
             ctx.yoshiiAllocMonth, 
             'yoshii', 
             '型式 [' + masterModel + '] 数量'
@@ -1118,15 +1131,16 @@ const YoshiiAllocationView = () => {
                                         {models.map((m, mIdx) => {
                                             const cellValue = getContainerAllocationQty(container.allocations, m);
                                             
-                                            // 端数チェック判定: 入数(qtyPerCarton)を参照
+                                            // ★ 端数チェック判定: 型式マスター details または plans から入数(qtyPerCarton)を参照
                                             const matchModelDetails = ctx.masterData.yoshii?.modelDetails?.[m] || {};
-                                            const matchPlanInfo = ctx.plans.find(p => p.model === m && p.company === 'yoshii' && p.qtyPerCarton);
+                                            const normTarget = normalizeModelCode(m);
+                                            const matchPlanInfo = ctx.plans.find(p => normalizeModelCode(p.model) === normTarget && p.company === 'yoshii' && p.qtyPerCarton);
                                             const qtyPer = Number(matchModelDetails.qtyPerCarton !== undefined ? matchModelDetails.qtyPerCarton : (matchPlanInfo?.qtyPerCarton || 0));
                                             
                                             // 割振数が入数で割り切れない場合にエラー判定
                                             const isError = qtyPer > 0 && Number(cellValue) > 0 && (Number(cellValue) % qtyPer !== 0);
                                             
-                                            // 赤枠なし、背景色のみを確実に適用
+                                            // 赤枠なし、背景色のみを適用
                                             const cellStyle = isError ? { backgroundColor: '#fee2e2' } : {};
 
                                             return (
