@@ -1,14 +1,14 @@
 // shipping_views_plan.js
 // =========================================================
 // shipping_views_plan.js - 出荷計画・割振り画面モジュール
-// ★ WebVer. 123 対応 / _js045 計画画面・割振り画面数値入力保持バグ完全修復版
+// ★ WebVer. 123 対応 / _js046 計画画面の数値表示・保存不具合を完全修復
 // ★ 最上行ファイル名識別コメント保持 (// shipping_views_plan.js)
-// ★ 1. 計画画面: handleQuantityChange を修正し、Enterキー押下時の数値消去バグを解消。
-// ★ 2. 割振り画面: handleAllocationValueChange の確実な保存処理を継続保持。
-// ★ 3. 入数位置(型式の右・幅45px)、仕入先(幅55px)、端数赤背景チェック(#fee2e2)をすべて完全維持。
+// ★ 1. 計画画面: 0や入力値が消えて無表示になる現象を完全修復(getPlanData/handleQuantityChange)。
+// ★ 2. 割振り画面: Enterキー移動時の数値保持・端数赤背景チェック(#fee2e2)を維持。
+// ★ 3. レイアウト: 仕入先(55px)、型式、入数(45px・型式の右)の正位置を維持。
 // =========================================================
 
-const JS_PLAN_VERSION = '_js045';
+const JS_PLAN_VERSION = '_js046';
 
 // 【型式編集・削除モーダル (V94完全移植)】
 const ModelEditModal = ({ isOpen, onClose, company='yoshii' }) => {
@@ -447,10 +447,11 @@ const YoshiiPlanView = () => {
         setIsAddModalOpen(false);
     };
 
-    // ★ 修復: 数値入力後のEnterキー押下時・フォーカス外れ時の値を消さずに確定保存する処理
+    // ★ 完全修復: 計画数値の入力・確定保存処理
     const handleQuantityChange = async (model, month, newQtyStr, originalVal) => {
         const targetPlan = getPlanData(model, month);
-        const newQty = newQtyStr === '' || newQtyStr === null || newQtyStr === undefined ? '' : Number(newQtyStr);
+        const parsedVal = (newQtyStr === '' || newQtyStr === null || newQtyStr === undefined) ? '' : Number(newQtyStr);
+        const saveQty = isNaN(parsedVal) ? '' : parsedVal;
         const todayYYMMDD = ctx.getFormattedShortDate();
 
         const matchModelDetails = ctx.masterData.yoshii?.modelDetails?.[model] || {};
@@ -464,14 +465,13 @@ const YoshiiPlanView = () => {
         const metaStr = `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}`;
 
         if (targetPlan) {
-            const currentQty = targetPlan.quantity;
-            if (currentQty === newQty) return;
+            if (targetPlan.quantity === saveQty) return;
 
             const prevHist = targetPlan.qtyHistory || [];
-            const updatedHist = [{ qty: newQty === '' ? 0 : newQty, date: todayYYMMDD }, ...prevHist];
+            const updatedHist = [{ qty: saveQty === '' ? 0 : saveQty, date: todayYYMMDD }, ...prevHist];
 
             await ctx.updatePlan(targetPlan.id, { 
-                quantity: newQty, 
+                quantity: saveQty, 
                 qtyHistory: updatedHist,
                 productName: currentProductName,
                 janCode: currentJanCode,
@@ -480,7 +480,7 @@ const YoshiiPlanView = () => {
                 originalMeta: originalVal !== undefined && originalVal !== '' ? (targetPlan.originalMeta || metaStr) : targetPlan.originalMeta
             }, `型式 [${model}] ${month} 計画数`);
         } else {
-            if (newQty === '') return;
+            if (saveQty === '') return;
             await ctx.updatePlan(null, {
                 company: 'yoshii',
                 model: model,
@@ -488,8 +488,8 @@ const YoshiiPlanView = () => {
                 janCode: currentJanCode,
                 vendorCode: currentVendorCode,
                 deliveryMonth: month,
-                quantity: newQty,
-                qtyHistory: [{ qty: newQty, date: todayYYMMDD }],
+                quantity: saveQty,
+                qtyHistory: [{ qty: saveQty, date: todayYYMMDD }],
                 originalVal: originalVal !== undefined && originalVal !== '' ? originalVal : undefined,
                 originalMeta: originalVal !== undefined && originalVal !== '' ? metaStr : undefined
             }, `型式 [${model}] ${month} 計画数`);
@@ -695,7 +695,8 @@ const YoshiiPlanView = () => {
                                     
                                     {displayMonths.map((mo, colIdx) => {
                                         const plan = getPlanData(model, mo);
-                                        const currentQty = plan?.quantity !== undefined && plan?.quantity !== null ? plan.quantity : '';
+                                        // ★ 修復: 0も含め正確に表示・保持
+                                        const currentQty = (plan?.quantity !== undefined && plan?.quantity !== null && plan?.quantity !== '') ? plan.quantity : '';
                                         const historyList = plan?.qtyHistory || [];
 
                                         return (
