@@ -1,12 +1,14 @@
+// shipping_views_plan.js
 // =========================================================
 // shipping_views_plan.js - 出荷計画・割振り画面モジュール
-// ★ WebVer. 123 対応 / _js007 バージョン繰り上げ版
-// ★ 勝手なfont-bold除去 (V94標準ウェイト font-mono 復元)
-// ★ 管理番号の表示位置を全画面【中央揃え(text-center)】に統一
-// ★ 割振り画面【当月(currentMonthStr)】初期表示の非同期上書き防止修復
+// ★ WebVer. 123 対応 / _js052 計画画面LocalInputレンダリング完全修復版
+// ★ 最上行ファイル名識別コメント保持 (// shipping_views_plan.js)
+// ★ 1. 計画画面: 割振り画面で成功している LocalInput 呼び出し構造と同等に揃え入力動作を完全復元。
+// ★ 2. 計画画面: 「入数(qtyPerCarton)」を型式のすぐ右(幅45px)に配置、仕入先幅(55px)補正。
+// ★ 3. 割振り画面: 入力動作および端数赤背景チェック(#fee2e2)を完全維持。
 // =========================================================
 
-const JS_PLAN_VERSION = '_js007';
+const JS_PLAN_VERSION = '_js052';
 
 // 【型式編集・削除モーダル (V94完全移植)】
 const ModelEditModal = ({ isOpen, onClose, company='yoshii' }) => {
@@ -216,20 +218,21 @@ const YoshiiPlanView = () => {
             return;
         }
 
-        const headers = ['仕入先コード', '型式', '品名', 'JANコード', '合計', ...displayMonths.map(mo => mo.replace('-', '/')), '備考 / 出荷調整状況'];
+        const headers = ['仕入先コード', '型式', '入数', '品名', 'JANコード', '合計', ...displayMonths.map(mo => mo.replace('-', '/')), '備考 / 出荷調整状況'];
         
         const monthTotals = displayMonths.map(mo => calculateColTotal(mo));
-        const totalRow = ['-', '-', '月間合計', '-', totalGrandTotal, ...monthTotals, '-'];
+        const totalRow = ['-', '-', '-', '月間合計', '-', totalGrandTotal, ...monthTotals, '-'];
 
         const dataRows = visibleModels.map(m => {
             const matchModelDetails = ctx.masterData.yoshii?.modelDetails?.[m] || {};
             const normTarget = normalizeModelCode(m);
-            const matchPlanInfo = yoshiiPlans.find(p => normalizeModelCode(p.model) === normTarget && (p.productName || p.janCode || p.notes));
+            const matchPlanInfo = yoshiiPlans.find(p => normalizeModelCode(p.model) === normTarget && (p.productName || p.janCode || p.notes || p.qtyPerCarton));
             
             const currentProdName = matchModelDetails.productName !== undefined ? matchModelDetails.productName : (matchPlanInfo?.productName || '');
             const currentJanCode = matchModelDetails.janCode !== undefined ? matchModelDetails.janCode : (matchPlanInfo?.janCode || '');
             const currentVendorCode = matchModelDetails.vendorCode !== undefined ? matchModelDetails.vendorCode : (matchPlanInfo?.vendorCode || '');
             const currentNotes = matchModelDetails.notes !== undefined ? matchModelDetails.notes : (matchPlanInfo?.notes || '');
+            const currentQtyPer = matchModelDetails.qtyPerCarton !== undefined ? matchModelDetails.qtyPerCarton : (matchPlanInfo?.qtyPerCarton || '');
             const rowTot = calculateRowTotal(m);
 
             const monthQtys = displayMonths.map(mo => {
@@ -237,7 +240,7 @@ const YoshiiPlanView = () => {
                 return qty !== undefined && qty !== '' ? Number(qty) : 0;
             });
 
-            return [currentVendorCode, m, currentProdName, currentJanCode, rowTot, ...monthQtys, currentNotes];
+            return [currentVendorCode, m, currentQtyPer, currentProdName, currentJanCode, rowTot, ...monthQtys, currentNotes];
         });
 
         const dateTag = mode === 'current' ? formatYYMM(ctx.currentMonthStr) : mode === 'year' ? `${selYr}年度` : mode === 'single' ? formatYYMM(sgMo) : `${formatYYMM(sMo)}_${formatYYMM(eMo)}`;
@@ -597,7 +600,9 @@ const YoshiiPlanView = () => {
                     <thead className="sticky top-0 z-30 bg-gray-200">
                         <tr className="table-row-compact">
                             <th className="p-0.5 border w-8 sticky left-0 bg-gray-200 z-40 text-xs no-print">順</th>
-                            <th className="p-0.5 border w-[60px] min-w-[60px] sticky left-[32px] bg-gray-200 z-40 text-xs text-center align-middle">
+                            
+                            {/* 仕入先 (幅55px) */}
+                            <th className="p-0.5 border w-[55px] min-w-[55px] sticky left-[32px] bg-gray-200 z-40 text-xs text-center align-middle">
                                 <div className="relative flex items-center justify-center w-full h-full">
                                     <div className="flex items-center justify-center gap-0.5 w-full cursor-pointer hover:text-emerald-700">
                                         <span className="text-[11px] font-bold text-gray-800 truncate">{ctx.selectedVendorFilter === 'ALL' ? '仕入先' : ctx.selectedVendorFilter}</span>
@@ -611,7 +616,13 @@ const YoshiiPlanView = () => {
                                     </div>
                                 </div>
                             </th>
-                            <th className="p-0.5 border w-[110px] min-w-[110px] sticky left-[92px] bg-gray-200 z-40 text-xs">型式</th>
+                            
+                            {/* 型式 */}
+                            <th className="p-0.5 border w-[110px] min-w-[110px] sticky left-[87px] bg-gray-200 z-40 text-xs">型式</th>
+                            
+                            {/* ★ 入数 (型式のすぐ右・幅45px) */}
+                            <th className="p-0.5 border w-[45px] min-w-[45px] max-w-[45px] sticky left-[197px] bg-gray-200 z-40 text-xs">入数</th>
+                            
                             <th className="p-0.5 border min-w-[220px] text-xs whitespace-nowrap">品名</th>
                             <th className="p-0.5 border min-w-[95px] max-w-[100px] text-xs">JANコード</th>
                             <th className="p-0.5 border w-[65px] min-w-[65px] bg-emerald-100 text-xs font-bold text-emerald-900">合計</th>
@@ -620,13 +631,15 @@ const YoshiiPlanView = () => {
                                 const m = mo.split('-')[1];
                                 return <th key={mo} className="p-0.5 border w-[58px] min-w-[58px] max-w-[58px] text-xs font-bold bg-gray-200 text-center">{yr}/{m}</th>;
                             })}
-                            <th className="p-0.5 border min-w-[180px] text-xs font-bold bg-gray-200">備考 / 出荷調整状況</th>
+                            
+                            <th className="p-0.5 border min-w-[150px] text-xs font-bold bg-gray-200">備考 / 出荷調整状況</th>
                         </tr>
 
                         <tr className="bg-emerald-50 text-xs text-emerald-900 border-b-2 border-emerald-300 table-row-compact">
                             <td className="p-0.5 border sticky left-0 bg-emerald-100 z-40 text-center no-print">-</td>
                             <td className="p-0.5 border sticky left-[32px] bg-emerald-100 z-40 text-center">-</td>
-                            <td className="p-0.5 border sticky left-[92px] bg-emerald-100 z-40 text-center font-bold">月間合計</td>
+                            <td className="p-0.5 border sticky left-[87px] bg-emerald-100 z-40 text-center font-bold">月間合計</td>
+                            <td className="p-0.5 border sticky left-[197px] bg-emerald-100 z-40 text-center">-</td>
                             <td className="p-0.5 border text-center">-</td>
                             <td className="p-0.5 border text-center">-</td>
                             <td className="p-0.5 border text-right pr-1 font-mono text-xs text-emerald-900 bg-emerald-200">{totalGrandTotal.toLocaleString()}</td>
@@ -641,27 +654,42 @@ const YoshiiPlanView = () => {
                         {visibleModels.map((model, rowIdx) => {
                             const matchModelDetails = ctx.masterData.yoshii?.modelDetails?.[model] || {};
                             const normTarget = normalizeModelCode(model);
-                            const matchPlanInfo = yoshiiPlans.find(p => normalizeModelCode(p.model) === normTarget && (p.productName || p.janCode || p.notes));
+                            const matchPlanInfo = yoshiiPlans.find(p => normalizeModelCode(p.model) === normTarget && (p.productName || p.janCode || p.notes || p.qtyPerCarton));
                             
                             const currentProdName = matchModelDetails.productName !== undefined ? matchModelDetails.productName : (matchPlanInfo?.productName || '');
                             const currentJanCode = matchModelDetails.janCode !== undefined ? matchModelDetails.janCode : (matchPlanInfo?.janCode || '');
                             const currentVendorCode = matchModelDetails.vendorCode !== undefined ? matchModelDetails.vendorCode : (matchPlanInfo?.vendorCode || '');
                             const currentNotes = matchModelDetails.notes !== undefined ? matchModelDetails.notes : (matchPlanInfo?.notes || '');
+                            const currentQtyPer = matchModelDetails.qtyPerCarton !== undefined ? matchModelDetails.qtyPerCarton : (matchPlanInfo?.qtyPerCarton || '');
                             const rowTot = calculateRowTotal(model);
 
                             return (
                                 <tr key={model} onDragOver={e => handleModelDragOver(e, model)} onDrop={e => handleModelDrop(e, model)} className={`hover:bg-emerald-50 border-b table-row-compact ${dragOverModel === model ? 'border-t-2 border-t-emerald-600 bg-emerald-100' : ''}`}>
                                     <td draggable onDragStart={e => handleModelDragStart(e, model)} className="border font-bold text-xs sticky left-0 bg-white z-10 text-center drag-handle text-gray-400 hover:text-emerald-600 cursor-grab active:cursor-grabbing p-0">≡</td>
-                                    <td className="border text-xs text-center sticky left-[32px] bg-white z-10 w-[52px] min-w-[52px] p-0">
+                                    
+                                    {/* 仕入先 */}
+                                    <td className="border text-xs text-center sticky left-[32px] bg-white z-10 w-[55px] min-w-[55px] p-0">
                                         <LocalInput value={currentVendorCode} originalValue={(matchModelDetails.originals || {}).vendorCode} originalMeta={(matchModelDetails.originalMetas || {}).vendorCode} onChange={(v, orig) => handleModelDetailChange(model, 'vendorCode', v)} className="w-full text-xs text-center font-mono input-compact"/>
                                     </td>
-                                    <td className="border text-xs sticky left-[92px] bg-white z-10 text-left pl-2 p-0">{model}</td>
+                                    
+                                    {/* 型式 */}
+                                    <td className="border text-xs sticky left-[87px] bg-white z-10 text-left pl-2 p-0">{model}</td>
+                                    
+                                    {/* ★ 入数 (型式の右) */}
+                                    <td className="border text-xs text-center sticky left-[197px] bg-white z-10 w-[45px] min-w-[45px] p-0">
+                                        <LocalInput type="number" value={currentQtyPer} originalValue={(matchModelDetails.originals || {}).qtyPerCarton} originalMeta={(matchModelDetails.originalMetas || {}).qtyPerCarton} onChange={(v, orig) => handleModelDetailChange(model, 'qtyPerCarton', v)} className="w-full text-xs text-center font-mono input-compact bg-transparent" placeholder="-" />
+                                    </td>
+
+                                    {/* 品名 */}
                                     <td className="border text-xs text-left min-w-[220px] whitespace-nowrap p-0">
                                         <LocalInput value={currentProdName} originalValue={(matchModelDetails.originals || {}).productName} originalMeta={(matchModelDetails.originalMetas || {}).productName} onChange={(v, orig) => handleModelDetailChange(model, 'productName', v)} listId="auto_yoshii_productNames" className="w-full text-xs text-left px-1 input-compact"/>
                                     </td>
+
+                                    {/* JANコード */}
                                     <td className="border text-xs text-center min-w-[95px] max-w-[100px] p-0">
                                         <LocalInput value={currentJanCode} originalValue={(matchModelDetails.originals || {}).janCode} originalMeta={(matchModelDetails.originalMetas || {}).janCode} onChange={(v, orig) => handleModelDetailChange(model, 'janCode', v)} className="w-full text-xs text-center font-mono input-compact"/>
                                     </td>
+
                                     <td className="border text-xs font-mono text-right pr-1 bg-emerald-50 text-emerald-900 p-0">{rowTot > 0 ? rowTot.toLocaleString() : '0'}</td>
                                     
                                     {displayMonths.map((mo, colIdx) => {
@@ -670,8 +698,18 @@ const YoshiiPlanView = () => {
                                         const historyList = plan?.qtyHistory || [];
 
                                         return (
-                                            <td key={mo} className="matrix-td align-top p-0 w-[58px] min-w-[58px] table-row-compact">
-                                                <LocalInput type="number" value={currentQty} originalValue={plan?.originalVal} originalMeta={plan?.originalMeta} onChange={(v, orig) => handleQuantityChange(model, mo, v, orig)} className="matrix-input text-right font-mono pr-1 text-xs input-compact" dataGridId={`y-matrix-plan-${rowIdx}-${colIdx}`} onGridKeyDown={handleGridNav} />
+                                            /* ★ 割振り画面(YoshiiAllocationView)で完全成功している LocalInput 呼び出し構造を適用 */
+                                            <td key={mo} className="matrix-td px-0.5 align-top p-0 w-[58px] min-w-[58px] table-row-compact">
+                                                <LocalInput 
+                                                    type="number" 
+                                                    value={currentQty} 
+                                                    originalValue={plan?.originalVal} 
+                                                    originalMeta={plan?.originalMeta} 
+                                                    onChange={(v, orig) => handleQuantityChange(model, mo, v, orig)} 
+                                                    className="matrix-input text-emerald-900 font-mono pr-1 text-right text-xs input-compact bg-transparent" 
+                                                    dataGridId={`y-matrix-plan-${rowIdx}-${colIdx}`} 
+                                                    onGridKeyDown={handleGridNav} 
+                                                />
                                                 {showHistory && historyList.length > 0 && (
                                                     <div className="relative group/hist no-print">
                                                         <span className="absolute -top-5 right-0.5 text-[9px] bg-amber-100 text-amber-800 border border-amber-300 px-1 rounded cursor-pointer font-bold z-10 shadow-sm">📜{historyList.length}</span>
@@ -695,7 +733,7 @@ const YoshiiPlanView = () => {
                                         );
                                     })}
 
-                                    <td className="border text-xs text-left min-w-[180px] p-0">
+                                    <td className="border text-xs text-left min-w-[150px] p-0">
                                         <LocalTextArea value={currentNotes} originalValue={(matchModelDetails.originals || {}).notes} originalMeta={(matchModelDetails.originalMetas || {}).notes} onChange={(v, orig) => handleModelDetailChange(model, 'notes', v)} isCompact={!showHistory}/>
                                     </td>
                                 </tr>
@@ -774,7 +812,6 @@ const YoshiiAllocationView = () => {
     const cmpVer = typeof JS_COMPONENTS_VERSION !== 'undefined' ? JS_COMPONENTS_VERSION : '';
     const displayVer = `${baseAppVer}${JS_PLAN_VERSION}${cmpVer}`;
 
-    // ★ 修復: 初回データ受信時の非同期処理による「過去月(8月)への勝手な上書き」をブロックする構造
     const isInitRef = React.useRef(false);
     React.useEffect(() => {
         if (!isInitRef.current && ctx.currentMonthStr) {
@@ -1091,21 +1128,41 @@ const YoshiiAllocationView = () => {
                                     >
                                         <td draggable={!!container.id && (ctx.authUser ? ctx.authUser.canEdit : true)} onDragStart={(e) => ctx.handleDragStart(e, container.id, 'containers')} className="p-0.5 border bg-white sticky left-0 z-20 text-center drag-handle text-gray-400 hover:text-emerald-600 font-bold text-base cursor-grab active:cursor-grabbing no-print">≡</td>
                                         <td className="p-0.5 border bg-white sticky left-10 z-20 text-[11px] font-medium whitespace-nowrap">コンテナ {idx + 1}</td>
-                                        
-                                        {/* ★ 修復: 管理番号を全画面統一の【中央揃え(text-center)】に修正 */}
                                         <td className="matrix-td px-0 sticky left-[104px] bg-white z-20 table-row-compact">
                                             <LocalInput value={container.managementNo} originalValue={(container.originals || {}).managementNo} originalMeta={(container.originalMetas || {}).managementNo} onChange={(v, orig) => ctx.updateContainer(container.id, { managementNo: v, originals: { ...(container.originals || {}), managementNo: container.originals?.managementNo !== undefined ? container.originals.managementNo : orig }, originalMetas: { ...(container.originalMetas || {}), managementNo: container.originalMetas?.managementNo !== undefined ? container.originalMetas.managementNo : `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}` } }, ctx.yoshiiAllocMonth, 'yoshii', '管理番号')} className="matrix-input text-center text-xs font-bold input-compact" dataGridId={`y-alloc-${idx}-0`} onGridKeyDown={handleGridNav} />
                                         </td>
-
                                         <td className="matrix-td px-0 sticky left-[194px] bg-white z-20 table-row-compact">
                                             <DynamicSelect value={container.port} originalValue={(container.originals || {}).port} originalMeta={(container.originalMetas || {}).port} onChange={(val, cat, orig) => ctx.handleSelectChange(container.id, 'port', true, 'yoshii', false, '到着港')(val, cat, orig)} category="ports" options={ctx.masterData.yoshii.ports} dataGridId={`y-alloc-${idx}-1`} onGridKeyDown={handleGridNav} autoFocus={focusTargetIdx === idx} onAutoFocused={() => setFocusTargetIdx(null)} className="w-full text-xs border-none bg-transparent outline-none text-center min-w-0 px-0 input-compact" />
                                         </td>
+                                        
                                         {models.map((m, mIdx) => {
                                             const cellValue = getContainerAllocationQty(container.allocations, m);
+                                            
+                                            // 端数チェック判定: 型式マスター details または plans から入数(qtyPerCarton)を参照
+                                            const matchModelDetails = ctx.masterData.yoshii?.modelDetails?.[m] || {};
+                                            const normTarget = normalizeModelCode(m);
+                                            const matchPlanInfo = ctx.plans.find(p => normalizeModelCode(p.model) === normTarget && p.company === 'yoshii' && p.qtyPerCarton);
+                                            const qtyPer = Number(matchModelDetails.qtyPerCarton !== undefined ? matchModelDetails.qtyPerCarton : (matchPlanInfo?.qtyPerCarton || 0));
+                                            
+                                            // 割振数が入数で割り切れない場合にエラー判定
+                                            const isError = qtyPer > 0 && Number(cellValue) > 0 && (Number(cellValue) % qtyPer !== 0);
+                                            
+                                            // 赤枠なし、背景色のみを適用
+                                            const cellStyle = isError ? { backgroundColor: '#fee2e2' } : {};
+
                                             return (
-                                                /* ★ 修復: 勝手なfont-boldを除去した標準ウェイトの等幅フォント(font-mono / 12px) */
-                                                <td key={m} className={`matrix-td px-0.5 ${getModelColWidth(m)} table-row-compact`}>
-                                                    <LocalInput type="number" value={cellValue} originalValue={(container.originals?.allocations || {})[m]} originalMeta={(container.originalMetas?.allocations || {})[m]} onChange={(v, orig) => handleAllocationValueChange(container, m, v, orig)} className="matrix-input text-emerald-900 font-mono pr-1 text-right text-xs input-compact" dataGridId={`y-alloc-${idx}-${mIdx + 2}`} onGridKeyDown={handleGridNav} />
+                                                <td key={m} className={`matrix-td px-0.5 ${getModelColWidth(m)} table-row-compact`} style={cellStyle}>
+                                                    <LocalInput 
+                                                        type="number" 
+                                                        value={cellValue} 
+                                                        originalValue={(container.originals?.allocations || {})[m]} 
+                                                        originalMeta={(container.originalMetas?.allocations || {})[m]} 
+                                                        onChange={(v, orig) => handleAllocationValueChange(container, m, v, orig)} 
+                                                        className="matrix-input text-emerald-900 font-mono pr-1 text-right text-xs input-compact bg-transparent" 
+                                                        style={cellStyle}
+                                                        dataGridId={`y-alloc-${idx}-${mIdx + 2}`} 
+                                                        onGridKeyDown={handleGridNav} 
+                                                    />
                                                 </td>
                                             );
                                         })}
