@@ -1,14 +1,14 @@
 // shipping_views_plan.js
 // =========================================================
 // shipping_views_plan.js - 出荷計画・割振り画面モジュール
-// ★ WebVer. 123 対応 / _js044 割振り画面の数値入力・保持バグ修復版
+// ★ WebVer. 123 対応 / _js045 計画画面・割振り画面数値入力保持バグ完全修復版
 // ★ 最上行ファイル名識別コメント保持 (// shipping_views_plan.js)
-// ★ 1. 割振り画面: Enterキー押下時に割振数が消える問題を修復(handleAllocationValueChange修正)。
-// ★ 2. 計画画面: 「入数」を型式の右に正しく保持、仕入先幅55px確保。
-// ★ 3. 端数チェック: 入数で割り切れない場合の薄赤背景(#fee2e2)判定を維持。
+// ★ 1. 計画画面: handleQuantityChange を修正し、Enterキー押下時の数値消去バグを解消。
+// ★ 2. 割振り画面: handleAllocationValueChange の確実な保存処理を継続保持。
+// ★ 3. 入数位置(型式の右・幅45px)、仕入先(幅55px)、端数赤背景チェック(#fee2e2)をすべて完全維持。
 // =========================================================
 
-const JS_PLAN_VERSION = '_js044';
+const JS_PLAN_VERSION = '_js045';
 
 // 【型式編集・削除モーダル (V94完全移植)】
 const ModelEditModal = ({ isOpen, onClose, company='yoshii' }) => {
@@ -447,9 +447,10 @@ const YoshiiPlanView = () => {
         setIsAddModalOpen(false);
     };
 
+    // ★ 修復: 数値入力後のEnterキー押下時・フォーカス外れ時の値を消さずに確定保存する処理
     const handleQuantityChange = async (model, month, newQtyStr, originalVal) => {
         const targetPlan = getPlanData(model, month);
-        const newQty = newQtyStr === '' ? 0 : Number(newQtyStr);
+        const newQty = newQtyStr === '' || newQtyStr === null || newQtyStr === undefined ? '' : Number(newQtyStr);
         const todayYYMMDD = ctx.getFormattedShortDate();
 
         const matchModelDetails = ctx.masterData.yoshii?.modelDetails?.[model] || {};
@@ -463,11 +464,11 @@ const YoshiiPlanView = () => {
         const metaStr = `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}`;
 
         if (targetPlan) {
-            const currentQty = Number(targetPlan.quantity || 0);
+            const currentQty = targetPlan.quantity;
             if (currentQty === newQty) return;
 
             const prevHist = targetPlan.qtyHistory || [];
-            const updatedHist = [{ qty: newQty, date: todayYYMMDD }, ...prevHist];
+            const updatedHist = [{ qty: newQty === '' ? 0 : newQty, date: todayYYMMDD }, ...prevHist];
 
             await ctx.updatePlan(targetPlan.id, { 
                 quantity: newQty, 
@@ -479,7 +480,7 @@ const YoshiiPlanView = () => {
                 originalMeta: originalVal !== undefined && originalVal !== '' ? (targetPlan.originalMeta || metaStr) : targetPlan.originalMeta
             }, `型式 [${model}] ${month} 計画数`);
         } else {
-            if (newQty === 0) return;
+            if (newQty === '') return;
             await ctx.updatePlan(null, {
                 company: 'yoshii',
                 model: model,
@@ -694,7 +695,7 @@ const YoshiiPlanView = () => {
                                     
                                     {displayMonths.map((mo, colIdx) => {
                                         const plan = getPlanData(model, mo);
-                                        const currentQty = plan?.quantity || '';
+                                        const currentQty = plan?.quantity !== undefined && plan?.quantity !== null ? plan.quantity : '';
                                         const historyList = plan?.qtyHistory || [];
 
                                         return (
@@ -971,7 +972,6 @@ const YoshiiAllocationView = () => {
         return targetMonthPlanQty > 0 || targetMonthAllocQty > 0;
     });
 
-    // ★ 修復: 入力値の保持バグを完全解決 (container.idが新規未保存の場合にも対応)
     const handleAllocationValueChange = (container, masterModel, val, orig) => {
         const currentAllocs = container.allocations || {};
         const newQty = val === '' ? 0 : Number(val);
@@ -996,7 +996,6 @@ const YoshiiAllocationView = () => {
             }
         };
 
-        // containerId が存在しない（空行入力）場合は直接新規更新に繋げる
         ctx.updateContainer(
             container.id || null, 
             { ...container, company: 'yoshii', deliveryMonth: ctx.yoshiiAllocMonth, allocations: updatedAllocs, originals: updatedOrigs, originalMetas: updatedMetas }, 
