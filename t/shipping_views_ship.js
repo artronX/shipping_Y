@@ -1,15 +1,15 @@
 // shipping_views_ship.js
 // =========================================================
 // shipping_views_ship.js - 出荷日程・ドレージ画面モジュール
-// ★ WebVer. 123 対応 / _js036 ドレージ画面(完全ReadOnly化) ＆ 補充部品入力安定化の完全版
+// ★ WebVer. 123 対応 / _js037 Babel構文エラー(ホワイトアウト)完全回避 ＆ ドレージ画面完全保護版
 // ★ 最上行ファイル名識別コメント保持 (// shipping_views_ship.js)
-// ★ 1. ドレージ画面の保護: LocalInput等の共通コンポーネント依存を脱却し、純粋なHTMLタグ(readOnly)による専用コンポーネントへ置換。権限問わず100%編集不可に。
-// ★ 2. 変更履歴の維持: 閲覧専用セルでも、修正前データ(originals)が存在する場合は赤文字・ツールチップを正確に表示。
+// ★ 1. ホワイトアウト修正: ブラウザ内Babelがクラッシュする原因となったアロー関数内の配列分割代入 `([m, q]) =>` を排除し、安全な `entry =>` 構文へ統一。
+// ★ 2. ドレージ画面の保護: 共通コンポーネント依存を脱却し、純粋なHTMLタグ(readOnly)による専用コンポーネントへ置換。権限問わず100%編集不可に。
 // ★ 3. 補充部品の入力: 出荷日程表側は、親CSS干渉を遮断するインラインスタイル＋フォーカス制御により、ズレ・肥大化を完封。
 // ★ 4. 積載型式の数値: 出荷日程表側で編集・保存(allocations)可能に設定。
 // =========================================================
 
-const JS_SHIP_VERSION = '_js036';
+const JS_SHIP_VERSION = '_js037';
 
 // 【ヘルパー: コンテナ内割振り製品総数量の動的自動計算】
 const calculateContainerTotalQty = (allocationsObj) => {
@@ -114,8 +114,8 @@ const YoshiiShipView = () => {
             groupedMap[mo].forEach(c => {
                 const totalQty = calculateContainerTotalQty(c.allocations);
                 const modelsStr = Object.entries(c.allocations || {})
-                    .filter(([_, q]) => Number(q) > 0)
-                    .map(([m, q]) => `${m} (${q})`)
+                    .filter(entry => Number(entry[1]) > 0)
+                    .map(entry => `${entry[0]} (${entry[1]})`)
                     .join(' / ');
 
                 rows.push([
@@ -242,7 +242,8 @@ const YoshiiShipView = () => {
                                         </tr>
                                         {containersInMonth.map((container, idx) => {
                                             const totalQty = calculateContainerTotalQty(container.allocations);
-                                            const activeAllocEntries = Object.entries(container.allocations || {}).filter(([_, q]) => Number(q) > 0);
+                                            // ★ 修正: アロー関数の配列分割代入によるBabel構文エラーを回避するため entry => に変更
+                                            const activeAllocEntries = Object.entries(container.allocations || {}).filter(entry => Number(entry[1]) > 0);
 
                                             const origTime = (container.originals || {}).deliveryTime;
                                             const currTime = container.deliveryTime || '';
@@ -266,36 +267,38 @@ const YoshiiShipView = () => {
                                                         <LocalInput value={container.containerNo} originalValue={(container.originals || {}).containerNo} originalMeta={(container.originalMetas || {}).containerNo} onChange={(v, orig) => ctx.updateContainer(container.id, { containerNo: v }, mo, 'yoshii', 'コンテナNO.')} className="text-center text-xs font-mono" dataGridId={`y-ship-${mo}-${idx}-2`} onGridKeyDown={handleGridNav} />
                                                     </td>
 
-                                                    {/* ★ 積載型式: 工場の編集要件に合わせて LocalInput にて編集・更新を担保 */}
                                                     <td className="border text-xs text-left px-1 py-0.5 bg-gray-50/50 align-middle">
                                                         {activeAllocEntries.length === 0 ? (
                                                             <span className="text-gray-400 text-[10px] italic">未割当</span>
                                                         ) : (
                                                             <div className="space-y-0.5">
-                                                                {activeAllocEntries.map(([m, q]) => (
-                                                                    <div key={m} className="flex justify-between items-center text-xs h-[20px]">
-                                                                        <span className="font-bold text-gray-800">{m}</span>
-                                                                        <div className="w-[42px] ml-1">
-                                                                            <LocalInput 
-                                                                                type="number"
-                                                                                value={q}
-                                                                                onChange={(v) => {
-                                                                                    const updatedAlloc = { ...(container.allocations || {}) };
-                                                                                    updatedAlloc[m] = Number(v) || 0;
-                                                                                    ctx.updateContainer(container.id, { allocations: updatedAlloc }, mo, 'yoshii', `${m} 割振数`);
-                                                                                }}
-                                                                                className="input-compact w-full text-right text-xs font-mono font-normal text-emerald-800 bg-transparent"
-                                                                            />
+                                                                {activeAllocEntries.map(entry => {
+                                                                    const m = entry[0];
+                                                                    const q = entry[1];
+                                                                    return (
+                                                                        <div key={m} className="flex justify-between items-center text-xs h-[20px]">
+                                                                            <span className="font-bold text-gray-800">{m}</span>
+                                                                            <div className="w-[42px] ml-1">
+                                                                                <LocalInput 
+                                                                                    type="number"
+                                                                                    value={q}
+                                                                                    onChange={(v) => {
+                                                                                        const updatedAlloc = { ...(container.allocations || {}) };
+                                                                                        updatedAlloc[m] = Number(v) || 0;
+                                                                                        ctx.updateContainer(container.id, { allocations: updatedAlloc }, mo, 'yoshii', `${m} 割振数`);
+                                                                                    }}
+                                                                                    className="input-compact w-full text-right text-xs font-mono font-normal text-emerald-800 bg-transparent"
+                                                                                />
+                                                                            </div>
                                                                         </div>
-                                                                    </div>
-                                                                ))}
+                                                                    );
+                                                                })}
                                                             </div>
                                                         )}
                                                     </td>
 
                                                     <td className="border font-mono text-xs text-right pr-1 bg-emerald-50/50 text-emerald-900 font-bold align-middle">{totalQty > 0 ? totalQty.toLocaleString() : '0'}</td>
 
-                                                    {/* ★ 補充部品: 親CSSの干渉を防ぐインラインスタイルとフォーカス制御で、カーソルズレや肥大化を完全遮断 */}
                                                     <td className="border text-center px-0 py-0.5 bg-emerald-50/30 align-middle">
                                                         {activeAllocEntries.length === 0 ? (
                                                             <div className="flex justify-center items-center gap-0.5 h-[20px]">
@@ -303,7 +306,8 @@ const YoshiiShipView = () => {
                                                             </div>
                                                         ) : (
                                                             <div className="space-y-0.5">
-                                                                {activeAllocEntries.map(([m, _]) => {
+                                                                {activeAllocEntries.map(entry => {
+                                                                    const m = entry[0];
                                                                     const sparePartsObj = container.spareParts || {};
                                                                     const modelSpare = sparePartsObj[m] || {};
 
@@ -570,8 +574,8 @@ const YoshiiDrayageView = () => {
             groupedMap[mo].forEach(c => {
                 const totalQty = calculateContainerTotalQty(c.allocations);
                 const modelsStr = Object.entries(c.allocations || {})
-                    .filter(([_, q]) => Number(q) > 0)
-                    .map(([m, q]) => `${m} (${q})`)
+                    .filter(entry => Number(entry[1]) > 0)
+                    .map(entry => `${entry[0]} (${entry[1]})`)
                     .join(' / ');
 
                 rows.push([
@@ -606,10 +610,15 @@ const YoshiiDrayageView = () => {
         return val;
     };
 
-    // ドレージ専用: 変更履歴(赤文字・ツールチップ)を保ちつつ完全編集不可にするコンポーネント
-    const ReadOnlyInput = ({ value, originalValue, originalMeta, className = "", isDate = false }) => {
+    // ドレージ専用: 変更履歴(赤文字・ツールチップ)を保ちつつ完全編集不可にする安全なコンポーネント
+    const ReadOnlyInput = ({ value, originalValue, originalMeta, className, isDate }) => {
+        const safeClassName = className || "";
+        const safeIsDate = isDate || false;
+        
         let displayVal = value || '';
-        if (isDate) displayVal = formatDisplayDate(displayVal);
+        if (safeIsDate) {
+            displayVal = formatDisplayDate(displayVal);
+        }
         
         const hasOrig = originalValue !== undefined && originalValue !== null && String(originalValue) !== '';
         const isChanged = hasOrig && String(originalValue) !== String(value || '');
@@ -619,7 +628,7 @@ const YoshiiDrayageView = () => {
 
         return (
             <div className={`w-full h-full flex items-center justify-center ${tooltipClass}`} data-original-val={originalValue === "" ? "【消去】" : originalValue} data-original-meta={metaStr}>
-                <input type="text" value={displayVal} readOnly className={`w-full bg-transparent border-none outline-none cursor-not-allowed ${className} ${changedClass}`} />
+                <input type="text" value={displayVal} readOnly className={`w-full bg-transparent border-none outline-none cursor-not-allowed ${safeClassName} ${changedClass}`} />
             </div>
         );
     };
@@ -729,4 +738,132 @@ const YoshiiDrayageView = () => {
                                         </tr>
                                         {containersInMonth.map((container, idx) => {
                                             const totalQty = calculateContainerTotalQty(container.allocations);
-                                            const activeAllocEntries = Object.entries(container.allocations || {}).filter(([_, q])
+                                            // ★ 修正: アロー関数の配列分割代入を完全排除
+                                            const activeAllocEntries = Object.entries(container.allocations || {}).filter(entry => Number(entry[1]) > 0);
+
+                                            return (
+                                                <tr key={container.id || `dray-${mo}-${idx}`} className="hover:bg-gray-200 border-b table-row-compact">
+                                                    <td className="p-0.5 border text-center align-middle bg-gray-100">
+                                                        <ReadOnlyInput value={container.managementNo} originalValue={(container.originals || {}).managementNo} originalMeta={(container.originalMetas || {}).managementNo} className="text-center text-xs font-bold" />
+                                                    </td>
+
+                                                    <td className="p-0.5 border text-center align-middle bg-gray-100">
+                                                        <ReadOnlyInput value={container.status} originalValue={(container.originals || {}).status} originalMeta={(container.originalMetas || {}).status} className="text-center text-xs" />
+                                                    </td>
+
+                                                    <td className="p-0.5 border text-center align-middle bg-gray-100">
+                                                        <ReadOnlyInput value={container.containerNo} originalValue={(container.originals || {}).containerNo} originalMeta={(container.originalMetas || {}).containerNo} className="text-center text-xs font-mono" />
+                                                    </td>
+
+                                                    <td className="border text-xs text-left px-1 py-0.5 align-middle bg-gray-100">
+                                                        {activeAllocEntries.length === 0 ? (
+                                                            <span className="text-gray-400 text-[10px] italic">未割当</span>
+                                                        ) : (
+                                                            <div className="space-y-0.5">
+                                                                {activeAllocEntries.map(entry => {
+                                                                    const m = entry[0];
+                                                                    const q = entry[1];
+                                                                    return (
+                                                                        <div key={m} className="flex justify-between items-center text-xs h-[20px]">
+                                                                            <span className="font-bold text-gray-700">{m}</span>
+                                                                            <span className="font-mono text-slate-700 font-normal ml-1">{Number(q).toLocaleString()}</span>
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        )}
+                                                    </td>
+
+                                                    <td className="border font-mono text-xs text-right pr-1 bg-gray-100 align-middle text-gray-700">{totalQty > 0 ? totalQty.toLocaleString() : '0'}</td>
+
+                                                    <td className="border text-center px-0 py-0.5 align-middle bg-gray-100">
+                                                        {activeAllocEntries.length === 0 ? (
+                                                            <div className="flex justify-center items-center gap-0.5 h-[20px]">
+                                                                <span className="text-[10px] text-gray-400">-</span>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="space-y-0.5">
+                                                                {activeAllocEntries.map(entry => {
+                                                                    const m = entry[0];
+                                                                    const sparePartsObj = container.spareParts || {};
+                                                                    const modelSpare = sparePartsObj[m] || {};
+
+                                                                    const outerVal = modelSpare.outerBox !== undefined ? modelSpare.outerBox : (container.spareOuter !== undefined ? container.spareOuter : '');
+                                                                    const innerVal = modelSpare.innerBox !== undefined ? modelSpare.innerBox : (container.spareInner !== undefined ? container.spareInner : '');
+                                                                    const labelVal = modelSpare.label !== undefined ? modelSpare.label : (container.spareLabel !== undefined ? container.spareLabel : '');
+
+                                                                    return (
+                                                                        <div key={m} className="flex justify-center items-center gap-0.5 h-[20px]">
+                                                                            <ReadOnlyInput value={outerVal} className="w-[36px] text-center text-xs font-mono font-normal" />
+                                                                            <ReadOnlyInput value={innerVal} className="w-[36px] text-center text-xs font-mono font-normal" />
+                                                                            <ReadOnlyInput value={labelVal} className="w-[36px] text-center text-xs font-mono font-normal" />
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        )}
+                                                    </td>
+
+                                                    <td className="p-0.5 border text-center align-middle bg-gray-100">
+                                                        <ReadOnlyInput value={container.port} originalValue={(container.originals || {}).port} originalMeta={(container.originalMetas || {}).port} className="text-center text-xs" />
+                                                    </td>
+
+                                                    <td className="p-0.5 border text-center align-middle bg-gray-100">
+                                                        <ReadOnlyInput value={container.etd} originalValue={(container.originals || {}).etd} originalMeta={(container.originalMetas || {}).etd} isDate={true} className="text-left pl-2 text-xs" />
+                                                    </td>
+
+                                                    <td className="p-0.5 border text-center align-middle bg-gray-100">
+                                                        <ReadOnlyInput value={container.eta} originalValue={(container.originals || {}).eta} originalMeta={(container.originalMetas || {}).eta} isDate={true} className="text-left pl-2 text-xs" />
+                                                    </td>
+
+                                                    <td className="p-0.5 border text-center align-middle bg-gray-100">
+                                                        <ReadOnlyInput value={container.freetime} originalValue={(container.originals || {}).freetime} originalMeta={(container.originalMetas || {}).freetime} isDate={true} className="text-left pl-2 text-xs" />
+                                                    </td>
+
+                                                    <td className="border text-center px-1 py-0.5 align-middle bg-gray-100">
+                                                        <div className="flex items-center justify-between gap-0.5 w-full">
+                                                            <div className="w-[85px] flex-shrink-0">
+                                                                <ReadOnlyInput value={container.deliveryDate} originalValue={(container.originals || {}).deliveryDate} originalMeta={(container.originalMetas || {}).deliveryDate} isDate={true} className="text-left pl-2 text-xs font-bold" />
+                                                            </div>
+                                                            <div className="w-[80px] flex-shrink-0 flex items-center gap-0.5 relative">
+                                                                <input 
+                                                                    type="time" 
+                                                                    value={container.deliveryTime || ''} 
+                                                                    disabled={true}
+                                                                    className="border border-gray-300 rounded px-0.5 py-0 text-[10px] font-bold text-center w-[66px] h-[22px] outline-none bg-gray-100 text-gray-500 cursor-not-allowed"
+                                                                />
+                                                                <div className="w-3.5"></div>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+
+                                                    <td className="p-0.5 border text-center align-middle whitespace-normal break-words bg-gray-100">
+                                                        <div className="w-full text-xs text-center px-1 py-0.5 text-gray-700 cursor-not-allowed">{container.destination || ''}</div>
+                                                    </td>
+
+                                                    <td className="p-0.5 border text-center align-middle whitespace-normal break-words bg-gray-100">
+                                                        <div className="w-full text-xs text-left px-1 py-0.5 text-gray-700 whitespace-pre-wrap break-words min-h-[18px] cursor-not-allowed">{container.notes || ''}</div>
+                                                    </td>
+
+                                                    <td className="p-0.5 border text-center align-middle bg-gray-100">
+                                                        <ReadOnlyInput value={container.containerSize} originalValue={(container.originals || {}).containerSize} originalMeta={(container.originalMetas || {}).containerSize} className="text-center text-xs" />
+                                                    </td>
+
+                                                    <td className="p-0.5 border text-center align-middle bg-gray-100">
+                                                        <ReadOnlyInput value={container.vesselName} originalValue={(container.originals || {}).vesselName} originalMeta={(container.originalMetas || {}).vesselName} className="text-center text-xs" />
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </React.Fragment>
+                                );
+                            })
+                        )}
+                    </tbody>
+                </table>
+            </div>
+
+            <ExportPrintModal isOpen={exportModal.isOpen} onClose={() => setExportModal({ isOpen: false, type: 'excel' })} screenName="ドレージ手配" currentMonthStr={ctx.currentMonthStr} defaultMode="year" onStartExport={handleExecuteExport} />
+        </div>
+    );
+};
