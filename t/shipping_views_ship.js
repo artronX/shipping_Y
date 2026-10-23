@@ -1,15 +1,15 @@
 // shipping_views_ship.js
 // =========================================================
 // shipping_views_ship.js - 出荷日程・ドレージ画面モジュール
-// ★ WebVer. 123 対応 / _js037 Babel構文エラー(ホワイトアウト)完全回避 ＆ ドレージ画面完全保護版
+// ★ WebVer. 123 対応 / _js038 ドレージ画面の入力機能(納品日時/納品先/備考)復旧版
 // ★ 最上行ファイル名識別コメント保持 (// shipping_views_ship.js)
-// ★ 1. ホワイトアウト修正: ブラウザ内Babelがクラッシュする原因となったアロー関数内の配列分割代入 `([m, q]) =>` を排除し、安全な `entry =>` 構文へ統一。
-// ★ 2. ドレージ画面の保護: 共通コンポーネント依存を脱却し、純粋なHTMLタグ(readOnly)による専用コンポーネントへ置換。権限問わず100%編集不可に。
-// ★ 3. 補充部品の入力: 出荷日程表側は、親CSS干渉を遮断するインラインスタイル＋フォーカス制御により、ズレ・肥大化を完封。
-// ★ 4. 積載型式の数値: 出荷日程表側で編集・保存(allocations)可能に設定。
+// ★ 1. ドレージ入力項目の復旧: 納品日時・納品先・備考を編集可能なコンポーネントに復元し、ドレージ手配の本来の機能を復旧。
+// ★ 2. 意図した保護の維持: 管理番号・割振数・補充部品などの上流データは引き続き ReadOnlyInput で100%保護。
+// ★ 3. 補充部品の入力: 出荷日程表側は、親CSS干渉を遮断するインラインスタイルでズレ・肥大化を完封。
+// ★ 4. 積載型式の数値: 出荷日程表側で編集・保存可能。
 // =========================================================
 
-const JS_SHIP_VERSION = '_js037';
+const JS_SHIP_VERSION = '_js038';
 
 // 【ヘルパー: コンテナ内割振り製品総数量の動的自動計算】
 const calculateContainerTotalQty = (allocationsObj) => {
@@ -242,7 +242,6 @@ const YoshiiShipView = () => {
                                         </tr>
                                         {containersInMonth.map((container, idx) => {
                                             const totalQty = calculateContainerTotalQty(container.allocations);
-                                            // ★ 修正: アロー関数の配列分割代入によるBabel構文エラーを回避するため entry => に変更
                                             const activeAllocEntries = Object.entries(container.allocations || {}).filter(entry => Number(entry[1]) > 0);
 
                                             const origTime = (container.originals || {}).deliveryTime;
@@ -596,7 +595,6 @@ const YoshiiDrayageView = () => {
         });
     };
 
-    // ドレージ専用: 日付のMM/DD表示整形用ヘルパー
     const formatDisplayDate = (val) => {
         if (!val) return '';
         if (val.includes('-')) {
@@ -610,7 +608,6 @@ const YoshiiDrayageView = () => {
         return val;
     };
 
-    // ドレージ専用: 変更履歴(赤文字・ツールチップ)を保ちつつ完全編集不可にする安全なコンポーネント
     const ReadOnlyInput = ({ value, originalValue, originalMeta, className, isDate }) => {
         const safeClassName = className || "";
         const safeIsDate = isDate || false;
@@ -632,6 +629,8 @@ const YoshiiDrayageView = () => {
             </div>
         );
     };
+
+    const isReadOnlyUser = ctx.authUser && !ctx.authUser.canEdit;
 
     return (
         <div className="p-4 bg-white flex-grow flex flex-col h-full">
@@ -728,6 +727,7 @@ const YoshiiDrayageView = () => {
                         ) : (
                             sortedMonths.map(mo => {
                                 const containersInMonth = groupedMap[mo] || [];
+                                const handleGridNav = ctx.createGridNav(`y-dray-${mo}`, containersInMonth.length - 1, 14);
 
                                 return (
                                     <React.Fragment key={mo}>
@@ -738,8 +738,15 @@ const YoshiiDrayageView = () => {
                                         </tr>
                                         {containersInMonth.map((container, idx) => {
                                             const totalQty = calculateContainerTotalQty(container.allocations);
-                                            // ★ 修正: アロー関数の配列分割代入を完全排除
                                             const activeAllocEntries = Object.entries(container.allocations || {}).filter(entry => Number(entry[1]) > 0);
+
+                                            const origTime = (container.originals || {}).deliveryTime;
+                                            const currTime = container.deliveryTime || '';
+                                            const isTimeChanged = origTime !== undefined && origTime !== null && (
+                                                (origTime !== '' && currTime === '') || 
+                                                (origTime !== '' && currTime !== '' && origTime !== currTime) || 
+                                                (origTime === '' && currTime !== '' && (container.originalMetas || {}).deliveryTime)
+                                            );
 
                                             return (
                                                 <tr key={container.id || `dray-${mo}-${idx}`} className="hover:bg-gray-200 border-b table-row-compact">
@@ -820,29 +827,61 @@ const YoshiiDrayageView = () => {
                                                         <ReadOnlyInput value={container.freetime} originalValue={(container.originals || {}).freetime} originalMeta={(container.originalMetas || {}).freetime} isDate={true} className="text-left pl-2 text-xs" />
                                                     </td>
 
-                                                    <td className="border text-center px-1 py-0.5 align-middle bg-gray-100">
+                                                    {/* ★ 納品日時: ドレージ画面で本来入力すべき機能として復旧 */}
+                                                    <td className={`border text-center px-1 py-0.5 align-middle ${isReadOnlyUser ? 'readonly-cell bg-gray-100' : 'bg-emerald-50/30'}`}>
                                                         <div className="flex items-center justify-between gap-0.5 w-full">
                                                             <div className="w-[85px] flex-shrink-0">
-                                                                <ReadOnlyInput value={container.deliveryDate} originalValue={(container.originals || {}).deliveryDate} originalMeta={(container.originalMetas || {}).deliveryDate} isDate={true} className="text-left pl-2 text-xs font-bold" />
+                                                                <LocalInput 
+                                                                    type="qc-date" 
+                                                                    value={container.deliveryDate} 
+                                                                    originalValue={(container.originals || {}).deliveryDate} 
+                                                                    originalMeta={(container.originalMetas || {}).deliveryDate} 
+                                                                    onChange={(v, orig) => ctx.updateContainer(container.id, { deliveryDate: v, originals: { ...(container.originals || {}), deliveryDate: container.originals?.deliveryDate !== undefined ? container.originals.deliveryDate : orig }, originalMetas: { ...(container.originalMetas || {}), deliveryDate: container.originalMetas?.deliveryDate !== undefined ? container.originalMetas.deliveryDate : `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}` } }, mo, 'yoshii', '納品日')} 
+                                                                    refDate={mo} 
+                                                                    className={`text-left pl-2 text-xs font-bold ${isReadOnlyUser ? 'readonly-cell bg-gray-100' : ''}`} 
+                                                                    dataGridId={`y-dray-${mo}-${idx}-7`} 
+                                                                    onGridKeyDown={handleGridNav} 
+                                                                />
                                                             </div>
-                                                            <div className="w-[80px] flex-shrink-0 flex items-center gap-0.5 relative">
+                                                            <div className={`w-[80px] flex-shrink-0 flex items-center gap-0.5 relative ${isTimeChanged ? 'qc-change-dot' : ''}`} title={isTimeChanged ? `変更前: ${(container.originals || {}).deliveryTime || '未設定'} (${(container.originalMetas || {}).deliveryTime || ''})` : ''}>
                                                                 <input 
                                                                     type="time" 
                                                                     value={container.deliveryTime || ''} 
-                                                                    disabled={true}
-                                                                    className="border border-gray-300 rounded px-0.5 py-0 text-[10px] font-bold text-center w-[66px] h-[22px] outline-none bg-gray-100 text-gray-500 cursor-not-allowed"
+                                                                    onChange={e => {
+                                                                        const val = e.target.value;
+                                                                        const prevValue = container.deliveryTime || '';
+                                                                        const orig = container.originals?.deliveryTime !== undefined ? container.originals.deliveryTime : prevValue;
+                                                                        ctx.updateContainer(container.id, { deliveryTime: val, originals: { ...(container.originals || {}), deliveryTime: orig }, originalMetas: { ...(container.originalMetas || {}), deliveryTime: container.originalMetas?.deliveryTime || `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}` } }, mo, 'yoshii', '納品時間');
+                                                                    }} 
+                                                                    className={`border rounded px-0.5 py-0 text-[10px] font-bold text-center w-[66px] h-[22px] outline-none focus:ring-1 focus:ring-indigo-500 ${isReadOnlyUser ? 'readonly-cell bg-gray-100 cursor-not-allowed' : 'bg-white cursor-pointer'}`}
+                                                                    disabled={isReadOnlyUser}
                                                                 />
-                                                                <div className="w-3.5"></div>
+                                                                {container.deliveryTime && !isReadOnlyUser ? (
+                                                                    <button 
+                                                                        type="button" 
+                                                                        onClick={() => {
+                                                                            const prevValue = container.deliveryTime || '';
+                                                                            const orig = container.originals?.deliveryTime !== undefined ? container.originals.deliveryTime : prevValue;
+                                                                            ctx.updateContainer(container.id, { deliveryTime: '', originals: { ...(container.originals || {}), deliveryTime: orig }, originalMetas: { ...(container.originalMetas || {}), deliveryTime: container.originalMetas?.deliveryTime || `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}` } }, mo, 'yoshii', '納品時間 (削除)');
+                                                                        }} 
+                                                                        className="w-3.5 h-3.5 flex items-center justify-center text-[9px] font-bold text-gray-400 hover:text-red-600 hover:bg-gray-100 rounded transition" 
+                                                                        title="時刻をクリア"
+                                                                    >
+                                                                        ✕
+                                                                    </button>
+                                                                ) : <div className="w-3.5"></div>}
                                                             </div>
                                                         </div>
                                                     </td>
 
-                                                    <td className="p-0.5 border text-center align-middle whitespace-normal break-words bg-gray-100">
-                                                        <div className="w-full text-xs text-center px-1 py-0.5 text-gray-700 cursor-not-allowed">{container.destination || ''}</div>
+                                                    {/* ★ 納品先: ドレージ画面で本来入力すべき機能として復旧 */}
+                                                    <td className={`p-0.5 border text-center align-middle whitespace-normal break-words ${isReadOnlyUser ? 'readonly-cell bg-gray-100' : ''}`}>
+                                                        <DynamicSelect value={container.destination} originalValue={(container.originals || {}).destination} originalMeta={(container.originalMetas || {}).destination} onChange={(val, cat, orig) => ctx.handleSelectChange(container.id, 'destination', true, 'yoshii', false, '納品先')(val, cat, orig)} category="destinations" options={ctx.masterData.yoshii.destinations} dataGridId={`y-dray-${mo}-${idx}-8`} onGridKeyDown={handleGridNav} className={`w-full text-xs border-none bg-transparent outline-none text-center px-0 h-auto whitespace-normal break-words ${isReadOnlyUser ? 'readonly-cell bg-gray-100' : ''}`} />
                                                     </td>
 
-                                                    <td className="p-0.5 border text-center align-middle whitespace-normal break-words bg-gray-100">
-                                                        <div className="w-full text-xs text-left px-1 py-0.5 text-gray-700 whitespace-pre-wrap break-words min-h-[18px] cursor-not-allowed">{container.notes || ''}</div>
+                                                    {/* ★ 備考: ドレージ画面で本来入力すべき機能として復旧 */}
+                                                    <td className={`p-0.5 border text-center align-middle whitespace-normal break-words ${isReadOnlyUser ? 'readonly-cell bg-gray-100' : ''}`}>
+                                                        <LocalTextArea value={container.notes} originalValue={(container.originals || {}).notes} originalMeta={(container.originalMetas || {}).notes} onChange={(v, orig) => ctx.updateContainer(container.id, { notes: v }, mo, 'yoshii', '備考')} isCompact={true} className={`h-auto whitespace-pre-wrap break-words ${isReadOnlyUser ? 'readonly-cell bg-gray-100' : ''}`}/>
                                                     </td>
 
                                                     <td className="p-0.5 border text-center align-middle bg-gray-100">
