@@ -1,15 +1,15 @@
 // shipping_views_ship.js
 // =========================================================
 // shipping_views_ship.js - 出荷日程・ドレージ画面モジュール
-// ★ WebVer. 123 対応 / _js038 ドレージ画面の入力機能(納品日時/納品先/備考)復旧版
+// ★ WebVer. 123 対応 / _js039 当月自動スクロールの確実化 ＆ 年度指定の動的初期化
 // ★ 最上行ファイル名識別コメント保持 (// shipping_views_ship.js)
-// ★ 1. ドレージ入力項目の復旧: 納品日時・納品先・備考を編集可能なコンポーネントに復元し、ドレージ手配の本来の機能を復旧。
-// ★ 2. 意図した保護の維持: 管理番号・割振数・補充部品などの上流データは引き続き ReadOnlyInput で100%保護。
-// ★ 3. 補充部品の入力: 出荷日程表側は、親CSS干渉を遮断するインラインスタイルでズレ・肥大化を完封。
-// ★ 4. 積載型式の数値: 出荷日程表側で編集・保存可能。
+// ★ 1. スクロール保証: 初期表示や未スクロール状態(0)の場合は確実に当月へスクロールさせ、ログイン中の意図的なスクロール(>0)のみ復元するよう修正。
+// ★ 2. 年度初期値: 固定の2026年を廃止し、currentMonthStrから当年度(4月始まり)を自動計算して初期化。
+// ★ 3. ドレージ画面の入力機能(納品日時/納品先/備考)および読み取り専用セルの完全保護維持。
+// ★ 4. Babel構文エラー回避(entry=>)および補充部品のインラインスタイル維持。
 // =========================================================
 
-const JS_SHIP_VERSION = '_js038';
+const JS_SHIP_VERSION = '_js039';
 
 // 【ヘルパー: コンテナ内割振り製品総数量の動的自動計算】
 const calculateContainerTotalQty = (allocationsObj) => {
@@ -30,7 +30,17 @@ const YoshiiShipView = () => {
     const displayVer = `${baseAppVer}${JS_SHIP_VERSION}${cmpVer}`;
 
     const [displayMode, setDisplayMode] = React.useState('year');
-    const [selectedYear, setSelectedYear] = React.useState(2026);
+    
+    // ★ 修正: 今日の月(ctx.currentMonthStr)から当年度(4月始まり)を自動計算して初期化
+    const [selectedYear, setSelectedYear] = React.useState(() => {
+        if (!ctx.currentMonthStr) return new Date().getFullYear();
+        const parts = ctx.currentMonthStr.split('-');
+        if (parts.length !== 2) return new Date().getFullYear();
+        const year = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10);
+        return month <= 3 ? year - 1 : year;
+    });
+
     const [selectedSingleMonth, setSelectedSingleMonth] = React.useState(ctx.currentMonthStr || '2026-10');
     const [rangeStartMonth, setRangeStartMonth] = React.useState('2026-04');
     const [rangeEndMonth, setRangeEndMonth] = React.useState('2027-03');
@@ -39,7 +49,8 @@ const YoshiiShipView = () => {
 
     React.useLayoutEffect(() => {
         if (ctx.tableContainerRef.current) {
-            if (ctx.shipScrollPosRef.current !== null) {
+            // ★ 修正: 過去のスクロール位置が0より大きい場合のみ復元し、0(一番上)またはnullなら当月へ自動スクロール
+            if (ctx.shipScrollPosRef.current !== null && ctx.shipScrollPosRef.current > 0) {
                 ctx.tableContainerRef.current.scrollTop = ctx.shipScrollPosRef.current;
             } else if (!isInitialScrolledRef.current && ctx.currentMonthStr) {
                 setTimeout(() => {
@@ -167,9 +178,11 @@ const YoshiiShipView = () => {
 
                         {displayMode === 'year' && (
                             <select value={selectedYear} onChange={e => setSelectedYear(Number(e.target.value))} className="border p-1 rounded text-xs font-bold bg-white text-indigo-900">
-                                <option value={2025}>2025年度</option>
-                                <option value={2026}>2026年度</option>
-                                <option value={2027}>2027年度</option>
+                                {/* ★ 将来の年度変化にも柔軟に対応できるよう、選択肢に動的計算の年を含める(過去1年・今年・来年・再来年) */}
+                                <option value={selectedYear - 1}>{selectedYear - 1}年度</option>
+                                <option value={selectedYear}>{selectedYear}年度</option>
+                                <option value={selectedYear + 1}>{selectedYear + 1}年度</option>
+                                <option value={selectedYear + 2}>{selectedYear + 2}年度</option>
                             </select>
                         )}
 
@@ -489,7 +502,17 @@ const YoshiiDrayageView = () => {
     const displayVer = `${baseAppVer}${JS_SHIP_VERSION}${cmpVer}`;
 
     const [displayMode, setDisplayMode] = React.useState('year');
-    const [selectedYear, setSelectedYear] = React.useState(2026);
+    
+    // ★ 修正: 今日の月(ctx.currentMonthStr)から当年度(4月始まり)を自動計算して初期化
+    const [selectedYear, setSelectedYear] = React.useState(() => {
+        if (!ctx.currentMonthStr) return new Date().getFullYear();
+        const parts = ctx.currentMonthStr.split('-');
+        if (parts.length !== 2) return new Date().getFullYear();
+        const year = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10);
+        return month <= 3 ? year - 1 : year;
+    });
+
     const [selectedSingleMonth, setSelectedSingleMonth] = React.useState(ctx.currentMonthStr || '2026-10');
     const [rangeStartMonth, setRangeStartMonth] = React.useState('2026-04');
     const [rangeEndMonth, setRangeEndMonth] = React.useState('2027-03');
@@ -498,7 +521,8 @@ const YoshiiDrayageView = () => {
 
     React.useLayoutEffect(() => {
         if (ctx.tableContainerRef.current) {
-            if (ctx.drayScrollPosRef.current !== null) {
+            // ★ 修正: 過去のスクロール位置が0より大きい場合のみ復元し、0(一番上)またはnullなら当月へ自動スクロール
+            if (ctx.drayScrollPosRef.current !== null && ctx.drayScrollPosRef.current > 0) {
                 ctx.tableContainerRef.current.scrollTop = ctx.drayScrollPosRef.current;
             } else if (!isInitialScrolledRef.current && ctx.currentMonthStr) {
                 setTimeout(() => {
@@ -663,9 +687,11 @@ const YoshiiDrayageView = () => {
 
                         {displayMode === 'year' && (
                             <select value={selectedYear} onChange={e => setSelectedYear(Number(e.target.value))} className="border p-1 rounded text-xs font-bold bg-white text-indigo-900">
-                                <option value={2025}>2025年度</option>
-                                <option value={2026}>2026年度</option>
-                                <option value={2027}>2027年度</option>
+                                {/* ★ 将来の年度変化にも柔軟に対応できるよう、選択肢に動的計算の年を含める */}
+                                <option value={selectedYear - 1}>{selectedYear - 1}年度</option>
+                                <option value={selectedYear}>{selectedYear}年度</option>
+                                <option value={selectedYear + 1}>{selectedYear + 1}年度</option>
+                                <option value={selectedYear + 2}>{selectedYear + 2}年度</option>
                             </select>
                         )}
 
@@ -827,7 +853,6 @@ const YoshiiDrayageView = () => {
                                                         <ReadOnlyInput value={container.freetime} originalValue={(container.originals || {}).freetime} originalMeta={(container.originalMetas || {}).freetime} isDate={true} className="text-left pl-2 text-xs" />
                                                     </td>
 
-                                                    {/* ★ 納品日時: ドレージ画面で本来入力すべき機能として復旧 */}
                                                     <td className={`border text-center px-1 py-0.5 align-middle ${isReadOnlyUser ? 'readonly-cell bg-gray-100' : 'bg-emerald-50/30'}`}>
                                                         <div className="flex items-center justify-between gap-0.5 w-full">
                                                             <div className="w-[85px] flex-shrink-0">
@@ -874,12 +899,10 @@ const YoshiiDrayageView = () => {
                                                         </div>
                                                     </td>
 
-                                                    {/* ★ 納品先: ドレージ画面で本来入力すべき機能として復旧 */}
                                                     <td className={`p-0.5 border text-center align-middle whitespace-normal break-words ${isReadOnlyUser ? 'readonly-cell bg-gray-100' : ''}`}>
                                                         <DynamicSelect value={container.destination} originalValue={(container.originals || {}).destination} originalMeta={(container.originalMetas || {}).destination} onChange={(val, cat, orig) => ctx.handleSelectChange(container.id, 'destination', true, 'yoshii', false, '納品先')(val, cat, orig)} category="destinations" options={ctx.masterData.yoshii.destinations} dataGridId={`y-dray-${mo}-${idx}-8`} onGridKeyDown={handleGridNav} className={`w-full text-xs border-none bg-transparent outline-none text-center px-0 h-auto whitespace-normal break-words ${isReadOnlyUser ? 'readonly-cell bg-gray-100' : ''}`} />
                                                     </td>
 
-                                                    {/* ★ 備考: ドレージ画面で本来入力すべき機能として復旧 */}
                                                     <td className={`p-0.5 border text-center align-middle whitespace-normal break-words ${isReadOnlyUser ? 'readonly-cell bg-gray-100' : ''}`}>
                                                         <LocalTextArea value={container.notes} originalValue={(container.originals || {}).notes} originalMeta={(container.originalMetas || {}).notes} onChange={(v, orig) => ctx.updateContainer(container.id, { notes: v }, mo, 'yoshii', '備考')} isCompact={true} className={`h-auto whitespace-pre-wrap break-words ${isReadOnlyUser ? 'readonly-cell bg-gray-100' : ''}`}/>
                                                     </td>
