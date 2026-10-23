@@ -1,14 +1,14 @@
 // shipping_views_plan.js
 // =========================================================
 // shipping_views_plan.js - 出荷計画・割振り画面モジュール
-// ★ WebVer. 123 対応 / _js051 _js007オリジナル構造100%復元＆計画入力完全修復版
+// ★ WebVer. 123 対応 / _js052 計画画面LocalInputレンダリング完全修復版
 // ★ 最上行ファイル名識別コメント保持 (// shipping_views_plan.js)
-// ★ 1. 計画画面: _js007 本来の計画数入力・保存処理(handleQuantityChange/getPlanData)へ完全復元。
+// ★ 1. 計画画面: 割振り画面で成功している LocalInput 呼び出し構造と同等に揃え入力動作を完全復元。
 // ★ 2. 計画画面: 「入数(qtyPerCarton)」を型式のすぐ右(幅45px)に配置、仕入先幅(55px)補正。
-// ★ 3. 割振り画面: OK確認済みの入力動作および端数赤背景チェック(#fee2e2)を完全維持。
+// ★ 3. 割振り画面: 入力動作および端数赤背景チェック(#fee2e2)を完全維持。
 // =========================================================
 
-const JS_PLAN_VERSION = '_js051';
+const JS_PLAN_VERSION = '_js052';
 
 // 【型式編集・削除モーダル (V94完全移植)】
 const ModelEditModal = ({ isOpen, onClose, company='yoshii' }) => {
@@ -384,7 +384,6 @@ const YoshiiPlanView = () => {
         setDragOverModel(null);
     };
 
-    // ★ _js007 100% 復元コード: getPlanData
     const getPlanData = (model, month) => {
         const normTarget = normalizeModelCode(model);
         return yoshiiPlans.find(p => normalizeModelCode(p.model) === normTarget && p.deliveryMonth === month);
@@ -448,7 +447,6 @@ const YoshiiPlanView = () => {
         setIsAddModalOpen(false);
     };
 
-    // ★ _js007 100% 復元コード: handleQuantityChange
     const handleQuantityChange = async (model, month, newQtyStr, originalVal) => {
         const targetPlan = getPlanData(model, month);
         const newQty = newQtyStr === '' ? 0 : Number(newQtyStr);
@@ -700,9 +698,18 @@ const YoshiiPlanView = () => {
                                         const historyList = plan?.qtyHistory || [];
 
                                         return (
-                                            <td key={mo} className="matrix-td align-top p-0 w-[58px] min-w-[58px] table-row-compact">
-                                                {/* ★ _js007 復元: LocalInput 設定 */}
-                                                <LocalInput type="number" value={currentQty} originalValue={plan?.originalVal} originalMeta={plan?.originalMeta} onChange={(v, orig) => handleQuantityChange(model, mo, v, orig)} className="matrix-input text-right font-mono pr-1 text-xs input-compact" dataGridId={`y-matrix-plan-${rowIdx}-${colIdx}`} onGridKeyDown={handleGridNav} />
+                                            /* ★ 割振り画面(YoshiiAllocationView)で完全成功している LocalInput 呼び出し構造を適用 */
+                                            <td key={mo} className="matrix-td px-0.5 align-top p-0 w-[58px] min-w-[58px] table-row-compact">
+                                                <LocalInput 
+                                                    type="number" 
+                                                    value={currentQty} 
+                                                    originalValue={plan?.originalVal} 
+                                                    originalMeta={plan?.originalMeta} 
+                                                    onChange={(v, orig) => handleQuantityChange(model, mo, v, orig)} 
+                                                    className="matrix-input text-emerald-900 font-mono pr-1 text-right text-xs input-compact bg-transparent" 
+                                                    dataGridId={`y-matrix-plan-${rowIdx}-${colIdx}`} 
+                                                    onGridKeyDown={handleGridNav} 
+                                                />
                                                 {showHistory && historyList.length > 0 && (
                                                     <div className="relative group/hist no-print">
                                                         <span className="absolute -top-5 right-0.5 text-[9px] bg-amber-100 text-amber-800 border border-amber-300 px-1 rounded cursor-pointer font-bold z-10 shadow-sm">📜{historyList.length}</span>
@@ -974,7 +981,6 @@ const YoshiiAllocationView = () => {
         return targetMonthPlanQty > 0 || targetMonthAllocQty > 0;
     });
 
-    // ★ _js007 100% 復元コード: handleAllocationValueChange
     const handleAllocationValueChange = (container, masterModel, val, orig) => {
         const currentAllocs = container.allocations || {};
         const newQty = val === '' ? 0 : Number(val);
