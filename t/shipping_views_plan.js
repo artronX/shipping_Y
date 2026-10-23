@@ -1,13 +1,14 @@
 // shipping_views_plan.js
 // =========================================================
 // shipping_views_plan.js - 出荷計画・割振り画面モジュール
-// ★ WebVer. 123 対応 / _js043 「入数」正しい位置(型式の右)配置 ＆ 仕入先幅補正・端数チェック実装
+// ★ WebVer. 123 対応 / _js044 割振り画面の数値入力・保持バグ修復版
 // ★ 最上行ファイル名識別コメント保持 (// shipping_views_plan.js)
-// ★ 1. 計画画面: 「入数(qtyPerCarton)」列を型式の右に配置。「仕入先▼」が途切れないよう幅55px確保。
-// ★ 2. 割振り画面: 入数を参照し、割振数が割り切れない場合に赤背景(#fee2e2)を適用(赤枠なし)。
+// ★ 1. 割振り画面: Enterキー押下時に割振数が消える問題を修復(handleAllocationValueChange修正)。
+// ★ 2. 計画画面: 「入数」を型式の右に正しく保持、仕入先幅55px確保。
+// ★ 3. 端数チェック: 入数で割り切れない場合の薄赤背景(#fee2e2)判定を維持。
 // =========================================================
 
-const JS_PLAN_VERSION = '_js043';
+const JS_PLAN_VERSION = '_js044';
 
 // 【型式編集・削除モーダル (V94完全移植)】
 const ModelEditModal = ({ isOpen, onClose, company='yoshii' }) => {
@@ -600,7 +601,7 @@ const YoshiiPlanView = () => {
                         <tr className="table-row-compact">
                             <th className="p-0.5 border w-8 sticky left-0 bg-gray-200 z-40 text-xs no-print">順</th>
                             
-                            {/* ★ 補正: 「仕入先▼」テキストが途切れないよう w-[55px] に調整 */}
+                            {/* 仕入先 (幅55px) */}
                             <th className="p-0.5 border w-[55px] min-w-[55px] sticky left-[32px] bg-gray-200 z-40 text-xs text-center align-middle">
                                 <div className="relative flex items-center justify-center w-full h-full">
                                     <div className="flex items-center justify-center gap-0.5 w-full cursor-pointer hover:text-emerald-700">
@@ -616,10 +617,10 @@ const YoshiiPlanView = () => {
                                 </div>
                             </th>
                             
-                            {/* ★ 補正: 仕入先が幅55pxとなったため sticky left を 87px に配置 */}
+                            {/* 型式 */}
                             <th className="p-0.5 border w-[110px] min-w-[110px] sticky left-[87px] bg-gray-200 z-40 text-xs">型式</th>
                             
-                            {/* ★ 正しい配置: 型式のすぐ右（型式と品名の間）に「入数」を配置 */}
+                            {/* ★ 入数 (型式のすぐ右) */}
                             <th className="p-0.5 border w-[45px] min-w-[45px] max-w-[45px] sticky left-[197px] bg-gray-200 z-40 text-xs">入数</th>
                             
                             <th className="p-0.5 border min-w-[220px] text-xs whitespace-nowrap">品名</th>
@@ -631,7 +632,6 @@ const YoshiiPlanView = () => {
                                 return <th key={mo} className="p-0.5 border w-[58px] min-w-[58px] max-w-[58px] text-xs font-bold bg-gray-200 text-center">{yr}/{m}</th>;
                             })}
                             
-                            {/* ★ 補正: 全体のバランスを整え min-w-[150px] に設定 */}
                             <th className="p-0.5 border min-w-[150px] text-xs font-bold bg-gray-200">備考 / 出荷調整状況</th>
                         </tr>
 
@@ -675,7 +675,7 @@ const YoshiiPlanView = () => {
                                     {/* 型式 */}
                                     <td className="border text-xs sticky left-[87px] bg-white z-10 text-left pl-2 p-0">{model}</td>
                                     
-                                    {/* ★ 正しい配置: 入数 (型式の右) */}
+                                    {/* ★ 入数 (型式の右) */}
                                     <td className="border text-xs text-center sticky left-[197px] bg-white z-10 w-[45px] min-w-[45px] p-0">
                                         <LocalInput type="number" value={currentQtyPer} originalValue={(matchModelDetails.originals || {}).qtyPerCarton} originalMeta={(matchModelDetails.originalMetas || {}).qtyPerCarton} onChange={(v, orig) => handleModelDetailChange(model, 'qtyPerCarton', v)} className="w-full text-xs text-center font-mono input-compact bg-transparent" placeholder="-" />
                                     </td>
@@ -971,6 +971,7 @@ const YoshiiAllocationView = () => {
         return targetMonthPlanQty > 0 || targetMonthAllocQty > 0;
     });
 
+    // ★ 修復: 入力値の保持バグを完全解決 (container.idが新規未保存の場合にも対応)
     const handleAllocationValueChange = (container, masterModel, val, orig) => {
         const currentAllocs = container.allocations || {};
         const newQty = val === '' ? 0 : Number(val);
@@ -995,9 +996,10 @@ const YoshiiAllocationView = () => {
             }
         };
 
+        // containerId が存在しない（空行入力）場合は直接新規更新に繋げる
         ctx.updateContainer(
-            container.id, 
-            { allocations: updatedAllocs, originals: updatedOrigs, originalMetas: updatedMetas }, 
+            container.id || null, 
+            { ...container, company: 'yoshii', deliveryMonth: ctx.yoshiiAllocMonth, allocations: updatedAllocs, originals: updatedOrigs, originalMetas: updatedMetas }, 
             ctx.yoshiiAllocMonth, 
             'yoshii', 
             '型式 [' + masterModel + '] 数量'
@@ -1128,7 +1130,7 @@ const YoshiiAllocationView = () => {
                                         {models.map((m, mIdx) => {
                                             const cellValue = getContainerAllocationQty(container.allocations, m);
                                             
-                                            // ★ 端数チェック判定: 入数(qtyPerCarton)を参照
+                                            // 端数チェック判定: 入数(qtyPerCarton)を参照
                                             const matchModelDetails = ctx.masterData.yoshii?.modelDetails?.[m] || {};
                                             const normTarget = normalizeModelCode(m);
                                             const matchPlanInfo = ctx.plans.find(p => normalizeModelCode(p.model) === normTarget && p.company === 'yoshii' && p.qtyPerCarton);
