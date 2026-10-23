@@ -1,16 +1,15 @@
 // shipping_views_ship.js
 // =========================================================
 // shipping_views_ship.js - 出荷日程・ドレージ画面モジュール
-// ★ WebVer. 123 対応 / _js035 積載型式の編集対応 & 補充部品の入力バグ(LocalInput+input-compact)完全修正版
+// ★ WebVer. 123 対応 / _js039 当月自動スクロールの確実化 ＆ 年度指定の動的初期化
 // ★ 最上行ファイル名識別コメント保持 (// shipping_views_ship.js)
-// ★ 1. 積載型式の数値: 工場での修正指示に基づき、LocalInputによる編集・更新(allocations)に対応
-// ★ 2. 補充部品の入力: LocalInput + 'input-compact' クラスを使用し、クリック位置ズレ・フォント肥大化バグを完全に修正。枠線なしの12px/等幅/標準ウェイトを実現
-// ★ 3. 月タイトル: <td> タグへ bg-emerald-100 text-emerald-900 を直接適用
-// ★ 4. 納品時間: w-[66px] 幅で 時計アイコン・末尾数字の見切れを解消
-// ★ 5. 連番キー(sortOrder)による割振り画面(親)の並び順100%継承
+// ★ 1. スクロール保証: 初期表示や未スクロール状態(0)の場合は確実に当月へスクロールさせ、ログイン中の意図的なスクロール(>0)のみ復元するよう修正。
+// ★ 2. 年度初期値: 固定の2026年を廃止し、currentMonthStrから当年度(4月始まり)を自動計算して初期化。
+// ★ 3. ドレージ画面の入力機能(納品日時/納品先/備考)および読み取り専用セルの完全保護維持。
+// ★ 4. Babel構文エラー回避(entry=>)および補充部品のインラインスタイル維持。
 // =========================================================
 
-const JS_SHIP_VERSION = '_js035';
+const JS_SHIP_VERSION = '_js039';
 
 // 【ヘルパー: コンテナ内割振り製品総数量の動的自動計算】
 const calculateContainerTotalQty = (allocationsObj) => {
@@ -31,7 +30,17 @@ const YoshiiShipView = () => {
     const displayVer = `${baseAppVer}${JS_SHIP_VERSION}${cmpVer}`;
 
     const [displayMode, setDisplayMode] = React.useState('year');
-    const [selectedYear, setSelectedYear] = React.useState(2026);
+    
+    // ★ 修正: 今日の月(ctx.currentMonthStr)から当年度(4月始まり)を自動計算して初期化
+    const [selectedYear, setSelectedYear] = React.useState(() => {
+        if (!ctx.currentMonthStr) return new Date().getFullYear();
+        const parts = ctx.currentMonthStr.split('-');
+        if (parts.length !== 2) return new Date().getFullYear();
+        const year = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10);
+        return month <= 3 ? year - 1 : year;
+    });
+
     const [selectedSingleMonth, setSelectedSingleMonth] = React.useState(ctx.currentMonthStr || '2026-10');
     const [rangeStartMonth, setRangeStartMonth] = React.useState('2026-04');
     const [rangeEndMonth, setRangeEndMonth] = React.useState('2027-03');
@@ -40,7 +49,8 @@ const YoshiiShipView = () => {
 
     React.useLayoutEffect(() => {
         if (ctx.tableContainerRef.current) {
-            if (ctx.shipScrollPosRef.current !== null) {
+            // ★ 修正: 過去のスクロール位置が0より大きい場合のみ復元し、0(一番上)またはnullなら当月へ自動スクロール
+            if (ctx.shipScrollPosRef.current !== null && ctx.shipScrollPosRef.current > 0) {
                 ctx.tableContainerRef.current.scrollTop = ctx.shipScrollPosRef.current;
             } else if (!isInitialScrolledRef.current && ctx.currentMonthStr) {
                 setTimeout(() => {
@@ -115,8 +125,8 @@ const YoshiiShipView = () => {
             groupedMap[mo].forEach(c => {
                 const totalQty = calculateContainerTotalQty(c.allocations);
                 const modelsStr = Object.entries(c.allocations || {})
-                    .filter(([_, q]) => Number(q) > 0)
-                    .map(([m, q]) => `${m} (${q})`)
+                    .filter(entry => Number(entry[1]) > 0)
+                    .map(entry => `${entry[0]} (${entry[1]})`)
                     .join(' / ');
 
                 rows.push([
@@ -168,9 +178,11 @@ const YoshiiShipView = () => {
 
                         {displayMode === 'year' && (
                             <select value={selectedYear} onChange={e => setSelectedYear(Number(e.target.value))} className="border p-1 rounded text-xs font-bold bg-white text-indigo-900">
-                                <option value={2025}>2025年度</option>
-                                <option value={2026}>2026年度</option>
-                                <option value={2027}>2027年度</option>
+                                {/* ★ 将来の年度変化にも柔軟に対応できるよう、選択肢に動的計算の年を含める(過去1年・今年・来年・再来年) */}
+                                <option value={selectedYear - 1}>{selectedYear - 1}年度</option>
+                                <option value={selectedYear}>{selectedYear}年度</option>
+                                <option value={selectedYear + 1}>{selectedYear + 1}年度</option>
+                                <option value={selectedYear + 2}>{selectedYear + 2}年度</option>
                             </select>
                         )}
 
@@ -243,7 +255,7 @@ const YoshiiShipView = () => {
                                         </tr>
                                         {containersInMonth.map((container, idx) => {
                                             const totalQty = calculateContainerTotalQty(container.allocations);
-                                            const activeAllocEntries = Object.entries(container.allocations || {}).filter(([_, q]) => Number(q) > 0);
+                                            const activeAllocEntries = Object.entries(container.allocations || {}).filter(entry => Number(entry[1]) > 0);
 
                                             const origTime = (container.originals || {}).deliveryTime;
                                             const currTime = container.deliveryTime || '';
@@ -267,36 +279,38 @@ const YoshiiShipView = () => {
                                                         <LocalInput value={container.containerNo} originalValue={(container.originals || {}).containerNo} originalMeta={(container.originalMetas || {}).containerNo} onChange={(v, orig) => ctx.updateContainer(container.id, { containerNo: v }, mo, 'yoshii', 'コンテナNO.')} className="text-center text-xs font-mono" dataGridId={`y-ship-${mo}-${idx}-2`} onGridKeyDown={handleGridNav} />
                                                     </td>
 
-                                                    {/* ★ 積載型式: 工場の編集要件に合わせて LocalInput (input-compact) に変更し編集・保存可能化 */}
                                                     <td className="border text-xs text-left px-1 py-0.5 bg-gray-50/50 align-middle">
                                                         {activeAllocEntries.length === 0 ? (
                                                             <span className="text-gray-400 text-[10px] italic">未割当</span>
                                                         ) : (
                                                             <div className="space-y-0.5">
-                                                                {activeAllocEntries.map(([m, q]) => (
-                                                                    <div key={m} className="flex justify-between items-center text-xs h-[20px]">
-                                                                        <span className="font-bold text-gray-800">{m}</span>
-                                                                        <div className="w-[42px] ml-1">
-                                                                            <LocalInput 
-                                                                                type="number"
-                                                                                value={q}
-                                                                                onChange={(v) => {
-                                                                                    const updatedAlloc = { ...(container.allocations || {}) };
-                                                                                    updatedAlloc[m] = Number(v) || 0;
-                                                                                    ctx.updateContainer(container.id, { allocations: updatedAlloc }, mo, 'yoshii', `${m} 割振数`);
-                                                                                }}
-                                                                                className="input-compact w-full text-right text-xs font-mono font-normal text-emerald-800 bg-transparent"
-                                                                            />
+                                                                {activeAllocEntries.map(entry => {
+                                                                    const m = entry[0];
+                                                                    const q = entry[1];
+                                                                    return (
+                                                                        <div key={m} className="flex justify-between items-center text-xs h-[20px]">
+                                                                            <span className="font-bold text-gray-800">{m}</span>
+                                                                            <div className="w-[42px] ml-1">
+                                                                                <LocalInput 
+                                                                                    type="number"
+                                                                                    value={q}
+                                                                                    onChange={(v) => {
+                                                                                        const updatedAlloc = { ...(container.allocations || {}) };
+                                                                                        updatedAlloc[m] = Number(v) || 0;
+                                                                                        ctx.updateContainer(container.id, { allocations: updatedAlloc }, mo, 'yoshii', `${m} 割振数`);
+                                                                                    }}
+                                                                                    className="input-compact w-full text-right text-xs font-mono font-normal text-emerald-800 bg-transparent"
+                                                                                />
+                                                                            </div>
                                                                         </div>
-                                                                    </div>
-                                                                ))}
+                                                                    );
+                                                                })}
                                                             </div>
                                                         )}
                                                     </td>
 
                                                     <td className="border font-mono text-xs text-right pr-1 bg-emerald-50/50 text-emerald-900 font-bold align-middle">{totalQty > 0 ? totalQty.toLocaleString() : '0'}</td>
 
-                                                    {/* ★ 補充部品: LocalInput + input-compact を使用。親CSS干渉による位置ズレ・フォント肥大化を完全防止し、枠線なしの12px等幅標準ウェイトを実現 */}
                                                     <td className="border text-center px-0 py-0.5 bg-emerald-50/30 align-middle">
                                                         {activeAllocEntries.length === 0 ? (
                                                             <div className="flex justify-center items-center gap-0.5 h-[20px]">
@@ -304,7 +318,8 @@ const YoshiiShipView = () => {
                                                             </div>
                                                         ) : (
                                                             <div className="space-y-0.5">
-                                                                {activeAllocEntries.map(([m, _]) => {
+                                                                {activeAllocEntries.map(entry => {
+                                                                    const m = entry[0];
                                                                     const sparePartsObj = container.spareParts || {};
                                                                     const modelSpare = sparePartsObj[m] || {};
 
@@ -331,27 +346,51 @@ const YoshiiShipView = () => {
                                                                         ctx.updateContainer(container.id, updatePayload, mo, 'yoshii', `${m} 補充部品(${fieldKey})`);
                                                                     };
 
+                                                                    const spareInputStyle = {
+                                                                        width: '36px',
+                                                                        height: '20px',
+                                                                        fontSize: '12px',
+                                                                        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+                                                                        fontWeight: 'normal',
+                                                                        textAlign: 'center',
+                                                                        border: '1px solid #d1d5db',
+                                                                        borderRadius: '2px',
+                                                                        background: '#ffffff',
+                                                                        outline: 'none',
+                                                                        boxSizing: 'border-box',
+                                                                        display: 'inline-block',
+                                                                        margin: '0 1px'
+                                                                    };
+
+                                                                    const handleFocusStyle = (e) => {
+                                                                        e.target.style.fontSize = '12px';
+                                                                        e.target.style.width = '36px';
+                                                                    };
+
                                                                     return (
-                                                                        <div key={m} className="flex justify-center items-center gap-0.5 h-[20px]">
-                                                                            <LocalInput 
-                                                                                type="number" 
+                                                                        <div key={m} className="flex justify-center items-center h-[20px]">
+                                                                            <input 
+                                                                                type="text" 
                                                                                 value={outerVal} 
-                                                                                onChange={(val) => updateSpareField('outerBox', val)} 
-                                                                                className="input-compact w-[36px] text-center text-xs font-mono font-normal bg-transparent" 
+                                                                                onChange={e => updateSpareField('outerBox', e.target.value)} 
+                                                                                onFocus={handleFocusStyle}
+                                                                                style={spareInputStyle} 
                                                                                 placeholder="0"
                                                                             />
-                                                                            <LocalInput 
-                                                                                type="number" 
+                                                                            <input 
+                                                                                type="text" 
                                                                                 value={innerVal} 
-                                                                                onChange={(val) => updateSpareField('innerBox', val)} 
-                                                                                className="input-compact w-[36px] text-center text-xs font-mono font-normal bg-transparent" 
+                                                                                onChange={e => updateSpareField('innerBox', e.target.value)} 
+                                                                                onFocus={handleFocusStyle}
+                                                                                style={spareInputStyle} 
                                                                                 placeholder="0"
                                                                             />
-                                                                            <LocalInput 
-                                                                                type="number" 
+                                                                            <input 
+                                                                                type="text" 
                                                                                 value={labelVal} 
-                                                                                onChange={(val) => updateSpareField('label', val)} 
-                                                                                className="input-compact w-[36px] text-center text-xs font-mono font-normal bg-transparent" 
+                                                                                onChange={e => updateSpareField('label', e.target.value)} 
+                                                                                onFocus={handleFocusStyle}
+                                                                                style={spareInputStyle} 
                                                                                 placeholder="0"
                                                                             />
                                                                         </div>
@@ -463,7 +502,17 @@ const YoshiiDrayageView = () => {
     const displayVer = `${baseAppVer}${JS_SHIP_VERSION}${cmpVer}`;
 
     const [displayMode, setDisplayMode] = React.useState('year');
-    const [selectedYear, setSelectedYear] = React.useState(2026);
+    
+    // ★ 修正: 今日の月(ctx.currentMonthStr)から当年度(4月始まり)を自動計算して初期化
+    const [selectedYear, setSelectedYear] = React.useState(() => {
+        if (!ctx.currentMonthStr) return new Date().getFullYear();
+        const parts = ctx.currentMonthStr.split('-');
+        if (parts.length !== 2) return new Date().getFullYear();
+        const year = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10);
+        return month <= 3 ? year - 1 : year;
+    });
+
     const [selectedSingleMonth, setSelectedSingleMonth] = React.useState(ctx.currentMonthStr || '2026-10');
     const [rangeStartMonth, setRangeStartMonth] = React.useState('2026-04');
     const [rangeEndMonth, setRangeEndMonth] = React.useState('2027-03');
@@ -472,7 +521,8 @@ const YoshiiDrayageView = () => {
 
     React.useLayoutEffect(() => {
         if (ctx.tableContainerRef.current) {
-            if (ctx.drayScrollPosRef.current !== null) {
+            // ★ 修正: 過去のスクロール位置が0より大きい場合のみ復元し、0(一番上)またはnullなら当月へ自動スクロール
+            if (ctx.drayScrollPosRef.current !== null && ctx.drayScrollPosRef.current > 0) {
                 ctx.tableContainerRef.current.scrollTop = ctx.drayScrollPosRef.current;
             } else if (!isInitialScrolledRef.current && ctx.currentMonthStr) {
                 setTimeout(() => {
@@ -547,8 +597,8 @@ const YoshiiDrayageView = () => {
             groupedMap[mo].forEach(c => {
                 const totalQty = calculateContainerTotalQty(c.allocations);
                 const modelsStr = Object.entries(c.allocations || {})
-                    .filter(([_, q]) => Number(q) > 0)
-                    .map(([m, q]) => `${m} (${q})`)
+                    .filter(entry => Number(entry[1]) > 0)
+                    .map(entry => `${entry[0]} (${entry[1]})`)
                     .join(' / ');
 
                 rows.push([
@@ -567,6 +617,41 @@ const YoshiiDrayageView = () => {
             title: `吉井電気 ドレージ手配 [仕入先: ${ctx.selectedVendorFilter || 'ALL'}]`,
             headers, rows, filename
         });
+    };
+
+    const formatDisplayDate = (val) => {
+        if (!val) return '';
+        if (val.includes('-')) {
+            const parts = val.split('-');
+            if (parts.length === 3) return `${parts[1]}/${parts[2]}`;
+        }
+        if (val.includes('/')) {
+            const parts = val.split('/');
+            if (parts.length === 3) return `${parts[1]}/${parts[2]}`;
+        }
+        return val;
+    };
+
+    const ReadOnlyInput = ({ value, originalValue, originalMeta, className, isDate }) => {
+        const safeClassName = className || "";
+        const safeIsDate = isDate || false;
+        
+        let displayVal = value || '';
+        if (safeIsDate) {
+            displayVal = formatDisplayDate(displayVal);
+        }
+        
+        const hasOrig = originalValue !== undefined && originalValue !== null && String(originalValue) !== '';
+        const isChanged = hasOrig && String(originalValue) !== String(value || '');
+        const tooltipClass = isChanged ? 'has-original-tooltip' : '';
+        const changedClass = (ctx.isChangeTrackingMode && isChanged) ? 'is-changed-cell' : 'text-gray-700';
+        const metaStr = originalMeta || '未設定';
+
+        return (
+            <div className={`w-full h-full flex items-center justify-center ${tooltipClass}`} data-original-val={originalValue === "" ? "【消去】" : originalValue} data-original-meta={metaStr}>
+                <input type="text" value={displayVal} readOnly className={`w-full bg-transparent border-none outline-none cursor-not-allowed ${safeClassName} ${changedClass}`} />
+            </div>
+        );
     };
 
     const isReadOnlyUser = ctx.authUser && !ctx.authUser.canEdit;
@@ -602,9 +687,11 @@ const YoshiiDrayageView = () => {
 
                         {displayMode === 'year' && (
                             <select value={selectedYear} onChange={e => setSelectedYear(Number(e.target.value))} className="border p-1 rounded text-xs font-bold bg-white text-indigo-900">
-                                <option value={2025}>2025年度</option>
-                                <option value={2026}>2026年度</option>
-                                <option value={2027}>2027年度</option>
+                                {/* ★ 将来の年度変化にも柔軟に対応できるよう、選択肢に動的計算の年を含める */}
+                                <option value={selectedYear - 1}>{selectedYear - 1}年度</option>
+                                <option value={selectedYear}>{selectedYear}年度</option>
+                                <option value={selectedYear + 1}>{selectedYear + 1}年度</option>
+                                <option value={selectedYear + 2}>{selectedYear + 2}年度</option>
                             </select>
                         )}
 
@@ -677,7 +764,7 @@ const YoshiiDrayageView = () => {
                                         </tr>
                                         {containersInMonth.map((container, idx) => {
                                             const totalQty = calculateContainerTotalQty(container.allocations);
-                                            const activeAllocEntries = Object.entries(container.allocations || {}).filter(([_, q]) => Number(q) > 0);
+                                            const activeAllocEntries = Object.entries(container.allocations || {}).filter(entry => Number(entry[1]) > 0);
 
                                             const origTime = (container.originals || {}).deliveryTime;
                                             const currTime = container.deliveryTime || '';
@@ -688,46 +775,49 @@ const YoshiiDrayageView = () => {
                                             );
 
                                             return (
-                                                <tr key={container.id || `dray-${mo}-${idx}`} className="hover:bg-emerald-50/60 border-b table-row-compact">
-                                                    <td className="p-0.5 border text-center align-middle readonly-cell bg-gray-100">
-                                                        <LocalInput value={container.managementNo} readOnly={true} className="text-center text-xs font-bold readonly-cell bg-gray-100 cursor-not-allowed" dataGridId={`y-dray-${mo}-${idx}-0`} onGridKeyDown={handleGridNav} />
+                                                <tr key={container.id || `dray-${mo}-${idx}`} className="hover:bg-gray-200 border-b table-row-compact">
+                                                    <td className="p-0.5 border text-center align-middle bg-gray-100">
+                                                        <ReadOnlyInput value={container.managementNo} originalValue={(container.originals || {}).managementNo} originalMeta={(container.originalMetas || {}).managementNo} className="text-center text-xs font-bold" />
                                                     </td>
 
-                                                    <td className="p-0.5 border text-center align-middle readonly-cell bg-gray-100">
-                                                        <DynamicSelect value={container.status} disabled={true} category="statuses" options={ctx.masterData.common.statuses} dataGridId={`y-dray-${mo}-${idx}-1`} onGridKeyDown={handleGridNav} className="w-full text-xs border-none bg-transparent outline-none text-center px-0 readonly-cell bg-gray-100 cursor-not-allowed" />
+                                                    <td className="p-0.5 border text-center align-middle bg-gray-100">
+                                                        <ReadOnlyInput value={container.status} originalValue={(container.originals || {}).status} originalMeta={(container.originalMetas || {}).status} className="text-center text-xs" />
                                                     </td>
 
-                                                    <td className="p-0.5 border text-center align-middle readonly-cell bg-gray-100">
-                                                        <LocalInput value={container.containerNo} readOnly={true} className="text-center text-xs font-mono readonly-cell bg-gray-100 cursor-not-allowed" dataGridId={`y-dray-${mo}-${idx}-2`} onGridKeyDown={handleGridNav} />
+                                                    <td className="p-0.5 border text-center align-middle bg-gray-100">
+                                                        <ReadOnlyInput value={container.containerNo} originalValue={(container.originals || {}).containerNo} originalMeta={(container.originalMetas || {}).containerNo} className="text-center text-xs font-mono" />
                                                     </td>
 
-                                                    {/* ★ 積載型式 (ドレージ): ドレージ側は読み取り専用のまま、12px/等幅/標準ウェイトに統一 */}
-                                                    <td className="border text-xs text-left px-1 py-0.5 align-middle readonly-cell bg-gray-100">
+                                                    <td className="border text-xs text-left px-1 py-0.5 align-middle bg-gray-100">
                                                         {activeAllocEntries.length === 0 ? (
                                                             <span className="text-gray-400 text-[10px] italic">未割当</span>
                                                         ) : (
                                                             <div className="space-y-0.5">
-                                                                {activeAllocEntries.map(([m, q]) => (
-                                                                    <div key={m} className="flex justify-between items-center text-xs h-[20px]">
-                                                                        <span className="font-bold text-gray-700">{m}</span>
-                                                                        <span className="font-mono text-slate-700 font-normal ml-1">{Number(q).toLocaleString()}</span>
-                                                                    </div>
-                                                                ))}
+                                                                {activeAllocEntries.map(entry => {
+                                                                    const m = entry[0];
+                                                                    const q = entry[1];
+                                                                    return (
+                                                                        <div key={m} className="flex justify-between items-center text-xs h-[20px]">
+                                                                            <span className="font-bold text-gray-700">{m}</span>
+                                                                            <span className="font-mono text-slate-700 font-normal ml-1">{Number(q).toLocaleString()}</span>
+                                                                        </div>
+                                                                    );
+                                                                })}
                                                             </div>
                                                         )}
                                                     </td>
 
-                                                    <td className="border font-mono text-xs text-right pr-1 bg-gray-100 readonly-cell align-middle text-gray-700">{totalQty > 0 ? totalQty.toLocaleString() : '0'}</td>
+                                                    <td className="border font-mono text-xs text-right pr-1 bg-gray-100 align-middle text-gray-700">{totalQty > 0 ? totalQty.toLocaleString() : '0'}</td>
 
-                                                    {/* ★ 補充部品 (ドレージ): LocalInput + input-compactで安全に枠線なし/12px等幅標準ウェイトを実現 */}
-                                                    <td className="border text-center px-0 py-0.5 align-middle readonly-cell bg-gray-100">
+                                                    <td className="border text-center px-0 py-0.5 align-middle bg-gray-100">
                                                         {activeAllocEntries.length === 0 ? (
                                                             <div className="flex justify-center items-center gap-0.5 h-[20px]">
                                                                 <span className="text-[10px] text-gray-400">-</span>
                                                             </div>
                                                         ) : (
                                                             <div className="space-y-0.5">
-                                                                {activeAllocEntries.map(([m, _]) => {
+                                                                {activeAllocEntries.map(entry => {
+                                                                    const m = entry[0];
                                                                     const sparePartsObj = container.spareParts || {};
                                                                     const modelSpare = sparePartsObj[m] || {};
 
@@ -737,27 +827,9 @@ const YoshiiDrayageView = () => {
 
                                                                     return (
                                                                         <div key={m} className="flex justify-center items-center gap-0.5 h-[20px]">
-                                                                            <LocalInput 
-                                                                                type="number" 
-                                                                                value={outerVal} 
-                                                                                disabled={true} 
-                                                                                className="input-compact w-[36px] text-center text-xs font-mono font-normal text-gray-600 bg-transparent" 
-                                                                                placeholder="0"
-                                                                            />
-                                                                            <LocalInput 
-                                                                                type="number" 
-                                                                                value={innerVal} 
-                                                                                disabled={true} 
-                                                                                className="input-compact w-[36px] text-center text-xs font-mono font-normal text-gray-600 bg-transparent" 
-                                                                                placeholder="0"
-                                                                            />
-                                                                            <LocalInput 
-                                                                                type="number" 
-                                                                                value={labelVal} 
-                                                                                disabled={true} 
-                                                                                className="input-compact w-[36px] text-center text-xs font-mono font-normal text-gray-600 bg-transparent" 
-                                                                                placeholder="0"
-                                                                            />
+                                                                            <ReadOnlyInput value={outerVal} className="w-[36px] text-center text-xs font-mono font-normal" />
+                                                                            <ReadOnlyInput value={innerVal} className="w-[36px] text-center text-xs font-mono font-normal" />
+                                                                            <ReadOnlyInput value={labelVal} className="w-[36px] text-center text-xs font-mono font-normal" />
                                                                         </div>
                                                                     );
                                                                 })}
@@ -765,20 +837,20 @@ const YoshiiDrayageView = () => {
                                                         )}
                                                     </td>
 
-                                                    <td className="p-0.5 border text-center align-middle readonly-cell bg-gray-100">
-                                                        <DynamicSelect value={container.port} disabled={true} category="ports" options={ctx.masterData.yoshii.ports} dataGridId={`y-dray-${mo}-${idx}-3`} onGridKeyDown={handleGridNav} className="w-full text-xs border-none bg-transparent outline-none text-center px-0 readonly-cell bg-gray-100 cursor-not-allowed" />
+                                                    <td className="p-0.5 border text-center align-middle bg-gray-100">
+                                                        <ReadOnlyInput value={container.port} originalValue={(container.originals || {}).port} originalMeta={(container.originalMetas || {}).port} className="text-center text-xs" />
                                                     </td>
 
-                                                    <td className="p-0.5 border text-center align-middle readonly-cell bg-gray-100">
-                                                        <LocalInput type="qc-date" value={container.etd} readOnly={true} refDate={mo} className="text-left pl-2 text-xs readonly-cell bg-gray-100 cursor-not-allowed" dataGridId={`y-dray-${mo}-${idx}-4`} onGridKeyDown={handleGridNav} />
+                                                    <td className="p-0.5 border text-center align-middle bg-gray-100">
+                                                        <ReadOnlyInput value={container.etd} originalValue={(container.originals || {}).etd} originalMeta={(container.originalMetas || {}).etd} isDate={true} className="text-left pl-2 text-xs" />
                                                     </td>
 
-                                                    <td className="p-0.5 border text-center align-middle readonly-cell bg-gray-100">
-                                                        <LocalInput type="qc-date" value={container.eta} readOnly={true} refDate={mo} className="text-left pl-2 text-xs readonly-cell bg-gray-100 cursor-not-allowed" dataGridId={`y-dray-${mo}-${idx}-5`} onGridKeyDown={handleGridNav} />
+                                                    <td className="p-0.5 border text-center align-middle bg-gray-100">
+                                                        <ReadOnlyInput value={container.eta} originalValue={(container.originals || {}).eta} originalMeta={(container.originalMetas || {}).eta} isDate={true} className="text-left pl-2 text-xs" />
                                                     </td>
 
-                                                    <td className="p-0.5 border text-center align-middle readonly-cell bg-gray-100">
-                                                        <LocalInput type="qc-date" value={container.freetime} readOnly={true} refDate={mo} className="text-left pl-2 text-xs readonly-cell bg-gray-100 cursor-not-allowed" dataGridId={`y-dray-${mo}-${idx}-6`} onGridKeyDown={handleGridNav} />
+                                                    <td className="p-0.5 border text-center align-middle bg-gray-100">
+                                                        <ReadOnlyInput value={container.freetime} originalValue={(container.originals || {}).freetime} originalMeta={(container.originalMetas || {}).freetime} isDate={true} className="text-left pl-2 text-xs" />
                                                     </td>
 
                                                     <td className={`border text-center px-1 py-0.5 align-middle ${isReadOnlyUser ? 'readonly-cell bg-gray-100' : 'bg-emerald-50/30'}`}>
@@ -835,12 +907,12 @@ const YoshiiDrayageView = () => {
                                                         <LocalTextArea value={container.notes} originalValue={(container.originals || {}).notes} originalMeta={(container.originalMetas || {}).notes} onChange={(v, orig) => ctx.updateContainer(container.id, { notes: v }, mo, 'yoshii', '備考')} isCompact={true} className={`h-auto whitespace-pre-wrap break-words ${isReadOnlyUser ? 'readonly-cell bg-gray-100' : ''}`}/>
                                                     </td>
 
-                                                    <td className="p-0.5 border text-center align-middle readonly-cell bg-gray-100">
-                                                        <DynamicSelect value={container.containerSize} disabled={true} category="containerSizes" options={ctx.masterData.common.containerSizes} dataGridId={`y-dray-${mo}-${idx}-9`} onGridKeyDown={handleGridNav} className="w-full text-xs border-none bg-transparent outline-none text-center px-0 readonly-cell bg-gray-100 cursor-not-allowed" />
+                                                    <td className="p-0.5 border text-center align-middle bg-gray-100">
+                                                        <ReadOnlyInput value={container.containerSize} originalValue={(container.originals || {}).containerSize} originalMeta={(container.originalMetas || {}).containerSize} className="text-center text-xs" />
                                                     </td>
 
-                                                    <td className="p-0.5 border text-center align-middle readonly-cell bg-gray-100">
-                                                        <LocalInput value={container.managementNo} readOnly={true} className="text-center text-xs readonly-cell bg-gray-100 cursor-not-allowed" dataGridId={`y-dray-${mo}-${idx}-10`} onGridKeyDown={handleGridNav} />
+                                                    <td className="p-0.5 border text-center align-middle bg-gray-100">
+                                                        <ReadOnlyInput value={container.vesselName} originalValue={(container.originals || {}).vesselName} originalMeta={(container.originalMetas || {}).vesselName} className="text-center text-xs" />
                                                     </td>
                                                 </tr>
                                             );
