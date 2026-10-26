@@ -1,15 +1,15 @@
 // shipping_views_ship.js
 // =========================================================
 // shipping_views_ship.js - 出荷日程・ドレージ画面モジュール
-// ★ WebVer. 123 対応 / _js039 当月自動スクロールの確実化 ＆ 年度指定の動的初期化
+// ★ WebVer. 123 対応 / _js057 出荷日程・ドレージ 積載型式割振数 入数端数警告(#fee2e2)完全対応版
 // ★ 最上行ファイル名識別コメント保持 (// shipping_views_ship.js)
-// ★ 1. スクロール保証: 初期表示や未スクロール状態(0)の場合は確実に当月へスクロールさせ、ログイン中の意図的なスクロール(>0)のみ復元するよう修正。
-// ★ 2. 年度初期値: 固定の2026年を廃止し、currentMonthStrから当年度(4月始まり)を自動計算して初期化。
-// ★ 3. ドレージ画面の入力機能(納品日時/納品先/備考)および読み取り専用セルの完全保護維持。
-// ★ 4. Babel構文エラー回避(entry=>)および補充部品のインラインスタイル維持。
+// ★ 1. 計画画面で設定された型式ごとの「入数(qtyPerCarton)」を自動参照。
+// ★ 2. 出荷日程表: 積載型式の各型式割振数入力セルに入数端数チェック(薄い赤背景 #fee2e2)を適用。
+// ★ 3. ドレージ手配: 積載型式の各型式割振数表示セルに入数端数チェック(薄い赤背景 #fee2e2)を適用。
+// ★ 4. スクロール保証、動的年度初期化、読み取り専用セルの保護を維持。
 // =========================================================
 
-const JS_SHIP_VERSION = '_js039';
+const JS_SHIP_VERSION = '_js057';
 
 // 【ヘルパー: コンテナ内割振り製品総数量の動的自動計算】
 const calculateContainerTotalQty = (allocationsObj) => {
@@ -18,6 +18,29 @@ const calculateContainerTotalQty = (allocationsObj) => {
         const num = Number(qty);
         return sum + (!isNaN(num) && num > 0 ? num : 0);
     }, 0);
+};
+
+// 【ヘルパー: 型式マスタ詳細および計画データから入数(qtyPerCarton)を安全に取得】
+const getModelQtyPerCarton = (ctx, modelName) => {
+    if (!modelName) return 0;
+    const norm = typeof normalizeModelCode === 'function' ? normalizeModelCode(modelName) : String(modelName).trim().toUpperCase();
+    
+    // 1. 型式マスタ詳細からの参照を優先
+    const details = ctx.masterData?.yoshii?.modelDetails?.[modelName] || {};
+    if (details.qtyPerCarton !== undefined && details.qtyPerCarton !== '' && Number(details.qtyPerCarton) > 0) {
+        return Number(details.qtyPerCarton);
+    }
+    
+    // 2. plans全体の該当型式レコードから探す
+    const matchInPlans = (ctx.plans || []).find(p => {
+        const pNorm = typeof normalizeModelCode === 'function' ? normalizeModelCode(p.model) : String(p.model).trim().toUpperCase();
+        return pNorm === norm && p.qtyPerCarton && Number(p.qtyPerCarton) > 0;
+    });
+    if (matchInPlans) {
+        return Number(matchInPlans.qtyPerCarton);
+    }
+
+    return 0;
 };
 
 // 【1. 吉井電気 出荷日程表ビュー (YoshiiShipView)】
@@ -31,7 +54,7 @@ const YoshiiShipView = () => {
 
     const [displayMode, setDisplayMode] = React.useState('year');
     
-    // ★ 修正: 今日の月(ctx.currentMonthStr)から当年度(4月始まり)を自動計算して初期化
+    // 今日の月(ctx.currentMonthStr)から当年度(4月始まり)を自動計算して初期化
     const [selectedYear, setSelectedYear] = React.useState(() => {
         if (!ctx.currentMonthStr) return new Date().getFullYear();
         const parts = ctx.currentMonthStr.split('-');
@@ -49,7 +72,7 @@ const YoshiiShipView = () => {
 
     React.useLayoutEffect(() => {
         if (ctx.tableContainerRef.current) {
-            // ★ 修正: 過去のスクロール位置が0より大きい場合のみ復元し、0(一番上)またはnullなら当月へ自動スクロール
+            // 過去のスクロール位置が0より大きい場合のみ復元し、0(一番上)またはnullなら当月へ自動スクロール
             if (ctx.shipScrollPosRef.current !== null && ctx.shipScrollPosRef.current > 0) {
                 ctx.tableContainerRef.current.scrollTop = ctx.shipScrollPosRef.current;
             } else if (!isInitialScrolledRef.current && ctx.currentMonthStr) {
@@ -178,7 +201,6 @@ const YoshiiShipView = () => {
 
                         {displayMode === 'year' && (
                             <select value={selectedYear} onChange={e => setSelectedYear(Number(e.target.value))} className="border p-1 rounded text-xs font-bold bg-white text-indigo-900">
-                                {/* ★ 将来の年度変化にも柔軟に対応できるよう、選択肢に動的計算の年を含める(過去1年・今年・来年・再来年) */}
                                 <option value={selectedYear - 1}>{selectedYear - 1}年度</option>
                                 <option value={selectedYear}>{selectedYear}年度</option>
                                 <option value={selectedYear + 1}>{selectedYear + 1}年度</option>
@@ -279,6 +301,7 @@ const YoshiiShipView = () => {
                                                         <LocalInput value={container.containerNo} originalValue={(container.originals || {}).containerNo} originalMeta={(container.originalMetas || {}).containerNo} onChange={(v, orig) => ctx.updateContainer(container.id, { containerNo: v }, mo, 'yoshii', 'コンテナNO.')} className="text-center text-xs font-mono" dataGridId={`y-ship-${mo}-${idx}-2`} onGridKeyDown={handleGridNav} />
                                                     </td>
 
+                                                    {/* 積載型式 (各型式の割振数に入数端数警告 #fee2e2 を適用) */}
                                                     <td className="border text-xs text-left px-1 py-0.5 bg-gray-50/50 align-middle">
                                                         {activeAllocEntries.length === 0 ? (
                                                             <span className="text-gray-400 text-[10px] italic">未割当</span>
@@ -286,9 +309,15 @@ const YoshiiShipView = () => {
                                                             <div className="space-y-0.5">
                                                                 {activeAllocEntries.map(entry => {
                                                                     const m = entry[0];
-                                                                    const q = entry[1];
+                                                                    const q = Number(entry[1]) || 0;
+                                                                    const qtyPer = getModelQtyPerCarton(ctx, m);
+                                                                    
+                                                                    // 端数チェック判定: 入数が1以上、数量が1以上、割り切れない場合に薄い赤背景
+                                                                    const isAllocError = qtyPer > 0 && q > 0 && (q % qtyPer !== 0);
+                                                                    const allocStyle = isAllocError ? { backgroundColor: '#fee2e2' } : {};
+
                                                                     return (
-                                                                        <div key={m} className="flex justify-between items-center text-xs h-[20px]">
+                                                                        <div key={m} className="flex justify-between items-center text-xs h-[20px] rounded px-0.5" style={allocStyle}>
                                                                             <span className="font-bold text-gray-800">{m}</span>
                                                                             <div className="w-[42px] ml-1">
                                                                                 <LocalInput 
@@ -300,6 +329,7 @@ const YoshiiShipView = () => {
                                                                                         ctx.updateContainer(container.id, { allocations: updatedAlloc }, mo, 'yoshii', `${m} 割振数`);
                                                                                     }}
                                                                                     className="input-compact w-full text-right text-xs font-mono font-normal text-emerald-800 bg-transparent"
+                                                                                    style={allocStyle}
                                                                                 />
                                                                             </div>
                                                                         </div>
@@ -503,7 +533,7 @@ const YoshiiDrayageView = () => {
 
     const [displayMode, setDisplayMode] = React.useState('year');
     
-    // ★ 修正: 今日の月(ctx.currentMonthStr)から当年度(4月始まり)を自動計算して初期化
+    // 今日の月(ctx.currentMonthStr)から当年度(4月始まり)を自動計算して初期化
     const [selectedYear, setSelectedYear] = React.useState(() => {
         if (!ctx.currentMonthStr) return new Date().getFullYear();
         const parts = ctx.currentMonthStr.split('-');
@@ -521,7 +551,7 @@ const YoshiiDrayageView = () => {
 
     React.useLayoutEffect(() => {
         if (ctx.tableContainerRef.current) {
-            // ★ 修正: 過去のスクロール位置が0より大きい場合のみ復元し、0(一番上)またはnullなら当月へ自動スクロール
+            // 過去のスクロール位置が0より大きい場合のみ復元し、0(一番上)またはnullなら当月へ自動スクロール
             if (ctx.drayScrollPosRef.current !== null && ctx.drayScrollPosRef.current > 0) {
                 ctx.tableContainerRef.current.scrollTop = ctx.drayScrollPosRef.current;
             } else if (!isInitialScrolledRef.current && ctx.currentMonthStr) {
@@ -687,7 +717,6 @@ const YoshiiDrayageView = () => {
 
                         {displayMode === 'year' && (
                             <select value={selectedYear} onChange={e => setSelectedYear(Number(e.target.value))} className="border p-1 rounded text-xs font-bold bg-white text-indigo-900">
-                                {/* ★ 将来の年度変化にも柔軟に対応できるよう、選択肢に動的計算の年を含める */}
                                 <option value={selectedYear - 1}>{selectedYear - 1}年度</option>
                                 <option value={selectedYear}>{selectedYear}年度</option>
                                 <option value={selectedYear + 1}>{selectedYear + 1}年度</option>
@@ -788,6 +817,7 @@ const YoshiiDrayageView = () => {
                                                         <ReadOnlyInput value={container.containerNo} originalValue={(container.originals || {}).containerNo} originalMeta={(container.originalMetas || {}).containerNo} className="text-center text-xs font-mono" />
                                                     </td>
 
+                                                    {/* 積載型式 (各型式の割振数表示に入数端数警告 #fee2e2 を適用) */}
                                                     <td className="border text-xs text-left px-1 py-0.5 align-middle bg-gray-100">
                                                         {activeAllocEntries.length === 0 ? (
                                                             <span className="text-gray-400 text-[10px] italic">未割当</span>
@@ -795,11 +825,17 @@ const YoshiiDrayageView = () => {
                                                             <div className="space-y-0.5">
                                                                 {activeAllocEntries.map(entry => {
                                                                     const m = entry[0];
-                                                                    const q = entry[1];
+                                                                    const q = Number(entry[1]) || 0;
+                                                                    const qtyPer = getModelQtyPerCarton(ctx, m);
+                                                                    
+                                                                    // 端数チェック判定: 入数が1以上、数量が1以上、割り切れない場合に薄い赤背景
+                                                                    const isAllocError = qtyPer > 0 && q > 0 && (q % qtyPer !== 0);
+                                                                    const allocStyle = isAllocError ? { backgroundColor: '#fee2e2' } : {};
+
                                                                     return (
-                                                                        <div key={m} className="flex justify-between items-center text-xs h-[20px]">
+                                                                        <div key={m} className="flex justify-between items-center text-xs h-[20px] rounded px-0.5" style={allocStyle}>
                                                                             <span className="font-bold text-gray-700">{m}</span>
-                                                                            <span className="font-mono text-slate-700 font-normal ml-1">{Number(q).toLocaleString()}</span>
+                                                                            <span className="font-mono text-slate-700 font-normal ml-1">{q.toLocaleString()}</span>
                                                                         </div>
                                                                     );
                                                                 })}
