@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>吉井電気 製品出荷管理システム (WebVer. 123)</title>
+    <title>吉井電気 製品出荷管理システム (WebVer. 124)</title>
     
-    <!-- React 18 -->
-    <script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js" crossorigin></script>
-    <script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js" crossorigin></script>
-    <!-- Babel -->
-    <script src="https://unpkg.com/@babel/standalone@7.23.6/babel.min.js"></script>
+    <!-- React 18 (cdnjs: 安定版固定) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+    <!-- Babel (cdnjs: 安定版固定) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.6/babel.min.js"></script>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- ExcelJS -->
@@ -162,7 +162,7 @@
             padding: 0 4px 0 0 !important;
             font-size: 0.75rem !important;
             font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
-            font-weight: normal !important; /* ★ 勝手なfont-boldを完全除去し標準ウェイトに復元 ★ */
+            font-weight: normal !important;
             text-align: right !important;
             border: none !important;
             background: transparent;
@@ -178,7 +178,7 @@
 
     <!-- 単一真実源: バージョン一元定義 -->
     <script>
-        const SYSTEM_VERSION = 'WebVer. 123';
+        const SYSTEM_VERSION = 'WebVer. 124';
     </script>
 
     <!-- 1. 基本UI・モーダル共通モジュール -->

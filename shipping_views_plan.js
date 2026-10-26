@@ -1,14 +1,15 @@
 // shipping_views_plan.js
 // =========================================================
 // shipping_views_plan.js - 出荷計画・割振り画面モジュール
-// ★ WebVer. 123 対応 / _js052 計画画面LocalInputレンダリング完全修復版
+// ★ WebVer. 123 対応 / _js055 計画画面(各月・合計)端数警告(#fee2e2)追加版
 // ★ 最上行ファイル名識別コメント保持 (// shipping_views_plan.js)
-// ★ 1. 計画画面: 割振り画面で成功している LocalInput 呼び出し構造と同等に揃え入力動作を完全復元。
-// ★ 2. 計画画面: 「入数(qtyPerCarton)」を型式のすぐ右(幅45px)に配置、仕入先幅(55px)補正。
+// ★ 1. 計画画面: 各月セルおよび合計セルにおいて、入数で割り切れない場合に薄赤背景(#fee2e2)警告を適用。
+// ★ 2. 計画画面: 前回OKとなった数値入力・保持(楽観的更新)、未入力時「-」表示を完全維持。
 // ★ 3. 割振り画面: 入力動作および端数赤背景チェック(#fee2e2)を完全維持。
+// ★ 4. レイアウト: 仕入先(55px)、型式、入数(45px・型式の右)の配置を維持。
 // =========================================================
 
-const JS_PLAN_VERSION = '_js052';
+const JS_PLAN_VERSION = '_js055';
 
 // 【型式編集・削除モーダル (V94完全移植)】
 const ModelEditModal = ({ isOpen, onClose, company='yoshii' }) => {
@@ -210,6 +211,9 @@ const YoshiiPlanView = () => {
     const cmpVer = typeof JS_COMPONENTS_VERSION !== 'undefined' ? JS_COMPONENTS_VERSION : '';
     const displayVer = `${baseAppVer}${JS_PLAN_VERSION}${cmpVer}`;
 
+    // 楽観的UI更新ステート: 入力確定直後の値を即座に握り、非同期中の再描画による値消失を完全に防ぐ
+    const [localQuantities, setLocalQuantities] = React.useState({});
+
     const handleExecuteExport = ({ mode, selectedYear: selYr, singleMonth: sgMo, startMonth: sMo, endMonth: eMo }) => {
         const targetVendor = ctx.selectedVendorFilter || 'ALL';
         
@@ -236,7 +240,7 @@ const YoshiiPlanView = () => {
             const rowTot = calculateRowTotal(m);
 
             const monthQtys = displayMonths.map(mo => {
-                const qty = getPlanData(m, mo)?.quantity;
+                const qty = getEffectivePlanQty(m, mo);
                 return qty !== undefined && qty !== '' ? Number(qty) : 0;
             });
 
@@ -389,6 +393,16 @@ const YoshiiPlanView = () => {
         return yoshiiPlans.find(p => normalizeModelCode(p.model) === normTarget && p.deliveryMonth === month);
     };
 
+    // 確定値の取得: 一時メモリに直前入力値があればそれを優先採用
+    const getEffectivePlanQty = (model, month) => {
+        const key = `${normalizeModelCode(model)}_${month}`;
+        if (localQuantities[key] !== undefined) {
+            return localQuantities[key];
+        }
+        const plan = getPlanData(model, month);
+        return plan?.quantity !== undefined && plan?.quantity !== null ? plan.quantity : '';
+    };
+
     const handleModelDetailChange = async (model, field, value) => {
         if (field === 'vendorCode' && value && value.trim() !== '') {
             const cleanCode = value.trim().toUpperCase();
@@ -447,13 +461,18 @@ const YoshiiPlanView = () => {
         setIsAddModalOpen(false);
     };
 
+    // 計画数変更処理: 一時ステートを即時更新して空戻りをブロック
     const handleQuantityChange = async (model, month, newQtyStr, originalVal) => {
+        const normTarget = normalizeModelCode(model);
+        const key = `${normTarget}_${month}`;
+        const newQty = (newQtyStr === '' || newQtyStr === null || newQtyStr === undefined) ? '' : Number(newQtyStr);
+
+        setLocalQuantities(prev => ({ ...prev, [key]: newQty }));
+
         const targetPlan = getPlanData(model, month);
-        const newQty = newQtyStr === '' ? 0 : Number(newQtyStr);
         const todayYYMMDD = ctx.getFormattedShortDate();
 
         const matchModelDetails = ctx.masterData.yoshii?.modelDetails?.[model] || {};
-        const normTarget = normalizeModelCode(model);
         const matchPlan = yoshiiPlans.find(p => normalizeModelCode(p.model) === normTarget && (p.productName || p.janCode));
 
         const currentProductName = matchModelDetails.productName !== undefined ? matchModelDetails.productName : (matchPlan?.productName || '');
@@ -461,16 +480,17 @@ const YoshiiPlanView = () => {
         const currentVendorCode = matchModelDetails.vendorCode || '';
 
         const metaStr = `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}`;
+        const dbQty = newQty === '' ? 0 : Number(newQty);
 
         if (targetPlan) {
             const currentQty = Number(targetPlan.quantity || 0);
-            if (currentQty === newQty) return;
+            if (currentQty === dbQty) return;
 
             const prevHist = targetPlan.qtyHistory || [];
-            const updatedHist = [{ qty: newQty, date: todayYYMMDD }, ...prevHist];
+            const updatedHist = [{ qty: dbQty, date: todayYYMMDD }, ...prevHist];
 
             await ctx.updatePlan(targetPlan.id, { 
-                quantity: newQty, 
+                quantity: dbQty, 
                 qtyHistory: updatedHist,
                 productName: currentProductName,
                 janCode: currentJanCode,
@@ -479,7 +499,7 @@ const YoshiiPlanView = () => {
                 originalMeta: originalVal !== undefined && originalVal !== '' ? (targetPlan.originalMeta || metaStr) : targetPlan.originalMeta
             }, `型式 [${model}] ${month} 計画数`);
         } else {
-            if (newQty === 0) return;
+            if (dbQty === 0 && newQtyStr === '') return;
             await ctx.updatePlan(null, {
                 company: 'yoshii',
                 model: model,
@@ -487,8 +507,8 @@ const YoshiiPlanView = () => {
                 janCode: currentJanCode,
                 vendorCode: currentVendorCode,
                 deliveryMonth: month,
-                quantity: newQty,
-                qtyHistory: [{ qty: newQty, date: todayYYMMDD }],
+                quantity: dbQty,
+                qtyHistory: [{ qty: dbQty, date: todayYYMMDD }],
                 originalVal: originalVal !== undefined && originalVal !== '' ? originalVal : undefined,
                 originalMeta: originalVal !== undefined && originalVal !== '' ? metaStr : undefined
             }, `型式 [${model}] ${month} 計画数`);
@@ -507,19 +527,17 @@ const YoshiiPlanView = () => {
     };
 
     const calculateRowTotal = (model) => {
-        return displayMonths.reduce((sum, mo) => sum + Number(getPlanData(model, mo)?.quantity || 0), 0);
+        return displayMonths.reduce((sum, mo) => sum + Number(getEffectivePlanQty(model, mo) || 0), 0);
     };
 
     const calculateColTotal = (month) => {
         return visibleModels.reduce((sum, m) => {
-            const p = getPlanData(m, month);
-            const q = p ? Number(p.quantity) : 0;
+            const q = Number(getEffectivePlanQty(m, month) || 0);
             return sum + (isNaN(q) ? 0 : q);
         }, 0);
     };
 
     const totalGrandTotal = visibleModels.reduce((sum, m) => sum + calculateRowTotal(m), 0);
-    const handleGridNav = ctx.createGridNav('y-matrix-plan', visibleModels.length - 1, displayMonths.length - 1);
 
     const startStr = `${displayMonths[0]?.split('-')[0]}年${displayMonths[0]?.split('-')[1]}月`;
     const endStr = `${displayMonths[displayMonths.length - 1]?.split('-')[0]}年${displayMonths[displayMonths.length - 1]?.split('-')[1]}月`;
@@ -620,7 +638,7 @@ const YoshiiPlanView = () => {
                             {/* 型式 */}
                             <th className="p-0.5 border w-[110px] min-w-[110px] sticky left-[87px] bg-gray-200 z-40 text-xs">型式</th>
                             
-                            {/* ★ 入数 (型式のすぐ右・幅45px) */}
+                            {/* 入数 (型式のすぐ右・幅45px) */}
                             <th className="p-0.5 border w-[45px] min-w-[45px] max-w-[45px] sticky left-[197px] bg-gray-200 z-40 text-xs">入数</th>
                             
                             <th className="p-0.5 border min-w-[220px] text-xs whitespace-nowrap">品名</th>
@@ -651,7 +669,7 @@ const YoshiiPlanView = () => {
                         </tr>
                     </thead>
                     <tbody>
-                        {visibleModels.map((model, rowIdx) => {
+                        {visibleModels.map((model) => {
                             const matchModelDetails = ctx.masterData.yoshii?.modelDetails?.[model] || {};
                             const normTarget = normalizeModelCode(model);
                             const matchPlanInfo = yoshiiPlans.find(p => normalizeModelCode(p.model) === normTarget && (p.productName || p.janCode || p.notes || p.qtyPerCarton));
@@ -661,7 +679,12 @@ const YoshiiPlanView = () => {
                             const currentVendorCode = matchModelDetails.vendorCode !== undefined ? matchModelDetails.vendorCode : (matchPlanInfo?.vendorCode || '');
                             const currentNotes = matchModelDetails.notes !== undefined ? matchModelDetails.notes : (matchPlanInfo?.notes || '');
                             const currentQtyPer = matchModelDetails.qtyPerCarton !== undefined ? matchModelDetails.qtyPerCarton : (matchPlanInfo?.qtyPerCarton || '');
+                            const qtyPerNum = Number(currentQtyPer) || 0;
                             const rowTot = calculateRowTotal(model);
+
+                            // ★ 型式合計の端数チェック: 入数があり、合計が割り切れない場合に薄赤背景
+                            const isRowTotError = qtyPerNum > 0 && rowTot > 0 && (rowTot % qtyPerNum !== 0);
+                            const rowTotStyle = isRowTotError ? { backgroundColor: '#fee2e2' } : {};
 
                             return (
                                 <tr key={model} onDragOver={e => handleModelDragOver(e, model)} onDrop={e => handleModelDrop(e, model)} className={`hover:bg-emerald-50 border-b table-row-compact ${dragOverModel === model ? 'border-t-2 border-t-emerald-600 bg-emerald-100' : ''}`}>
@@ -675,7 +698,7 @@ const YoshiiPlanView = () => {
                                     {/* 型式 */}
                                     <td className="border text-xs sticky left-[87px] bg-white z-10 text-left pl-2 p-0">{model}</td>
                                     
-                                    {/* ★ 入数 (型式の右) */}
+                                    {/* 入数 (型式の右・幅45px) */}
                                     <td className="border text-xs text-center sticky left-[197px] bg-white z-10 w-[45px] min-w-[45px] p-0">
                                         <LocalInput type="number" value={currentQtyPer} originalValue={(matchModelDetails.originals || {}).qtyPerCarton} originalMeta={(matchModelDetails.originalMetas || {}).qtyPerCarton} onChange={(v, orig) => handleModelDetailChange(model, 'qtyPerCarton', v)} className="w-full text-xs text-center font-mono input-compact bg-transparent" placeholder="-" />
                                     </td>
@@ -690,25 +713,33 @@ const YoshiiPlanView = () => {
                                         <LocalInput value={currentJanCode} originalValue={(matchModelDetails.originals || {}).janCode} originalMeta={(matchModelDetails.originalMetas || {}).janCode} onChange={(v, orig) => handleModelDetailChange(model, 'janCode', v)} className="w-full text-xs text-center font-mono input-compact"/>
                                     </td>
 
-                                    <td className="border text-xs font-mono text-right pr-1 bg-emerald-50 text-emerald-900 p-0">{rowTot > 0 ? rowTot.toLocaleString() : '0'}</td>
+                                    {/* 型式合計 (端数警告適用) */}
+                                    <td className="border text-xs font-mono text-right pr-1 bg-emerald-50 text-emerald-900 p-0" style={rowTotStyle}>
+                                        {rowTot > 0 ? rowTot.toLocaleString() : '0'}
+                                    </td>
                                     
-                                    {displayMonths.map((mo, colIdx) => {
+                                    {displayMonths.map((mo) => {
                                         const plan = getPlanData(model, mo);
-                                        const currentQty = plan?.quantity || '';
+                                        const effectiveVal = getEffectivePlanQty(model, mo);
+                                        const displayVal = (effectiveVal === '' || Number(effectiveVal) === 0) ? '' : effectiveVal;
                                         const historyList = plan?.qtyHistory || [];
 
+                                        // ★ 各月セルの端数チェック: 入数があり、計画数が割り切れない場合に薄赤背景
+                                        const cellQty = Number(displayVal) || 0;
+                                        const isCellError = qtyPerNum > 0 && cellQty > 0 && (cellQty % qtyPerNum !== 0);
+                                        const cellStyle = isCellError ? { backgroundColor: '#fee2e2' } : {};
+
                                         return (
-                                            /* ★ 割振り画面(YoshiiAllocationView)で完全成功している LocalInput 呼び出し構造を適用 */
-                                            <td key={mo} className="matrix-td px-0.5 align-top p-0 w-[58px] min-w-[58px] table-row-compact">
+                                            <td key={mo} className="matrix-td px-0.5 align-top p-0 w-[58px] min-w-[58px] table-row-compact" style={cellStyle}>
                                                 <LocalInput 
                                                     type="number" 
-                                                    value={currentQty} 
+                                                    value={displayVal} 
                                                     originalValue={plan?.originalVal} 
                                                     originalMeta={plan?.originalMeta} 
                                                     onChange={(v, orig) => handleQuantityChange(model, mo, v, orig)} 
                                                     className="matrix-input text-emerald-900 font-mono pr-1 text-right text-xs input-compact bg-transparent" 
-                                                    dataGridId={`y-matrix-plan-${rowIdx}-${colIdx}`} 
-                                                    onGridKeyDown={handleGridNav} 
+                                                    style={cellStyle}
+                                                    placeholder="-"
                                                 />
                                                 {showHistory && historyList.length > 0 && (
                                                     <div className="relative group/hist no-print">
