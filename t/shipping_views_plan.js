@@ -1,14 +1,14 @@
 // shipping_views_plan.js
 // =========================================================
 // shipping_views_plan.js - 出荷計画・割振り画面モジュール
-// ★ WebVer. 123 対応 / _js052 計画画面LocalInputレンダリング完全修復版
+// ★ WebVer. 123 対応 / _js053 計画画面入力「入数セル仕様準拠」完全修復版
 // ★ 最上行ファイル名識別コメント保持 (// shipping_views_plan.js)
-// ★ 1. 計画画面: 割振り画面で成功している LocalInput 呼び出し構造と同等に揃え入力動作を完全復元。
+// ★ 1. 計画画面: 入力成功している「入数」列と同一のLocalInputバインディングを適用し完全修復。
 // ★ 2. 計画画面: 「入数(qtyPerCarton)」を型式のすぐ右(幅45px)に配置、仕入先幅(55px)補正。
 // ★ 3. 割振り画面: 入力動作および端数赤背景チェック(#fee2e2)を完全維持。
 // =========================================================
 
-const JS_PLAN_VERSION = '_js052';
+const JS_PLAN_VERSION = '_js053';
 
 // 【型式編集・削除モーダル (V94完全移植)】
 const ModelEditModal = ({ isOpen, onClose, company='yoshii' }) => {
@@ -447,6 +447,7 @@ const YoshiiPlanView = () => {
         setIsAddModalOpen(false);
     };
 
+    // ★ 入数セルと同様に素直に渡された値を更新する処理
     const handleQuantityChange = async (model, month, newQtyStr, originalVal) => {
         const targetPlan = getPlanData(model, month);
         const newQty = newQtyStr === '' ? 0 : Number(newQtyStr);
@@ -519,7 +520,6 @@ const YoshiiPlanView = () => {
     };
 
     const totalGrandTotal = visibleModels.reduce((sum, m) => sum + calculateRowTotal(m), 0);
-    const handleGridNav = ctx.createGridNav('y-matrix-plan', visibleModels.length - 1, displayMonths.length - 1);
 
     const startStr = `${displayMonths[0]?.split('-')[0]}年${displayMonths[0]?.split('-')[1]}月`;
     const endStr = `${displayMonths[displayMonths.length - 1]?.split('-')[0]}年${displayMonths[displayMonths.length - 1]?.split('-')[1]}月`;
@@ -651,7 +651,7 @@ const YoshiiPlanView = () => {
                         </tr>
                     </thead>
                     <tbody>
-                        {visibleModels.map((model, rowIdx) => {
+                        {visibleModels.map((model) => {
                             const matchModelDetails = ctx.masterData.yoshii?.modelDetails?.[model] || {};
                             const normTarget = normalizeModelCode(model);
                             const matchPlanInfo = yoshiiPlans.find(p => normalizeModelCode(p.model) === normTarget && (p.productName || p.janCode || p.notes || p.qtyPerCarton));
@@ -692,23 +692,22 @@ const YoshiiPlanView = () => {
 
                                     <td className="border text-xs font-mono text-right pr-1 bg-emerald-50 text-emerald-900 p-0">{rowTot > 0 ? rowTot.toLocaleString() : '0'}</td>
                                     
-                                    {displayMonths.map((mo, colIdx) => {
+                                    {displayMonths.map((mo) => {
                                         const plan = getPlanData(model, mo);
-                                        const currentQty = plan?.quantity || '';
+                                        const currentQty = plan?.quantity;
                                         const historyList = plan?.qtyHistory || [];
 
                                         return (
-                                            /* ★ 割振り画面(YoshiiAllocationView)で完全成功している LocalInput 呼び出し構造を適用 */
-                                            <td key={mo} className="matrix-td px-0.5 align-top p-0 w-[58px] min-w-[58px] table-row-compact">
+                                            /* ★ 入数セルと全く同じ設定形式で確実に値を反映させる */
+                                            <td key={mo} className="border text-xs text-center w-[58px] min-w-[58px] p-0 relative">
                                                 <LocalInput 
                                                     type="number" 
-                                                    value={currentQty} 
+                                                    value={currentQty !== undefined && currentQty !== null ? currentQty : ''} 
                                                     originalValue={plan?.originalVal} 
                                                     originalMeta={plan?.originalMeta} 
                                                     onChange={(v, orig) => handleQuantityChange(model, mo, v, orig)} 
-                                                    className="matrix-input text-emerald-900 font-mono pr-1 text-right text-xs input-compact bg-transparent" 
-                                                    dataGridId={`y-matrix-plan-${rowIdx}-${colIdx}`} 
-                                                    onGridKeyDown={handleGridNav} 
+                                                    className="w-full text-xs text-right font-mono pr-1 input-compact bg-transparent" 
+                                                    placeholder=""
                                                 />
                                                 {showHistory && historyList.length > 0 && (
                                                     <div className="relative group/hist no-print">
