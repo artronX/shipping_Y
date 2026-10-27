@@ -1,15 +1,14 @@
 // shipping_views_ship.js
 // =========================================================
 // shipping_views_ship.js - 出荷日程・ドレージ画面モジュール
-// ★ WebVer. 123 対応 / _js057 出荷日程・ドレージ 積載型式割振数 入数端数警告(#fee2e2)完全対応版
+// ★ WebVer. 126 対応 / _js058 凡例2行目配置 & ボタン1行目集約 & 端数警告(#fee2e2)完全統合版
 // ★ 最上行ファイル名識別コメント保持 (// shipping_views_ship.js)
-// ★ 1. 計画画面で設定された型式ごとの「入数(qtyPerCarton)」を自動参照。
-// ★ 2. 出荷日程表: 積載型式の各型式割振数入力セルに入数端数チェック(薄い赤背景 #fee2e2)を適用。
-// ★ 3. ドレージ手配: 積載型式の各型式割振数表示セルに入数端数チェック(薄い赤背景 #fee2e2)を適用。
-// ★ 4. スクロール保証、動的年度初期化、読み取り専用セルの保護を維持。
+// ★ 1. ボタン群を1行目右側にまとめ、2行目右側に [■ 端数発生の警告表示] 凡例を配置。
+// ★ 2. 計画画面で設定された型式ごとの「入数(qtyPerCarton)」を自動参照。
+// ★ 3. 出荷日程表 & ドレージ手配: 積載型式の各型式割振数セルに入数端数チェック(薄い赤背景 #fee2e2)を適用。
 // =========================================================
 
-const JS_SHIP_VERSION = '_js057';
+const JS_SHIP_VERSION = '_js058';
 
 // 【ヘルパー: コンテナ内割振り製品総数量の動的自動計算】
 const calculateContainerTotalQty = (allocationsObj) => {
@@ -43,6 +42,14 @@ const getModelQtyPerCarton = (ctx, modelName) => {
     return 0;
 };
 
+// 【共通コンポーネント: 端数警告の凡例バッジ (2行目右側用)】
+const YoshiiFractionLegend = () => (
+    <div className="flex items-center gap-1.5 bg-white border border-gray-300 px-2 py-0.5 rounded shadow-sm flex-shrink-0">
+        <span className="inline-block w-3 h-3 rounded-[2px] border border-red-300 flex-shrink-0" style={{ backgroundColor: '#fee2e2' }}></span>
+        <span className="text-xs font-bold text-gray-700">端数発生の警告表示</span>
+    </div>
+);
+
 // 【1. 吉井電気 出荷日程表ビュー (YoshiiShipView)】
 const YoshiiShipView = () => {
     const ctx = React.useContext(AppContext);
@@ -72,7 +79,6 @@ const YoshiiShipView = () => {
 
     React.useLayoutEffect(() => {
         if (ctx.tableContainerRef.current) {
-            // 過去のスクロール位置が0より大きい場合のみ復元し、0(一番上)またはnullなら当月へ自動スクロール
             if (ctx.shipScrollPosRef.current !== null && ctx.shipScrollPosRef.current > 0) {
                 ctx.tableContainerRef.current.scrollTop = ctx.shipScrollPosRef.current;
             } else if (!isInitialScrolledRef.current && ctx.currentMonthStr) {
@@ -176,8 +182,10 @@ const YoshiiShipView = () => {
                 吉井電気 出荷日程表 [仕入先: {ctx.selectedVendorFilter || 'ALL'}]
             </div>
 
-            <div className="flex justify-between items-center mb-2 no-print flex-shrink-0">
-                <div className="flex gap-3 items-center bg-gray-50 p-1.5 rounded border">
+            {/* ヘッダー操作部: 2段レイアウト */}
+            <div className="mb-2 no-print flex-shrink-0 space-y-1.5">
+                {/* 1行目: タイトル・バージョンバッジ & 右側ボタン群 */}
+                <div className="flex justify-between items-center">
                     <div className="flex items-center gap-2">
                         <h2 className="text-lg font-bold">吉井電気 出荷日程表</h2>
                         <span className="bg-slate-700 text-slate-100 border border-slate-500 text-[10px] font-extrabold px-1.5 py-0.5 rounded font-mono shadow-sm">
@@ -185,7 +193,17 @@ const YoshiiShipView = () => {
                         </span>
                     </div>
 
-                    <div className="flex items-center gap-2 ml-2">
+                    <div className="flex items-center gap-1.5">
+                        <button onClick={() => setExportModal({ isOpen: true, type: 'excel' })} className="px-2.5 py-1 text-xs font-bold rounded bg-emerald-700 hover:bg-emerald-800 text-white shadow transition flex items-center gap-1">📊 Excel出力</button>
+                        <button onClick={() => setExportModal({ isOpen: true, type: 'print' })} className="px-2.5 py-1 text-xs font-bold rounded bg-slate-700 hover:bg-slate-800 text-white shadow transition flex items-center gap-1">🖨 印刷</button>
+                        <button onClick={ctx.handleStartTracking} className={`px-2.5 py-1 text-xs font-bold rounded shadow transition ${ctx.isChangeTrackingMode ? 'bg-red-600 text-white animate-pulse' : 'bg-gray-200 hover:bg-gray-300 text-gray-800'}`}>{ctx.isChangeTrackingMode ? '● 変更記録中' : '変更開始'}</button>
+                        <button onClick={ctx.handleClearTracking} className="px-2.5 py-1 text-xs font-bold rounded bg-gray-600 hover:bg-gray-700 text-white shadow transition">変更クリア</button>
+                    </div>
+                </div>
+
+                {/* 2行目: 納入月切替セレクタ & 右側凡例バッジ */}
+                <div className="flex justify-between items-center bg-gray-50 p-1.5 rounded border">
+                    <div className="flex items-center gap-2">
                         <label className="font-bold text-xs text-gray-700">📅 納入月表示切替:</label>
                         <select 
                             value={displayMode} 
@@ -220,13 +238,9 @@ const YoshiiShipView = () => {
                             </div>
                         )}
                     </div>
-                </div>
 
-                <div className="flex items-center gap-1.5 no-print">
-                    <button onClick={() => setExportModal({ isOpen: true, type: 'excel' })} className="px-2.5 py-1 text-xs font-bold rounded bg-emerald-700 hover:bg-emerald-800 text-white shadow transition flex items-center gap-1">📊 Excel出力</button>
-                    <button onClick={() => setExportModal({ isOpen: true, type: 'print' })} className="px-2.5 py-1 text-xs font-bold rounded bg-slate-700 hover:bg-slate-800 text-white shadow transition flex items-center gap-1">🖨 印刷</button>
-                    <button onClick={ctx.handleStartTracking} className={`px-2.5 py-1 text-xs font-bold rounded shadow transition ${ctx.isChangeTrackingMode ? 'bg-red-600 text-white animate-pulse' : 'bg-gray-200 hover:bg-gray-300 text-gray-800'}`}>{ctx.isChangeTrackingMode ? '● 変更記録中' : '変更開始'}</button>
-                    <button onClick={ctx.handleClearTracking} className="px-2.5 py-1 text-xs font-bold rounded bg-gray-600 hover:bg-gray-700 text-white shadow transition">変更クリア</button>
+                    {/* ★ 2行目右側: 端数発生の警告表示 凡例バッジ */}
+                    <YoshiiFractionLegend />
                 </div>
             </div>
 
@@ -551,7 +565,6 @@ const YoshiiDrayageView = () => {
 
     React.useLayoutEffect(() => {
         if (ctx.tableContainerRef.current) {
-            // 過去のスクロール位置が0より大きい場合のみ復元し、0(一番上)またはnullなら当月へ自動スクロール
             if (ctx.drayScrollPosRef.current !== null && ctx.drayScrollPosRef.current > 0) {
                 ctx.tableContainerRef.current.scrollTop = ctx.drayScrollPosRef.current;
             } else if (!isInitialScrolledRef.current && ctx.currentMonthStr) {
@@ -692,8 +705,10 @@ const YoshiiDrayageView = () => {
                 吉井電気 ドレージ手配 [仕入先: {ctx.selectedVendorFilter || 'ALL'}]
             </div>
 
-            <div className="flex justify-between items-center mb-2 no-print flex-shrink-0">
-                <div className="flex gap-3 items-center bg-gray-50 p-1.5 rounded border">
+            {/* ヘッダー操作部: 2段レイアウト */}
+            <div className="mb-2 no-print flex-shrink-0 space-y-1.5">
+                {/* 1行目: タイトル・バージョンバッジ & 右側ボタン群 */}
+                <div className="flex justify-between items-center">
                     <div className="flex items-center gap-2">
                         <h2 className="text-lg font-bold">吉井電気 ドレージ手配</h2>
                         <span className="bg-slate-700 text-slate-100 border border-slate-500 text-[10px] font-extrabold px-1.5 py-0.5 rounded font-mono shadow-sm">
@@ -701,7 +716,17 @@ const YoshiiDrayageView = () => {
                         </span>
                     </div>
 
-                    <div className="flex items-center gap-2 ml-2">
+                    <div className="flex items-center gap-1.5">
+                        <button onClick={() => setExportModal({ isOpen: true, type: 'excel' })} className="px-2.5 py-1 text-xs font-bold rounded bg-emerald-700 hover:bg-emerald-800 text-white shadow transition flex items-center gap-1">📊 Excel出力</button>
+                        <button onClick={() => setExportModal({ isOpen: true, type: 'print' })} className="px-2.5 py-1 text-xs font-bold rounded bg-slate-700 hover:bg-slate-800 text-white shadow transition flex items-center gap-1">🖨 印刷</button>
+                        <button onClick={ctx.handleStartTracking} className={`px-2.5 py-1 text-xs font-bold rounded shadow transition ${ctx.isChangeTrackingMode ? 'bg-red-600 text-white animate-pulse' : 'bg-gray-200 hover:bg-gray-300 text-gray-800'}`}>{ctx.isChangeTrackingMode ? '● 変更記録中' : '変更開始'}</button>
+                        <button onClick={ctx.handleClearTracking} className="px-2.5 py-1 text-xs font-bold rounded bg-gray-600 hover:bg-gray-700 text-white shadow transition">変更クリア</button>
+                    </div>
+                </div>
+
+                {/* 2行目: 納入月切替セレクタ & 右側凡例バッジ */}
+                <div className="flex justify-between items-center bg-gray-50 p-1.5 rounded border">
+                    <div className="flex items-center gap-2">
                         <label className="font-bold text-xs text-gray-700">📅 納入月表示切替:</label>
                         <select 
                             value={displayMode} 
@@ -736,13 +761,9 @@ const YoshiiDrayageView = () => {
                             </div>
                         )}
                     </div>
-                </div>
 
-                <div className="flex items-center gap-1.5 no-print">
-                    <button onClick={() => setExportModal({ isOpen: true, type: 'excel' })} className="px-2.5 py-1 text-xs font-bold rounded bg-emerald-700 hover:bg-emerald-800 text-white shadow transition flex items-center gap-1">📊 Excel出力</button>
-                    <button onClick={() => setExportModal({ isOpen: true, type: 'print' })} className="px-2.5 py-1 text-xs font-bold rounded bg-slate-700 hover:bg-slate-800 text-white shadow transition flex items-center gap-1">🖨 印刷</button>
-                    <button onClick={ctx.handleStartTracking} className={`px-2.5 py-1 text-xs font-bold rounded shadow transition ${ctx.isChangeTrackingMode ? 'bg-red-600 text-white animate-pulse' : 'bg-gray-200 hover:bg-gray-300 text-gray-800'}`}>{ctx.isChangeTrackingMode ? '● 変更記録中' : '変更開始'}</button>
-                    <button onClick={ctx.handleClearTracking} className="px-2.5 py-1 text-xs font-bold rounded bg-gray-600 hover:bg-gray-700 text-white shadow transition">変更クリア</button>
+                    {/* ★ 2行目右側: 端数発生の警告表示 凡例バッジ */}
+                    <YoshiiFractionLegend />
                 </div>
             </div>
 
@@ -948,7 +969,7 @@ const YoshiiDrayageView = () => {
                                                     </td>
 
                                                     <td className="p-0.5 border text-center align-middle bg-gray-100">
-                                                        <ReadOnlyInput value={container.vesselName} originalValue={(container.originals || {}).vesselName} originalMeta={(container.originalMetas || {}).vesselName} className="text-center text-xs" />
+                                                        <ReadOnlyInput value={container.vesselName} originalValue={(container.originals || {}).vesselName} originalMeta={(container.originalMetas || {}).originalMetas?.vesselName} className="text-center text-xs" />
                                                     </td>
                                                 </tr>
                                             );

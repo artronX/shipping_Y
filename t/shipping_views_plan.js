@@ -1,15 +1,24 @@
 // shipping_views_plan.js
 // =========================================================
 // shipping_views_plan.js - 出荷計画・割振り画面モジュール
-// ★ WebVer. 123 対応 / _js055 計画画面(各月・合計)端数警告(#fee2e2)追加版
+// ★ WebVer. 126 対応 / _js058 凡例2行目配置 & ボタン1行目集約 & 端数警告(#fee2e2)完全統合版
 // ★ 最上行ファイル名識別コメント保持 (// shipping_views_plan.js)
-// ★ 1. 計画画面: 各月セルおよび合計セルにおいて、入数で割り切れない場合に薄赤背景(#fee2e2)警告を適用。
-// ★ 2. 計画画面: 前回OKとなった数値入力・保持(楽観的更新)、未入力時「-」表示を完全維持。
-// ★ 3. 割振り画面: 入力動作および端数赤背景チェック(#fee2e2)を完全維持。
-// ★ 4. レイアウト: 仕入先(55px)、型式、入数(45px・型式の右)の配置を維持。
+// ★ 1. 計画画面: 2行目右側「変更履歴を表示」の左隣に [■ 端数発生の警告表示] 凡例を配置。
+// ★ 2. 割振り画面: ボタン群を1行目右側に集約し、2行目右側に [■ 端数発生の警告表示] 凡例を配置。
+// ★ 3. 計画画面: 各月セルおよび合計セルにおいて、入数で割り切れない場合に薄赤背景(#fee2e2)警告を完全維持。
+// ★ 4. 割振り画面: 入力動作および端数赤背景チェック(#fee2e2)を完全維持。
+// ★ 5. レイアウト: 仕入先(55px)、型式、入数(45px・型式の右)の配置を維持。
 // =========================================================
 
-const JS_PLAN_VERSION = '_js055';
+const JS_PLAN_VERSION = '_js058';
+
+// 【共通コンポーネント: 端数警告の凡例バッジ (2行目右側用)】
+const YoshiiFractionLegend = () => (
+    <div className="flex items-center gap-1.5 bg-white border border-gray-300 px-2 py-0.5 rounded shadow-sm flex-shrink-0">
+        <span className="inline-block w-3 h-3 rounded-[2px] border border-red-300 flex-shrink-0" style={{ backgroundColor: '#fee2e2' }}></span>
+        <span className="text-xs font-bold text-gray-700">端数発生の警告表示</span>
+    </div>
+);
 
 // 【型式編集・削除モーダル (V94完全移植)】
 const ModelEditModal = ({ isOpen, onClose, company='yoshii' }) => {
@@ -549,6 +558,7 @@ const YoshiiPlanView = () => {
                 {dynamicTitle} [仕入先: {ctx.selectedVendorFilter || 'ALL'}]
             </div>
             
+            {/* 1行目: タイトル・バージョンバッジ & 右側ボタン群 */}
             <div className="mb-1.5 flex-shrink-0 flex justify-between items-center no-print">
                 <div className="flex items-center gap-2">
                     <span className="text-base md:text-lg font-extrabold text-emerald-900 border-b-2 border-emerald-600 pb-0.5">
@@ -567,6 +577,7 @@ const YoshiiPlanView = () => {
                 </div>
             </div>
 
+            {/* 2行目: フィルタ・型式操作 & 右側凡例バッジ + 変更履歴チェック */}
             <div className="flex flex-wrap justify-between items-center mb-2 no-print gap-2 flex-shrink-0">
                 <div className="flex items-center gap-2 flex-wrap">
                     <div className="flex items-center gap-1">
@@ -605,7 +616,9 @@ const YoshiiPlanView = () => {
                     <button onClick={() => setIsEditModalOpen(true)} disabled={ctx.authUser && !ctx.authUser.canEdit} className="bg-gray-700 hover:bg-gray-800 disabled:bg-gray-300 text-white px-2 py-0.5 rounded text-xs font-bold shadow transition flex items-center gap-1">✏ 型式編集</button>
                 </div>
 
+                {/* ★ 2行目右側: 端数発生の警告表示 凡例バッジ ＋ 変更履歴チェックボックス */}
                 <div className="flex items-center gap-2">
+                    <YoshiiFractionLegend />
                     <label className="flex items-center gap-1 text-xs font-bold text-gray-700 cursor-pointer bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 shadow-sm hover:bg-emerald-100 transition">
                         <input type="checkbox" checked={showHistory} onChange={e => setShowHistory(e.target.checked)} className="w-3 h-3 text-emerald-600 rounded" />
                         <span>変更履歴を表示</span>
@@ -1077,29 +1090,44 @@ const YoshiiAllocationView = () => {
                 吉井電気 コンテナ割振り [対象年月: {ctx.yoshiiAllocMonth}] [仕入先: {ctx.selectedVendorFilter || 'ALL'}]
             </div>
             
-            <div className="flex justify-between items-center mb-2 no-print flex-shrink-0">
-                <div className="flex gap-3 items-center bg-gray-50 p-1.5 rounded border">
+            {/* ヘッダー操作部: 2段レイアウト */}
+            <div className="mb-2 no-print flex-shrink-0 space-y-1.5">
+                {/* 1行目: タイトル・バージョンバッジ & 右側ボタン群 */}
+                <div className="flex justify-between items-center">
                     <div className="flex items-center gap-2">
                         <h2 className="text-lg font-bold">吉井電気 コンテナ割振り</h2>
                         <span className="bg-slate-700 text-slate-100 border border-slate-500 text-[10px] font-extrabold px-1.5 py-0.5 rounded font-mono shadow-sm">
                             {displayVer}
                         </span>
                     </div>
-                    <label className="font-bold text-sm ml-2">対象年月:</label>
-                    <input type="month" value={ctx.yoshiiAllocMonth} onChange={e => ctx.setYoshiiAllocMonth(e.target.value)} className="border p-1 rounded text-sm text-center font-bold bg-white" />
-                    <label className="font-bold text-sm ml-2">コンテナ枠数:</label>
-                    <div className="flex items-center gap-1">
-                        <button onClick={() => { if (displayRows > monthContainers.length) setRowLimit(displayRows - 1); }} disabled={ctx.authUser && !ctx.authUser.canEdit} className="bg-gray-300 hover:bg-gray-400 disabled:opacity-30 w-7 h-7 rounded font-bold transition">-</button>
-                        <span className="w-6 text-center font-bold">{displayRows}</span>
-                        <button onClick={handleAddRow} disabled={ctx.authUser && !ctx.authUser.canEdit} className="bg-gray-300 hover:bg-gray-400 disabled:opacity-30 w-7 h-7 rounded font-bold transition">+</button>
+
+                    <div className="flex items-center gap-1.5">
+                        <button onClick={() => setExportModal({ isOpen: true, type: 'excel' })} className="px-2.5 py-1 text-xs font-bold rounded bg-emerald-700 hover:bg-emerald-800 text-white shadow transition flex items-center gap-1">📊 Excel出力</button>
+                        <button onClick={() => setExportModal({ isOpen: true, type: 'print' })} className="px-2.5 py-1 text-xs font-bold rounded bg-slate-700 hover:bg-slate-800 text-white shadow transition flex items-center gap-1">🖨 印刷</button>
+                        <button onClick={ctx.handleStartTracking} className={`px-2.5 py-1 text-xs font-bold rounded shadow transition ${ctx.isChangeTrackingMode ? 'bg-red-600 text-white animate-pulse' : 'bg-gray-200 hover:bg-gray-300 text-gray-800'}`}>{ctx.isChangeTrackingMode ? '● 変更記録中' : '変更開始'}</button>
+                        <button onClick={ctx.handleClearTracking} className="px-2.5 py-1 text-xs font-bold rounded bg-gray-600 hover:bg-gray-700 text-white shadow transition">変更クリア</button>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-1.5 no-print">
-                    <button onClick={() => setExportModal({ isOpen: true, type: 'excel' })} className="px-2.5 py-1 text-xs font-bold rounded bg-emerald-700 hover:bg-emerald-800 text-white shadow transition flex items-center gap-1">📊 Excel出力</button>
-                    <button onClick={() => setExportModal({ isOpen: true, type: 'print' })} className="px-2.5 py-1 text-xs font-bold rounded bg-slate-700 hover:bg-slate-800 text-white shadow transition flex items-center gap-1">🖨 印刷</button>
-                    <button onClick={ctx.handleStartTracking} className={`px-2.5 py-1 text-xs font-bold rounded shadow transition ${ctx.isChangeTrackingMode ? 'bg-red-600 text-white animate-pulse' : 'bg-gray-200 hover:bg-gray-300 text-gray-800'}`}>{ctx.isChangeTrackingMode ? '● 変更記録中' : '変更開始'}</button>
-                    <button onClick={ctx.handleClearTracking} className="px-2.5 py-1 text-xs font-bold rounded bg-gray-600 hover:bg-gray-700 text-white shadow transition">変更クリア</button>
+                {/* 2行目: 対象年月・枠数セレクタ & 右側凡例バッジ */}
+                <div className="flex justify-between items-center bg-gray-50 p-1.5 rounded border">
+                    <div className="flex gap-3 items-center">
+                        <div className="flex items-center gap-1">
+                            <label className="font-bold text-xs text-gray-700">対象年月:</label>
+                            <input type="month" value={ctx.yoshiiAllocMonth} onChange={e => ctx.setYoshiiAllocMonth(e.target.value)} className="border p-1 rounded text-xs text-center font-bold bg-white" />
+                        </div>
+                        <div className="flex items-center gap-1">
+                            <label className="font-bold text-xs text-gray-700">コンテナ枠数:</label>
+                            <div className="flex items-center gap-1">
+                                <button onClick={() => { if (displayRows > monthContainers.length) setRowLimit(displayRows - 1); }} disabled={ctx.authUser && !ctx.authUser.canEdit} className="bg-gray-300 hover:bg-gray-400 disabled:opacity-30 w-6 h-6 rounded font-bold text-xs transition">-</button>
+                                <span className="w-6 text-center font-bold text-xs">{displayRows}</span>
+                                <button onClick={handleAddRow} disabled={ctx.authUser && !ctx.authUser.canEdit} className="bg-gray-300 hover:bg-gray-400 disabled:opacity-30 w-6 h-6 rounded font-bold text-xs transition">+</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* ★ 2行目右側: 端数発生の警告表示 凡例バッジ */}
+                    <YoshiiFractionLegend />
                 </div>
             </div>
 
