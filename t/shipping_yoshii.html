@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>吉井電気 製品出荷管理システム (WebVer. 124)</title>
+    <title>吉井電気 製品出荷管理システム (WebVer. 125)</title>
     
     <!-- React 18 (cdnjs: 安定版固定) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
@@ -152,7 +152,6 @@
             color: #374151 !important;
         }
 
-        /* ★ V94極小サイズ & 上下完全中央揃え & 勝手なbold完全除去 (標準等幅ウェイト) スタイル ★ */
         .table-row-compact {
             height: 20px !important;
         }
@@ -176,7 +175,6 @@
 <body class="bg-gray-100 text-gray-800">
     <div id="root"></div>
 
-    <!-- 単一真実源: バージョン一元定義 -->
     <script>
         const SYSTEM_VERSION = 'WebVer. 124';
     </script>
@@ -209,9 +207,19 @@
         const db = firebase.firestore();
         const auth = firebase.auth();
 
+        // パスワードのSHA-256ハッシュ計算関数 (Web Crypto API)
+        const hashPassword = async (text) => {
+            const msgBuffer = new TextEncoder().encode(text);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        };
+
+        // ハッシュ化済み権限マトリクス（出荷管理権限一覧.xlsxより生成）
         const AUTH_TABLE = [
             {
-                passwords: ['Zall@0617'],
+                // Zall@0617
+                hashes: ['5579cdc6320d1718cd7c5f40c65230f504ef19055c16e919a0183298ddc32805'],
                 role: 'ADMIN_ALL',
                 label: '東亜全体 (全画面編集)',
                 allowedViews: ['yoshii_plan', 'yoshii_alloc', 'yoshii_ship', 'yoshii_drayage'],
@@ -220,7 +228,11 @@
                 canEdit: true
             },
             {
-                passwords: ['Read＠0617', 'Read@0617'],
+                // Read@0617, Read＠0617（半角・全角両対応）
+                hashes: [
+                    '47900fcf9d6bccf97bcafa06c788cf92ef418f855e47bd3a57a6f2b6c6ae9037',
+                    '1df4ee4fe023087aba3d91e6e7a589ef60c6e4fdd0beb653e5bdd30a7cc5d83d'
+                ],
                 role: 'READ_ONLY',
                 label: '閲覧専用',
                 allowedViews: ['yoshii_plan', 'yoshii_alloc', 'yoshii_ship', 'yoshii_drayage'],
@@ -229,7 +241,8 @@
                 canEdit: false
             },
             {
-                passwords: ['JPZ10345'],
+                // JPZ10345
+                hashes: ['16bdf5696aa28e37f4feba4e6addbbccefeb0d277adaad62341942c74522586d'],
                 role: 'VENDOR_JP',
                 label: 'JP専用 (出荷日程編集/割振り閲覧)',
                 allowedViews: ['yoshii_alloc', 'yoshii_ship'],
@@ -238,7 +251,8 @@
                 canEdit: true
             },
             {
-                passwords: ['GM10345Z'],
+                // GM10345Z
+                hashes: ['09601fab9012fdf12499952140117516683995014bec9dd15cafe0cdb6cb4005'],
                 role: 'VENDOR_GM',
                 label: 'GM専用 (出荷日程編集/割振り閲覧)',
                 allowedViews: ['yoshii_alloc', 'yoshii_ship'],
@@ -247,7 +261,8 @@
                 canEdit: true
             },
             {
-                passwords: ['LDSZ1034'],
+                // LDSZ1034
+                hashes: ['b7b32aa228848392ed901100150a59ba680f4e10a81c564a617e15f8a18953f7'],
                 role: 'VENDOR_LDS',
                 label: 'LDS専用 (出荷日程編集/割振り閲覧)',
                 allowedViews: ['yoshii_alloc', 'yoshii_ship'],
@@ -256,7 +271,8 @@
                 canEdit: true
             },
             {
-                passwords: ['SLT1034Z'],
+                // SLT1034Z
+                hashes: ['5af306260c101af52e30743755566709b0ebd3e0368321c8058b592e5530c996'],
                 role: 'VENDOR_SLT',
                 label: 'SLT専用 (出荷日程編集/割振り閲覧)',
                 allowedViews: ['yoshii_alloc', 'yoshii_ship'],
@@ -265,7 +281,8 @@
                 canEdit: true
             },
             {
-                passwords: ['YosiiZ'],
+                // YosiiZ
+                hashes: ['d61ec598b505d37324b46365777d9e7f917b0fc37ec065c3659af84a4e584741'],
                 role: 'DRAYAGE_YO',
                 label: 'ドレージ (YO) 専用',
                 allowedViews: ['yoshii_drayage'],
@@ -330,7 +347,7 @@
                 localStorage.removeItem(LAST_OPERATOR_STORAGE_KEY);
             };
 
-            const handleSubmit = (e) => {
+            const handleSubmit = async (e) => {
                 e.preventDefault();
                 setErrorMsg('');
                 const cleanWorkerId = String(workerId).trim();
@@ -341,26 +358,14 @@
                     return;
                 }
 
+                // 入力されたパスワードをSHA-256ハッシュに変換して照合
+                const inputHash = await hashPassword(cleanPass);
+
                 let matchedRule = null;
                 for (const rule of AUTH_TABLE) {
-                    if (rule.passwords.includes(cleanPass)) {
+                    if (rule.hashes && rule.hashes.includes(inputHash)) {
                         matchedRule = rule;
                         break;
-                    }
-                }
-
-                if (!matchedRule) {
-                    const matchPattern = cleanPass.match(/^(.+)[＠@]\s*8888\$/i);
-                    if (matchPattern) {
-                        const vendorPrefix = matchPattern[1].trim().toUpperCase();
-                        matchedRule = {
-                            role: `VENDOR_${vendorPrefix}`,
-                            label: `${vendorPrefix}専用 (出荷日程編集/割振り閲覧)`,
-                            allowedViews: ['yoshii_alloc', 'yoshii_ship'],
-                            editableViews: ['yoshii_ship'],
-                            vendorRestriction: vendorPrefix,
-                            canEdit: true
-                        };
                     }
                 }
 
@@ -647,10 +652,19 @@
                 } catch (e) { console.error("Log Error:", e); }
             };
 
-            const handleOpenLogs = () => {
+            // 管理者ログ閲覧もハッシュ値照合に修正
+            const handleOpenLogs = async () => {
                 const password = prompt("管理者パスワードを入力してください:");
-                if (password === '0617') setIsLogModalOpen(true);
-                else if (password !== null) alert("パスワードが正しくありません。");
+                if (!password) return;
+                const inputHash = await hashPassword(password.trim());
+                // '0617' のSHA-256ハッシュ値
+                const adminPinHash = '2a1c68bab4a7c58f210f0ce36a3371aa4f90e9a36ca7a8c5f85bc0e8db098e42';
+                
+                if (inputHash === adminPinHash) {
+                    setIsLogModalOpen(true);
+                } else {
+                    alert("パスワードが正しくありません。");
+                }
             };
 
             const handleStartTracking = () => {
