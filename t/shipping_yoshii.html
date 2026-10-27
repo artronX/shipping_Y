@@ -176,7 +176,7 @@
     <div id="root"></div>
 
     <script>
-        const SYSTEM_VERSION = 'WebVer. 124';
+        const SYSTEM_VERSION = 'WebVer. 125';
     </script>
 
     <!-- 1. 基本UI・モーダル共通モジュール -->
@@ -216,90 +216,74 @@
         };
 
         // ハッシュ化済み権限マトリクス（出荷管理権限一覧.xlsxより生成）
-        const AUTH_TABLE = [
-            {
-                // Zall@0617
-                hashes: ['5579cdc6320d1718cd7c5f40c65230f504ef19055c16e919a0183298ddc32805'],
-                role: 'ADMIN_ALL',
-                label: '東亜全体 (全画面編集)',
-                allowedViews: ['yoshii_plan', 'yoshii_alloc', 'yoshii_ship', 'yoshii_drayage'],
-                editableViews: ['yoshii_plan', 'yoshii_alloc', 'yoshii_ship', 'yoshii_drayage'],
-                vendorRestriction: null,
-                canEdit: true
-            },
-            {
-                // Read@0617, Read＠0617（半角・全角両対応）
-                hashes: [
-                    '47900fcf9d6bccf97bcafa06c788cf92ef418f855e47bd3a57a6f2b6c6ae9037',
-                    '1df4ee4fe023087aba3d91e6e7a589ef60c6e4fdd0beb653e5bdd30a7cc5d83d'
-                ],
-                role: 'READ_ONLY',
-                label: '閲覧専用',
-                allowedViews: ['yoshii_plan', 'yoshii_alloc', 'yoshii_ship', 'yoshii_drayage'],
-                editableViews: [],
-                vendorRestriction: null,
-                canEdit: false
-            },
-            {
-                // JPZ10345
-                hashes: ['16bdf5696aa28e37f4feba4e6addbbccefeb0d277adaad62341942c74522586d'],
-                role: 'VENDOR_JP',
-                label: 'JP専用 (出荷日程編集/割振り閲覧)',
-                allowedViews: ['yoshii_alloc', 'yoshii_ship'],
-                editableViews: ['yoshii_ship'],
-                vendorRestriction: 'JP',
-                canEdit: true
-            },
-            {
-                // GM10345Z
-                hashes: ['09601fab9012fdf12499952140117516683995014bec9dd15cafe0cdb6cb4005'],
-                role: 'VENDOR_GM',
-                label: 'GM専用 (出荷日程編集/割振り閲覧)',
-                allowedViews: ['yoshii_alloc', 'yoshii_ship'],
-                editableViews: ['yoshii_ship'],
-                vendorRestriction: 'GM',
-                canEdit: true
-            },
-            {
-                // LDSZ1034
-                hashes: ['b7b32aa228848392ed901100150a59ba680f4e10a81c564a617e15f8a18953f7'],
-                role: 'VENDOR_LDS',
-                label: 'LDS専用 (出荷日程編集/割振り閲覧)',
-                allowedViews: ['yoshii_alloc', 'yoshii_ship'],
-                editableViews: ['yoshii_ship'],
-                vendorRestriction: 'LDS',
-                canEdit: true
-            },
-            {
-                // SLT1034Z
-                hashes: ['5af306260c101af52e30743755566709b0ebd3e0368321c8058b592e5530c996'],
-                role: 'VENDOR_SLT',
-                label: 'SLT専用 (出荷日程編集/割振り閲覧)',
-                allowedViews: ['yoshii_alloc', 'yoshii_ship'],
-                editableViews: ['yoshii_ship'],
-                vendorRestriction: 'SLT',
-                canEdit: true
-            },
-            {
-                // YosiiZ
-                hashes: ['d61ec598b505d37324b46365777d9e7f917b0fc37ec065c3659af84a4e584741'],
-                role: 'DRAYAGE_YO',
-                label: 'ドレージ (YO) 専用',
-                allowedViews: ['yoshii_drayage'],
-                editableViews: ['yoshii_drayage'],
-                vendorRestriction: 'YO',
-                canEdit: true
-            }
-        ];
-
-        const normalizeModelCode = (str) => {
-            if (!str) return '';
-            return String(str)
-                .replace(/[‐-―−－–—\-]/g, '')
-                .replace(/\s+/g, '')
-                .toUpperCase();
-        };
-
+const AUTH_TABLE = [
+    {
+        hashes: ['5579cdc6320d1718cd7c5f40c65230f504ef19055c16e919a0183298ddc32805'],
+        role: 'ADMIN_ALL',
+        label: '東亜全体 (全画面編集)',
+        allowedViews: ['yoshii_plan', 'yoshii_alloc', 'yoshii_ship', 'yoshii_drayage'],
+        editableViews: ['yoshii_plan', 'yoshii_alloc', 'yoshii_ship', 'yoshii_drayage'],
+        vendorRestriction: null,
+        canEdit: true
+    },
+    {
+        hashes: [
+            '47900fcf9d6bccf97bcafa06c788cf92ef418f855e47bd3a57a6f2b6c6ae9037',
+            '1df4ee4fe023087aba3d91e6e7a589ef60c6e4fdd0beb653e5bdd30a7cc5d83d'
+        ],
+        role: 'READ_ONLY',
+        label: '閲覧専用',
+        allowedViews: ['yoshii_plan', 'yoshii_alloc', 'yoshii_ship', 'yoshii_drayage'],
+        editableViews: [],
+        vendorRestriction: null,
+        canEdit: false
+    },
+    {
+        hashes: ['16bdf5696aa28e37f4feba4e6addbbccefeb0d277adaad62341942c74522586d'],
+        role: 'VENDOR_JP',
+        label: 'JP専用 (出荷日程編集/割振り閲覧)',
+        allowedViews: ['yoshii_alloc', 'yoshii_ship'],
+        editableViews: ['yoshii_ship'],
+        vendorRestriction: 'JP',
+        canEdit: true
+    },
+    {
+        hashes: ['09601fab9012fdf12499952140117516683995014bec9dd15cafe0cdb6cb4005'],
+        role: 'VENDOR_GM',
+        label: 'GM専用 (出荷日程編集/割振り閲覧)',
+        allowedViews: ['yoshii_alloc', 'yoshii_ship'],
+        editableViews: ['yoshii_ship'],
+        vendorRestriction: 'GM',
+        canEdit: true
+    },
+    {
+        hashes: ['b7b32aa228848392ed901100150a59ba680f4e10a81c564a617e15f8a18953f7'],
+        role: 'VENDOR_LDS',
+        label: 'LDS専用 (出荷日程編集/割振り閲覧)',
+        allowedViews: ['yoshii_alloc', 'yoshii_ship'],
+        editableViews: ['yoshii_ship'],
+        vendorRestriction: 'LDS',
+        canEdit: true
+    },
+    {
+        hashes: ['5af306260c101af52e30743755566709b0ebd3e0368321c8058b592e5530c996'],
+        role: 'VENDOR_SLT',
+        label: 'SLT専用 (出荷日程編集/割振り閲覧)',
+        allowedViews: ['yoshii_alloc', 'yoshii_ship'],
+        editableViews: ['yoshii_ship'],
+        vendorRestriction: 'SLT',
+        canEdit: true
+    },
+    {
+        hashes: ['d61ec598b505d37324b46365777d9e7f917b0fc37ec065c3659af84a4e584741'],
+        role: 'DRAYAGE_YO',
+        label: 'ドレージ (YO) 専用',
+        allowedViews: ['yoshii_drayage'],
+        editableViews: ['yoshii_drayage'],
+        vendorRestriction: 'YO',
+        canEdit: true
+    }
+];
         const INITIAL_MASTER_DATA = {
             hitachi: { ports: ["東京", "神戸", "博多", "名古屋"], destinations: ["栃木", "五光物流", "高砂倉庫"], models: ["HFK-CV1B", "HFK-CS5000C", "HFK-VS6000T"], modelDetails: {} },
             yoshii: { ports: ["東京", "神戸", "博多", "名古屋"], destinations: ["吉井電気太田物流センター", "NXNP様 西日本", "東日本GLC 浦安Ⅲ"], models: ["ALC-06SK", "ALC-S14", "KS-LC24C"], productNames: ["ｱﾋﾞﾃﾗｯックス LEDｼｰﾘﾝｸﾞ L6畳", "ｱﾋﾞﾃﾗｯックス LEDｼｰﾘﾝｸﾞ L8畳"], modelDetails: {}, modelOrder: {} },
