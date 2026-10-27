@@ -1,9 +1,9 @@
 // shipping_views_plan.js
 // =========================================================
 // shipping_views_plan.js - 出荷計画・割振り画面モジュール
-// ★ WebVer. 127 対応 / _js059 仕入先計画画面閲覧(入数のみ編集可)&不要UI非表示&凡例2行目完全統合版
+// ★ WebVer. 127 対応 / _js059 仕入先計画画面閲覧(入数のみダイレクト編集可)&不要UI非表示&凡例2行目完全統合版
 // ★ 最上行ファイル名識別コメント保持 (// shipping_views_plan.js)
-// ★ 1. 仕入先ユーザー(vendorRestrictionあり): 計画画面を閲覧可能。入数のみ編集可能。
+// ★ 1. 入数セル: LocalInputのcanEdit制限をバイパスするダイレクトinputを採用し、仕入先ユーザーでも確実に編集・保存可能。
 // ★ 2. 仕入先ユーザー: 計画数、品名、JAN、備考、仕入先コードは閲覧専用化。
 // ★ 3. 仕入先ユーザー: [+型式追加], [✏型式編集], [≡], [×削除] などの操作UIを完全非表示。
 // ★ 4. 計画画面 & 割振り画面: 2行目右側に [■ 端数発生の警告表示] 凡例を配置。
@@ -743,15 +743,24 @@ const YoshiiPlanView = () => {
                                     {/* 型式 */}
                                     <td className="border text-xs sticky left-[87px] bg-white z-10 text-left pl-2 p-0 font-bold">{model}</td>
                                     
-                                    {/* 入数 (型式の右・幅45px): ★仕入先ユーザーでも編集可能！ */}
+                                    {/* 入数 (型式の右・幅45px): ★LocalInputの制限をバイパスし、仕入先ユーザーでもダイレクト入力・保存可能！ */}
                                     <td className="border text-xs text-center sticky left-[197px] bg-white z-10 w-[45px] min-w-[45px] p-0">
-                                        <LocalInput 
+                                        <input 
                                             type="number" 
-                                            value={currentQtyPer} 
-                                            originalValue={(matchModelDetails.originals || {}).qtyPerCarton} 
-                                            originalMeta={(matchModelDetails.originalMetas || {}).qtyPerCarton} 
-                                            onChange={(v, orig) => handleModelDetailChange(model, 'qtyPerCarton', v)} 
-                                            className="w-full text-xs text-center font-mono input-compact bg-transparent font-bold text-emerald-900" 
+                                            defaultValue={currentQtyPer !== undefined && currentQtyPer !== null ? currentQtyPer : ''} 
+                                            key={`${model}_${currentQtyPer}`}
+                                            onBlur={(e) => {
+                                                const val = e.target.value.trim();
+                                                if (String(currentQtyPer) !== val) {
+                                                    handleModelDetailChange(model, 'qtyPerCarton', val);
+                                                }
+                                            }}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') {
+                                                    e.target.blur();
+                                                }
+                                            }}
+                                            className="w-full h-[20px] text-xs text-center font-mono input-compact bg-transparent font-bold text-emerald-900 outline-none focus:bg-emerald-50 focus:ring-1 focus:ring-emerald-500 cursor-text" 
                                             placeholder="-" 
                                         />
                                     </td>
