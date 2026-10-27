@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>吉井電気 製品出荷管理システム (WebVer. 126)</title>
+    <title>吉井電気 製品出荷管理システム (WebVer. 127)</title>
     
     <!-- React 18 (cdnjs: 安定版固定) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
@@ -22,7 +22,7 @@
 
     <!-- ★重要: 外部モジュール読み込み前に共通定数・関数を定義★ -->
     <script>
-        const SYSTEM_VERSION = 'WebVer. 126';
+        const SYSTEM_VERSION = 'WebVer. 127';
 
         // 型式名正規化関数（外部JSより先に定義してReferenceErrorを防止）
         function normalizeModelCode(str) {
@@ -225,7 +225,8 @@
             return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
         };
 
-        // ハッシュ化済み権限マトリクス（平文コメント完全除去版）
+        // ハッシュ化済み権限マトリクス
+        // ★ 各仕入先ロールの allowedViews に 'yoshii_plan' を追加して計画画面の閲覧を許可
         const AUTH_TABLE = [
             {
                 hashes: ['5579cdc6320d1718cd7c5f40c65230f504ef19055c16e919a0183298ddc32805'],
@@ -251,8 +252,8 @@
             {
                 hashes: ['16bdf5696aa28e37f4feba4e6addbbccefeb0d277adaad62341942c74522586d'],
                 role: 'VENDOR_JP',
-                label: 'JP専用 (出荷日程編集/割振り閲覧)',
-                allowedViews: ['yoshii_alloc', 'yoshii_ship'],
+                label: 'JP専用 (出荷日程編集/計画閲覧/割振り閲覧)',
+                allowedViews: ['yoshii_plan', 'yoshii_alloc', 'yoshii_ship'],
                 editableViews: ['yoshii_ship'],
                 vendorRestriction: 'JP',
                 canEdit: true
@@ -260,8 +261,8 @@
             {
                 hashes: ['09601fab9012fdf12499952140117516683995014bec9dd15cafe0cdb6cb4005'],
                 role: 'VENDOR_GM',
-                label: 'GM専用 (出荷日程編集/割振り閲覧)',
-                allowedViews: ['yoshii_alloc', 'yoshii_ship'],
+                label: 'GM専用 (出荷日程編集/計画閲覧/割振り閲覧)',
+                allowedViews: ['yoshii_plan', 'yoshii_alloc', 'yoshii_ship'],
                 editableViews: ['yoshii_ship'],
                 vendorRestriction: 'GM',
                 canEdit: true
@@ -269,8 +270,8 @@
             {
                 hashes: ['b7b32aa228848392ed901100150a59ba680f4e10a81c564a617e15f8a18953f7'],
                 role: 'VENDOR_LDS',
-                label: 'LDS専用 (出荷日程編集/割振り閲覧)',
-                allowedViews: ['yoshii_alloc', 'yoshii_ship'],
+                label: 'LDS専用 (出荷日程編集/計画閲覧/割振り閲覧)',
+                allowedViews: ['yoshii_plan', 'yoshii_alloc', 'yoshii_ship'],
                 editableViews: ['yoshii_ship'],
                 vendorRestriction: 'LDS',
                 canEdit: true
@@ -278,8 +279,8 @@
             {
                 hashes: ['5af306260c101af52e30743755566709b0ebd3e0368321c8058b592e5530c996'],
                 role: 'VENDOR_SLT',
-                label: 'SLT専用 (出荷日程編集/割振り閲覧)',
-                allowedViews: ['yoshii_alloc', 'yoshii_ship'],
+                label: 'SLT専用 (出荷日程編集/計画閲覧/割振り閲覧)',
+                allowedViews: ['yoshii_plan', 'yoshii_alloc', 'yoshii_ship'],
                 editableViews: ['yoshii_ship'],
                 vendorRestriction: 'SLT',
                 canEdit: true
@@ -763,7 +764,10 @@
             };
 
             const updateModelDetail = async (company, model, field, value) => {
-                if (authUser && !authUser.canEdit) return;
+                // 仕入先ユーザーも「入数(qtyPerCarton)」の更新は許可する
+                const isVendor = authUser && authUser.vendorRestriction;
+                if (authUser && !authUser.canEdit && !(isVendor && field === 'qtyPerCarton')) return;
+                
                 const currentCompanyMaster = masterData[company] || {};
                 const currentDetails = currentCompanyMaster.modelDetails || {};
                 const modelObj = currentDetails[model] || {};
@@ -958,13 +962,16 @@
                             </div>
 
                             <div className="flex items-center gap-3">
-                                <button 
-                                    onClick={handleOpenLogs} 
-                                    className="p-1 text-indigo-100 hover:text-white text-sm transition flex items-center gap-1 font-bold bg-indigo-800/60 hover:bg-indigo-600 rounded px-2"
-                                    title="操作ログ履歴"
-                                >
-                                    ⚙
-                                </button>
+                                {/* ★ 東亜全体管理者(ADMIN_ALL)のみ歯車ボタン(⚙)を表示 */}
+                                {authUser && authUser.role === 'ADMIN_ALL' && (
+                                    <button 
+                                        onClick={handleOpenLogs} 
+                                        className="p-1 text-indigo-100 hover:text-white text-sm transition flex items-center gap-1 font-bold bg-indigo-800/60 hover:bg-indigo-600 rounded px-2"
+                                        title="操作ログ履歴"
+                                    >
+                                        ⚙
+                                    </button>
+                                )}
                                 <div className="flex items-center gap-1 text-xs">
                                     <span className="text-indigo-200 hidden lg:inline">作業者:</span>
                                     <span className="bg-white text-gray-900 border rounded px-2 py-0.5 font-bold">

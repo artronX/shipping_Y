@@ -1,16 +1,16 @@
 // shipping_views_plan.js
 // =========================================================
 // shipping_views_plan.js - 出荷計画・割振り画面モジュール
-// ★ WebVer. 126 対応 / _js058 凡例2行目配置 & ボタン1行目集約 & 端数警告(#fee2e2)完全統合版
+// ★ WebVer. 127 対応 / _js059 仕入先計画画面閲覧(入数のみ編集可)&不要UI非表示&凡例2行目完全統合版
 // ★ 最上行ファイル名識別コメント保持 (// shipping_views_plan.js)
-// ★ 1. 計画画面: 2行目右側「変更履歴を表示」の左隣に [■ 端数発生の警告表示] 凡例を配置。
-// ★ 2. 割振り画面: ボタン群を1行目右側に集約し、2行目右側に [■ 端数発生の警告表示] 凡例を配置。
-// ★ 3. 計画画面: 各月セルおよび合計セルにおいて、入数で割り切れない場合に薄赤背景(#fee2e2)警告を完全維持。
-// ★ 4. 割振り画面: 入力動作および端数赤背景チェック(#fee2e2)を完全維持。
-// ★ 5. レイアウト: 仕入先(55px)、型式、入数(45px・型式の右)の配置を維持。
+// ★ 1. 仕入先ユーザー(vendorRestrictionあり): 計画画面を閲覧可能。入数のみ編集可能。
+// ★ 2. 仕入先ユーザー: 計画数、品名、JAN、備考、仕入先コードは閲覧専用化。
+// ★ 3. 仕入先ユーザー: [+型式追加], [✏型式編集], [≡], [×削除] などの操作UIを完全非表示。
+// ★ 4. 計画画面 & 割振り画面: 2行目右側に [■ 端数発生の警告表示] 凡例を配置。
+// ★ 5. 端数赤背景チェック(#fee2e2)および楽観的UI更新を完全維持。
 // =========================================================
 
-const JS_PLAN_VERSION = '_js058';
+const JS_PLAN_VERSION = '_js059';
 
 // 【共通コンポーネント: 端数警告の凡例バッジ (2行目右側用)】
 const YoshiiFractionLegend = () => (
@@ -220,6 +220,10 @@ const YoshiiPlanView = () => {
     const cmpVer = typeof JS_COMPONENTS_VERSION !== 'undefined' ? JS_COMPONENTS_VERSION : '';
     const displayVer = `${baseAppVer}${JS_PLAN_VERSION}${cmpVer}`;
 
+    // ユーザー権限判定: 仕入先専用ユーザーかどうか
+    const isVendorUser = Boolean(ctx.authUser && ctx.authUser.vendorRestriction);
+    const canFullEdit = Boolean(ctx.authUser && ctx.authUser.canEdit && !isVendorUser);
+
     // 楽観的UI更新ステート: 入力確定直後の値を即座に握り、非同期中の再描画による値消失を完全に防ぐ
     const [localQuantities, setLocalQuantities] = React.useState({});
 
@@ -357,12 +361,14 @@ const YoshiiPlanView = () => {
         : allModels;
 
     const handleModelDragStart = (e, model) => {
+        if (!canFullEdit) return;
         setDraggedModel(model);
         e.dataTransfer.setData('text/plain', model);
         e.dataTransfer.effectAllowed = 'move';
     };
 
     const handleModelDragOver = (e, model) => {
+        if (!canFullEdit) return;
         e.preventDefault();
         if (draggedModel && draggedModel !== model) {
             setDragOverModel(model);
@@ -370,6 +376,7 @@ const YoshiiPlanView = () => {
     };
 
     const handleModelDrop = async (e, targetModel) => {
+        if (!canFullEdit) return;
         e.preventDefault();
         if (!draggedModel || draggedModel === targetModel) return;
 
@@ -413,6 +420,9 @@ const YoshiiPlanView = () => {
     };
 
     const handleModelDetailChange = async (model, field, value) => {
+        // 仕入先ユーザーは「qtyPerCarton（入数）」のみ更新可能
+        if (isVendorUser && field !== 'qtyPerCarton') return;
+
         if (field === 'vendorCode' && value && value.trim() !== '') {
             const cleanCode = value.trim().toUpperCase();
             const knownVendors = ctx.masterData.yoshii?.vendors || ['JP', 'GM', 'LDS', 'SLT', 'YO'];
@@ -450,6 +460,7 @@ const YoshiiPlanView = () => {
 
     const handleAddNewModelSubmit = async (e) => {
         e.preventDefault();
+        if (!canFullEdit) return;
         const targetModel = newModel.trim();
         if (!targetModel) return alert("型式名を入力してください。");
 
@@ -470,8 +481,10 @@ const YoshiiPlanView = () => {
         setIsAddModalOpen(false);
     };
 
-    // 計画数変更処理: 一時ステートを即時更新して空戻りをブロック
+    // 計画数変更処理: 仕入先ユーザーは計画数を変更できない
     const handleQuantityChange = async (model, month, newQtyStr, originalVal) => {
+        if (!canFullEdit) return;
+
         const normTarget = normalizeModelCode(model);
         const key = `${normTarget}_${month}`;
         const newQty = (newQtyStr === '' || newQtyStr === null || newQtyStr === undefined) ? '' : Number(newQtyStr);
@@ -525,6 +538,7 @@ const YoshiiPlanView = () => {
     };
 
     const handleDeleteHistory = async (planId, historyIdx, model, month) => {
+        if (!canFullEdit) return;
         const targetPlan = yoshiiPlans.find(p => p.id === planId);
         if (!targetPlan || !targetPlan.qtyHistory) return;
 
@@ -572,8 +586,12 @@ const YoshiiPlanView = () => {
                 <div className="flex items-center gap-1.5 no-print">
                     <button onClick={() => setExportModal({ isOpen: true, type: 'excel' })} className="px-2 py-0.5 text-xs font-bold rounded bg-emerald-700 hover:bg-emerald-800 text-white shadow transition flex items-center gap-1">📊 Excel出力</button>
                     <button onClick={() => setExportModal({ isOpen: true, type: 'print' })} className="px-2 py-0.5 text-xs font-bold rounded bg-slate-700 hover:bg-slate-800 text-white shadow transition flex items-center gap-1">🖨 印刷</button>
-                    <button onClick={ctx.handleStartTracking} className={`px-2 py-0.5 text-xs font-bold rounded shadow transition ${ctx.isChangeTrackingMode ? 'bg-red-600 text-white animate-pulse' : 'bg-gray-200 hover:bg-gray-300 text-gray-800'}`}>{ctx.isChangeTrackingMode ? '● 変更記録中' : '変更開始'}</button>
-                    <button onClick={ctx.handleClearTracking} className="px-2 py-0.5 text-xs font-bold rounded bg-gray-600 hover:bg-gray-700 text-white shadow transition">変更クリア</button>
+                    {canFullEdit && (
+                        <>
+                            <button onClick={ctx.handleStartTracking} className={`px-2 py-0.5 text-xs font-bold rounded shadow transition ${ctx.isChangeTrackingMode ? 'bg-red-600 text-white animate-pulse' : 'bg-gray-200 hover:bg-gray-300 text-gray-800'}`}>{ctx.isChangeTrackingMode ? '● 変更記録中' : '変更開始'}</button>
+                            <button onClick={ctx.handleClearTracking} className="px-2 py-0.5 text-xs font-bold rounded bg-gray-600 hover:bg-gray-700 text-white shadow transition">変更クリア</button>
+                        </>
+                    )}
                 </div>
             </div>
 
@@ -612,8 +630,13 @@ const YoshiiPlanView = () => {
                         )}
                     </div>
 
-                    <button onClick={() => setIsAddModalOpen(true)} disabled={ctx.authUser && !ctx.authUser.canEdit} className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 text-white px-2.5 py-0.5 rounded text-xs font-bold shadow transition">+ 型式追加</button>
-                    <button onClick={() => setIsEditModalOpen(true)} disabled={ctx.authUser && !ctx.authUser.canEdit} className="bg-gray-700 hover:bg-gray-800 disabled:bg-gray-300 text-white px-2 py-0.5 rounded text-xs font-bold shadow transition flex items-center gap-1">✏ 型式編集</button>
+                    {/* ★ 東亜全体管理者のみ「+型式追加」「✏型式編集」を表示。仕入先ユーザーには非表示 */}
+                    {canFullEdit && (
+                        <>
+                            <button onClick={() => setIsAddModalOpen(true)} className="bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-0.5 rounded text-xs font-bold shadow transition">+ 型式追加</button>
+                            <button onClick={() => setIsEditModalOpen(true)} className="bg-gray-700 hover:bg-gray-800 text-white px-2 py-0.5 rounded text-xs font-bold shadow transition flex items-center gap-1">✏ 型式編集</button>
+                        </>
+                    )}
                 </div>
 
                 {/* ★ 2行目右側: 端数発生の警告表示 凡例バッジ ＋ 変更履歴チェックボックス */}
@@ -637,13 +660,15 @@ const YoshiiPlanView = () => {
                                 <div className="relative flex items-center justify-center w-full h-full">
                                     <div className="flex items-center justify-center gap-0.5 w-full cursor-pointer hover:text-emerald-700">
                                         <span className="text-[11px] font-bold text-gray-800 truncate">{ctx.selectedVendorFilter === 'ALL' ? '仕入先' : ctx.selectedVendorFilter}</span>
-                                        <span className="text-[9px] text-gray-500 no-print">▼</span>
-                                        <select value={ctx.selectedVendorFilter} onChange={e => ctx.setSelectedVendorFilter(e.target.value)} className="no-print absolute inset-0 w-full h-full opacity-0 cursor-pointer text-xs font-bold" title="仕入先コードで絞り込み">
-                                            <option value="ALL">全体 (全表示)</option>
-                                            {Array.from(new Set(['JP', 'GM', 'LDS', 'SLT', 'YO', ...(ctx.masterData.yoshii?.vendors || [])])).map(v => (
-                                                <option key={v} value={v}>{v}</option>
-                                            ))}
-                                        </select>
+                                        {canFullEdit && <span className="text-[9px] text-gray-500 no-print">▼</span>}
+                                        {canFullEdit && (
+                                            <select value={ctx.selectedVendorFilter} onChange={e => ctx.setSelectedVendorFilter(e.target.value)} className="no-print absolute inset-0 w-full h-full opacity-0 cursor-pointer text-xs font-bold" title="仕入先コードで絞り込み">
+                                                <option value="ALL">全体 (全表示)</option>
+                                                {Array.from(new Set(['JP', 'GM', 'LDS', 'SLT', 'YO', ...(ctx.masterData.yoshii?.vendors || [])])).map(v => (
+                                                    <option key={v} value={v}>{v}</option>
+                                                ))}
+                                            </select>
+                                        )}
                                     </div>
                                 </div>
                             </th>
@@ -701,33 +726,56 @@ const YoshiiPlanView = () => {
 
                             return (
                                 <tr key={model} onDragOver={e => handleModelDragOver(e, model)} onDrop={e => handleModelDrop(e, model)} className={`hover:bg-emerald-50 border-b table-row-compact ${dragOverModel === model ? 'border-t-2 border-t-emerald-600 bg-emerald-100' : ''}`}>
-                                    <td draggable onDragStart={e => handleModelDragStart(e, model)} className="border font-bold text-xs sticky left-0 bg-white z-10 text-center drag-handle text-gray-400 hover:text-emerald-600 cursor-grab active:cursor-grabbing p-0">≡</td>
+                                    {/* 移動ハンドル: 管理者のみドラッグ可能。仕入先ユーザーには「-」表示で非表示化 */}
+                                    <td draggable={canFullEdit} onDragStart={e => handleModelDragStart(e, model)} className={`border font-bold text-xs sticky left-0 bg-white z-10 text-center p-0 ${canFullEdit ? 'drag-handle text-gray-400 hover:text-emerald-600 cursor-grab active:cursor-grabbing' : 'text-gray-300 cursor-default'}`}>
+                                        {canFullEdit ? '≡' : '-'}
+                                    </td>
                                     
-                                    {/* 仕入先 */}
-                                    <td className="border text-xs text-center sticky left-[32px] bg-white z-10 w-[55px] min-w-[55px] p-0">
-                                        <LocalInput value={currentVendorCode} originalValue={(matchModelDetails.originals || {}).vendorCode} originalMeta={(matchModelDetails.originalMetas || {}).vendorCode} onChange={(v, orig) => handleModelDetailChange(model, 'vendorCode', v)} className="w-full text-xs text-center font-mono input-compact"/>
+                                    {/* 仕入先コード: 管理者のみ編集可能、仕入先ユーザーはテキスト表示 */}
+                                    <td className="border text-xs text-center sticky left-[32px] bg-white z-10 w-[55px] min-w-[55px] p-0 font-mono">
+                                        {canFullEdit ? (
+                                            <LocalInput value={currentVendorCode} originalValue={(matchModelDetails.originals || {}).vendorCode} originalMeta={(matchModelDetails.originalMetas || {}).vendorCode} onChange={(v, orig) => handleModelDetailChange(model, 'vendorCode', v)} className="w-full text-xs text-center font-mono input-compact"/>
+                                        ) : (
+                                            <span className="text-gray-700 text-xs">{currentVendorCode || '-'}</span>
+                                        )}
                                     </td>
                                     
                                     {/* 型式 */}
-                                    <td className="border text-xs sticky left-[87px] bg-white z-10 text-left pl-2 p-0">{model}</td>
+                                    <td className="border text-xs sticky left-[87px] bg-white z-10 text-left pl-2 p-0 font-bold">{model}</td>
                                     
-                                    {/* 入数 (型式の右・幅45px) */}
+                                    {/* 入数 (型式の右・幅45px): ★仕入先ユーザーでも編集可能！ */}
                                     <td className="border text-xs text-center sticky left-[197px] bg-white z-10 w-[45px] min-w-[45px] p-0">
-                                        <LocalInput type="number" value={currentQtyPer} originalValue={(matchModelDetails.originals || {}).qtyPerCarton} originalMeta={(matchModelDetails.originalMetas || {}).qtyPerCarton} onChange={(v, orig) => handleModelDetailChange(model, 'qtyPerCarton', v)} className="w-full text-xs text-center font-mono input-compact bg-transparent" placeholder="-" />
+                                        <LocalInput 
+                                            type="number" 
+                                            value={currentQtyPer} 
+                                            originalValue={(matchModelDetails.originals || {}).qtyPerCarton} 
+                                            originalMeta={(matchModelDetails.originalMetas || {}).qtyPerCarton} 
+                                            onChange={(v, orig) => handleModelDetailChange(model, 'qtyPerCarton', v)} 
+                                            className="w-full text-xs text-center font-mono input-compact bg-transparent font-bold text-emerald-900" 
+                                            placeholder="-" 
+                                        />
                                     </td>
 
-                                    {/* 品名 */}
-                                    <td className="border text-xs text-left min-w-[220px] whitespace-nowrap p-0">
-                                        <LocalInput value={currentProdName} originalValue={(matchModelDetails.originals || {}).productName} originalMeta={(matchModelDetails.originalMetas || {}).productName} onChange={(v, orig) => handleModelDetailChange(model, 'productName', v)} listId="auto_yoshii_productNames" className="w-full text-xs text-left px-1 input-compact"/>
+                                    {/* 品名: 管理者のみ編集可能、仕入先ユーザーはテキスト表示 */}
+                                    <td className="border text-xs text-left min-w-[220px] whitespace-nowrap p-0 px-1">
+                                        {canFullEdit ? (
+                                            <LocalInput value={currentProdName} originalValue={(matchModelDetails.originals || {}).productName} originalMeta={(matchModelDetails.originalMetas || {}).productName} onChange={(v, orig) => handleModelDetailChange(model, 'productName', v)} listId="auto_yoshii_productNames" className="w-full text-xs text-left px-1 input-compact"/>
+                                        ) : (
+                                            <span className="text-gray-800 text-xs">{currentProdName || '-'}</span>
+                                        )}
                                     </td>
 
-                                    {/* JANコード */}
-                                    <td className="border text-xs text-center min-w-[95px] max-w-[100px] p-0">
-                                        <LocalInput value={currentJanCode} originalValue={(matchModelDetails.originals || {}).janCode} originalMeta={(matchModelDetails.originalMetas || {}).janCode} onChange={(v, orig) => handleModelDetailChange(model, 'janCode', v)} className="w-full text-xs text-center font-mono input-compact"/>
+                                    {/* JANコード: 管理者のみ編集可能、仕入先ユーザーはテキスト表示 */}
+                                    <td className="border text-xs text-center min-w-[95px] max-w-[100px] p-0 font-mono">
+                                        {canFullEdit ? (
+                                            <LocalInput value={currentJanCode} originalValue={(matchModelDetails.originals || {}).janCode} originalMeta={(matchModelDetails.originalMetas || {}).janCode} onChange={(v, orig) => handleModelDetailChange(model, 'janCode', v)} className="w-full text-xs text-center font-mono input-compact"/>
+                                        ) : (
+                                            <span className="text-gray-700 text-xs">{currentJanCode || '-'}</span>
+                                        )}
                                     </td>
 
                                     {/* 型式合計 (端数警告適用) */}
-                                    <td className="border text-xs font-mono text-right pr-1 bg-emerald-50 text-emerald-900 p-0" style={rowTotStyle}>
+                                    <td className="border text-xs font-mono text-right pr-1 bg-emerald-50 text-emerald-900 p-0 font-bold" style={rowTotStyle}>
                                         {rowTot > 0 ? rowTot.toLocaleString() : '0'}
                                     </td>
                                     
@@ -744,16 +792,25 @@ const YoshiiPlanView = () => {
 
                                         return (
                                             <td key={mo} className="matrix-td px-0.5 align-top p-0 w-[58px] min-w-[58px] table-row-compact" style={cellStyle}>
-                                                <LocalInput 
-                                                    type="number" 
-                                                    value={displayVal} 
-                                                    originalValue={plan?.originalVal} 
-                                                    originalMeta={plan?.originalMeta} 
-                                                    onChange={(v, orig) => handleQuantityChange(model, mo, v, orig)} 
-                                                    className="matrix-input text-emerald-900 font-mono pr-1 text-right text-xs input-compact bg-transparent" 
-                                                    style={cellStyle}
-                                                    placeholder="-"
-                                                />
+                                                {/* 計画数セル: 管理者のみ入力ボックス、仕入先ユーザーは閲覧専用の数値テキスト表示 */}
+                                                {canFullEdit ? (
+                                                    <LocalInput 
+                                                        type="number" 
+                                                        value={displayVal} 
+                                                        originalValue={plan?.originalVal} 
+                                                        originalMeta={plan?.originalMeta} 
+                                                        onChange={(v, orig) => handleQuantityChange(model, mo, v, orig)} 
+                                                        className="matrix-input text-emerald-900 font-mono pr-1 text-right text-xs input-compact bg-transparent" 
+                                                        style={cellStyle}
+                                                        placeholder="-"
+                                                    />
+                                                ) : (
+                                                    <div className="w-full h-[20px] flex items-center justify-end pr-1 font-mono text-xs text-gray-800">
+                                                        {displayVal ? Number(displayVal).toLocaleString() : '-'}
+                                                    </div>
+                                                )}
+
+                                                {/* 変更履歴の吹き出し: 仕入先ユーザーには「×(履歴削除)」ボタンを非表示 */}
                                                 {showHistory && historyList.length > 0 && (
                                                     <div className="relative group/hist no-print">
                                                         <span className="absolute -top-5 right-0.5 text-[9px] bg-amber-100 text-amber-800 border border-amber-300 px-1 rounded cursor-pointer font-bold z-10 shadow-sm">📜{historyList.length}</span>
@@ -765,7 +822,10 @@ const YoshiiPlanView = () => {
                                                                         <span className="font-mono text-emerald-300">{hist.qty.toLocaleString()} 台</span>
                                                                         <div className="flex items-center gap-1">
                                                                             <span className="text-[9px] text-slate-300">{hist.date || ctx.getFormattedShortDate()}</span>
-                                                                            <button onClick={() => handleDeleteHistory(plan.id, hIdx, model, mo)} disabled={ctx.authUser && !ctx.authUser.canEdit} className="text-red-400 hover:text-red-200 font-bold ml-1 text-xs" title="この履歴を削除">×</button>
+                                                                            {/* ★ 管理者のみ×ボタンを表示。仕入先には非表示 */}
+                                                                            {canFullEdit && (
+                                                                                <button onClick={() => handleDeleteHistory(plan.id, hIdx, model, mo)} className="text-red-400 hover:text-red-200 font-bold ml-1 text-xs" title="この履歴を削除">×</button>
+                                                                            )}
                                                                         </div>
                                                                     </div>
                                                                 ))}
@@ -777,8 +837,13 @@ const YoshiiPlanView = () => {
                                         );
                                     })}
 
-                                    <td className="border text-xs text-left min-w-[150px] p-0">
-                                        <LocalTextArea value={currentNotes} originalValue={(matchModelDetails.originals || {}).notes} originalMeta={(matchModelDetails.originalMetas || {}).notes} onChange={(v, orig) => handleModelDetailChange(model, 'notes', v)} isCompact={!showHistory}/>
+                                    {/* 備考: 管理者のみ編集可能、仕入先ユーザーはテキスト表示 */}
+                                    <td className="border text-xs text-left min-w-[150px] p-0 px-1">
+                                        {canFullEdit ? (
+                                            <LocalTextArea value={currentNotes} originalValue={(matchModelDetails.originals || {}).notes} originalMeta={(matchModelDetails.originalMetas || {}).notes} onChange={(v, orig) => handleModelDetailChange(model, 'notes', v)} isCompact={!showHistory}/>
+                                        ) : (
+                                            <div className="text-gray-700 text-xs py-0.5 whitespace-pre-wrap break-words">{currentNotes || ''}</div>
+                                        )}
                                     </td>
                                 </tr>
                             );
@@ -787,7 +852,8 @@ const YoshiiPlanView = () => {
                 </table>
             </div>
 
-            {isAddModalOpen && (
+            {/* 新規型式追加モーダル (管理者のみ) */}
+            {isAddModalOpen && canFullEdit && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
                     <form onSubmit={handleAddNewModelSubmit} className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md flex flex-col gap-4">
                         <h3 className="font-bold text-base border-b pb-2 text-emerald-800">+ 新規型式の追加</h3>
@@ -855,6 +921,9 @@ const YoshiiAllocationView = () => {
     const baseAppVer = typeof SYSTEM_VERSION !== 'undefined' ? SYSTEM_VERSION : '';
     const cmpVer = typeof JS_COMPONENTS_VERSION !== 'undefined' ? JS_COMPONENTS_VERSION : '';
     const displayVer = `${baseAppVer}${JS_PLAN_VERSION}${cmpVer}`;
+
+    const isVendorUser = Boolean(ctx.authUser && ctx.authUser.vendorRestriction);
+    const canFullEdit = Boolean(ctx.authUser && ctx.authUser.canEdit && !isVendorUser);
 
     const isInitRef = React.useRef(false);
     React.useEffect(() => {
@@ -1104,8 +1173,12 @@ const YoshiiAllocationView = () => {
                     <div className="flex items-center gap-1.5">
                         <button onClick={() => setExportModal({ isOpen: true, type: 'excel' })} className="px-2.5 py-1 text-xs font-bold rounded bg-emerald-700 hover:bg-emerald-800 text-white shadow transition flex items-center gap-1">📊 Excel出力</button>
                         <button onClick={() => setExportModal({ isOpen: true, type: 'print' })} className="px-2.5 py-1 text-xs font-bold rounded bg-slate-700 hover:bg-slate-800 text-white shadow transition flex items-center gap-1">🖨 印刷</button>
-                        <button onClick={ctx.handleStartTracking} className={`px-2.5 py-1 text-xs font-bold rounded shadow transition ${ctx.isChangeTrackingMode ? 'bg-red-600 text-white animate-pulse' : 'bg-gray-200 hover:bg-gray-300 text-gray-800'}`}>{ctx.isChangeTrackingMode ? '● 変更記録中' : '変更開始'}</button>
-                        <button onClick={ctx.handleClearTracking} className="px-2.5 py-1 text-xs font-bold rounded bg-gray-600 hover:bg-gray-700 text-white shadow transition">変更クリア</button>
+                        {canFullEdit && (
+                            <>
+                                <button onClick={ctx.handleStartTracking} className={`px-2.5 py-1 text-xs font-bold rounded shadow transition ${ctx.isChangeTrackingMode ? 'bg-red-600 text-white animate-pulse' : 'bg-gray-200 hover:bg-gray-300 text-gray-800'}`}>{ctx.isChangeTrackingMode ? '● 変更記録中' : '変更開始'}</button>
+                                <button onClick={ctx.handleClearTracking} className="px-2.5 py-1 text-xs font-bold rounded bg-gray-600 hover:bg-gray-700 text-white shadow transition">変更クリア</button>
+                            </>
+                        )}
                     </div>
                 </div>
 
@@ -1119,9 +1192,9 @@ const YoshiiAllocationView = () => {
                         <div className="flex items-center gap-1">
                             <label className="font-bold text-xs text-gray-700">コンテナ枠数:</label>
                             <div className="flex items-center gap-1">
-                                <button onClick={() => { if (displayRows > monthContainers.length) setRowLimit(displayRows - 1); }} disabled={ctx.authUser && !ctx.authUser.canEdit} className="bg-gray-300 hover:bg-gray-400 disabled:opacity-30 w-6 h-6 rounded font-bold text-xs transition">-</button>
+                                <button onClick={() => { if (displayRows > monthContainers.length) setRowLimit(displayRows - 1); }} disabled={!canFullEdit} className="bg-gray-300 hover:bg-gray-400 disabled:opacity-30 w-6 h-6 rounded font-bold text-xs transition">-</button>
                                 <span className="w-6 text-center font-bold text-xs">{displayRows}</span>
-                                <button onClick={handleAddRow} disabled={ctx.authUser && !ctx.authUser.canEdit} className="bg-gray-300 hover:bg-gray-400 disabled:opacity-30 w-6 h-6 rounded font-bold text-xs transition">+</button>
+                                <button onClick={handleAddRow} disabled={!canFullEdit} className="bg-gray-300 hover:bg-gray-400 disabled:opacity-30 w-6 h-6 rounded font-bold text-xs transition">+</button>
                             </div>
                         </div>
                     </div>
@@ -1141,7 +1214,7 @@ const YoshiiAllocationView = () => {
                                 <th className="p-0.5 border w-[90px] min-w-[90px] sticky left-[104px] top-0 bg-gray-200 z-40 text-xs text-center">管理番号</th>
                                 <th className="p-0.5 border w-[76px] min-w-[70px] sticky left-[194px] top-0 bg-gray-200 z-40 text-xs">到着港</th>
                                 {models.map(m => <th key={m} className={`p-0.5 border bg-emerald-100 text-xs leading-tight align-bottom model-hdr ${getModelColWidth(m)}`} title={m}>{formatModelWithBreak(m)}</th>)}
-                                <th className="p-0.5 border w-12 bg-gray-200 no-print">削除</th>
+                                {canFullEdit && <th className="p-0.5 border w-12 bg-gray-200 no-print">削除</th>}
                             </tr>
                             <tr className="bg-gray-50 text-xs text-gray-700 border-b table-row-compact">
                                 <td className="p-0.5 border sticky left-0 bg-gray-50 z-40 text-center no-print">-</td>
@@ -1151,7 +1224,7 @@ const YoshiiAllocationView = () => {
                                     {models.reduce((sum, m) => sum + (Number(modelTotals[m]) || 0), 0).toLocaleString()}
                                 </td>
                                 {models.map(m => <td key={m} className={`p-0.5 border font-mono text-xs text-right pr-1 ${getModelColWidth(m)} ${modelTotals[m] === 0 ? 'text-red-500' : ''}`}>{Number(modelTotals[m]).toLocaleString()}</td>)}
-                                <td className="p-0.5 border bg-gray-50 no-print"></td>
+                                {canFullEdit && <td className="p-0.5 border bg-gray-50 no-print"></td>}
                             </tr>
                             <tr className="bg-gray-100 text-xs text-gray-800 border-b-2 border-gray-300 table-row-compact">
                                 <td className="p-0.5 border sticky left-0 bg-gray-100 z-40 text-center no-print">-</td>
@@ -1171,7 +1244,7 @@ const YoshiiAllocationView = () => {
                                     const remain = modelTotals[m] - allocated;
                                     return <td key={m} className={`p-0.5 border font-mono text-xs text-right pr-1 ${getModelColWidth(m)} ${remain < 0 ? 'text-red-600' : remain > 0 ? 'text-blue-600' : 'text-green-600'}`}>{remain.toLocaleString()}</td>;
                                 })}
-                                <td className="p-0.5 border bg-gray-100 no-print"></td>
+                                {canFullEdit && <td className="p-0.5 border bg-gray-100 no-print"></td>}
                             </tr>
                         </thead>
                         <tbody>
@@ -1185,7 +1258,9 @@ const YoshiiAllocationView = () => {
                                         onDragEnd={ctx.handleDragEnd}
                                         className={`hover:bg-emerald-50 table-row-compact ${ctx.dragOverRowId === container.id ? (ctx.dragDirection === 'top' ? 'drag-over-top' : 'drag-over-bottom') : ''} ${ctx.draggedRowId === container.id ? 'dragging-row' : ''}`}
                                     >
-                                        <td draggable={!!container.id && (ctx.authUser ? ctx.authUser.canEdit : true)} onDragStart={(e) => ctx.handleDragStart(e, container.id, 'containers')} className="p-0.5 border bg-white sticky left-0 z-20 text-center drag-handle text-gray-400 hover:text-emerald-600 font-bold text-base cursor-grab active:cursor-grabbing no-print">≡</td>
+                                        <td draggable={!!container.id && canFullEdit} onDragStart={(e) => ctx.handleDragStart(e, container.id, 'containers')} className={`p-0.5 border bg-white sticky left-0 z-20 text-center font-bold text-base no-print ${canFullEdit ? 'drag-handle text-gray-400 hover:text-emerald-600 cursor-grab active:cursor-grabbing' : 'text-gray-300 cursor-default'}`}>
+                                            {canFullEdit ? '≡' : '-'}
+                                        </td>
                                         <td className="p-0.5 border bg-white sticky left-10 z-20 text-[11px] font-medium whitespace-nowrap">コンテナ {idx + 1}</td>
                                         <td className="matrix-td px-0 sticky left-[104px] bg-white z-20 table-row-compact">
                                             <LocalInput value={container.managementNo} originalValue={(container.originals || {}).managementNo} originalMeta={(container.originalMetas || {}).managementNo} onChange={(v, orig) => ctx.updateContainer(container.id, { managementNo: v, originals: { ...(container.originals || {}), managementNo: container.originals?.managementNo !== undefined ? container.originals.managementNo : orig }, originalMetas: { ...(container.originalMetas || {}), managementNo: container.originalMetas?.managementNo !== undefined ? container.originalMetas.managementNo : `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}` } }, ctx.yoshiiAllocMonth, 'yoshii', '管理番号')} className="matrix-input text-center text-xs font-bold input-compact" dataGridId={`y-alloc-${idx}-0`} onGridKeyDown={handleGridNav} />
@@ -1226,16 +1301,19 @@ const YoshiiAllocationView = () => {
                                             );
                                         })}
                                         
-                                        <td className="p-0.5 border text-center align-middle whitespace-nowrap relative no-print">
-                                            <button tabIndex="-1" onClick={() => setDeleteConfirmTarget(deleteConfirmTarget === idx ? null : idx)} disabled={ctx.authUser && !ctx.authUser.canEdit} className="text-red-500 hover:text-red-700 disabled:opacity-30 font-bold text-lg leading-none" title="削除">×</button>
-                                            {deleteConfirmTarget === idx && (
-                                                <div className="absolute right-8 top-1/2 -translate-y-1/2 bg-white border border-red-300 shadow-lg rounded p-2 z-50 text-xs flex items-center gap-2 font-bold whitespace-nowrap">
-                                                    <span className="text-red-700">削除しますか？</span>
-                                                    <button onClick={() => handleExecuteDeleteRow(container.id, idx)} className="bg-red-600 hover:bg-red-700 text-white px-2 py-0.5 rounded text-[11px]">削除</button>
-                                                    <button onClick={() => setDeleteConfirmTarget(null)} className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-2 py-0.5 rounded text-[11px]">消す</button>
-                                                </div>
-                                            )}
-                                        </td>
+                                        {/* ★ 管理者のみ削除(×)ボタンを表示。仕入先ユーザーには非表示 */}
+                                        {canFullEdit && (
+                                            <td className="p-0.5 border text-center align-middle whitespace-nowrap relative no-print">
+                                                <button tabIndex="-1" onClick={() => setDeleteConfirmTarget(deleteConfirmTarget === idx ? null : idx)} className="text-red-500 hover:text-red-700 font-bold text-lg leading-none" title="削除">×</button>
+                                                {deleteConfirmTarget === idx && (
+                                                    <div className="absolute right-8 top-1/2 -translate-y-1/2 bg-white border border-red-300 shadow-lg rounded p-2 z-50 text-xs flex items-center gap-2 font-bold whitespace-nowrap">
+                                                        <span className="text-red-700">削除しますか？</span>
+                                                        <button onClick={() => handleExecuteDeleteRow(container.id, idx)} className="bg-red-600 hover:bg-red-700 text-white px-2 py-0.5 rounded text-[11px]">削除</button>
+                                                        <button onClick={() => setDeleteConfirmTarget(null)} className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-2 py-0.5 rounded text-[11px]">消す</button>
+                                                    </div>
+                                                )}
+                                            </td>
+                                        )}
                                     </tr>
                                 );
                             })}
