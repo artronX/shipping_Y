@@ -1,16 +1,15 @@
 // shipping_views_plan.js
 // =========================================================
 // shipping_views_plan.js - 出荷計画・割振り画面モジュール
-// ★ WebVer. 128 対応 / _js060 仕入先計画閲覧(入数のみ正規編集可)&不要UI非表示&凡例2行目完全版
+// ★ WebVer. 129 対応 / _js061 仕入先非編集セルグレー化(入数のみ白地編集可)&不要UI非表示&凡例2行目完全版
 // ★ 最上行ファイル名識別コメント保持 (// shipping_views_plan.js)
-// ★ 1. 親(HTML)のupdateModelDetailと正しく連携し、仕入先ユーザーでも入数を安全かつ確実に更新。
-// ★ 2. 仕入先ユーザー: 計画数、品名、JAN、備考、仕入先コードは閲覧専用化。
+// ★ 1. 仕入先ログイン時: 入数列のみ白地で入力可能、その他の編集不可セル(仕入先コード/品名/JAN/計画数/備考)はグレー(bg-gray-100)表示。
+// ★ 2. 各月セルの端数警告(#fee2e2)はグレーより優先して薄赤表示。
 // ★ 3. 仕入先ユーザー: [+型式追加], [✏型式編集], [≡], [×削除] などの操作UIを完全非表示。
 // ★ 4. 計画画面 & 割振り画面: 2行目右側に [■ 端数発生の警告表示] 凡例を配置。
-// ★ 5. 端数赤背景チェック(#fee2e2)および楽観的UI更新を完全維持。
 // =========================================================
 
-const JS_PLAN_VERSION = '_js060';
+const JS_PLAN_VERSION = '_js061';
 
 // 【共通コンポーネント: 端数警告の凡例バッジ (2行目右側用)】
 const YoshiiFractionLegend = () => (
@@ -20,7 +19,7 @@ const YoshiiFractionLegend = () => (
     </div>
 );
 
-// 【型式編集・削除モーダル (V94完全移植)】
+// 【型式編集・削除モーダル】
 const ModelEditModal = ({ isOpen, onClose, company='yoshii' }) => {
     const ctx = React.useContext(AppContext);
     const [models, setModels] = React.useState([]);
@@ -618,7 +617,7 @@ const YoshiiPlanView = () => {
                         )}
                     </div>
 
-                    {/* ★ 管理者のみ「+型式追加」「✏型式編集」を表示。仕入先ユーザーには非表示 */}
+                    {/* 管理者のみ「+型式追加」「✏型式編集」を表示。仕入先ユーザーには非表示 */}
                     {canFullEdit && (
                         <>
                             <button onClick={() => setIsAddModalOpen(true)} className="bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-0.5 rounded text-xs font-bold shadow transition">+ 型式追加</button>
@@ -627,7 +626,7 @@ const YoshiiPlanView = () => {
                     )}
                 </div>
 
-                {/* ★ 2行目右側: 端数発生の警告表示 凡例バッジ ＋ 変更履歴チェックボックス */}
+                {/* 2行目右側: 端数発生の警告表示 凡例バッジ ＋ 変更履歴チェックボックス */}
                 <div className="flex items-center gap-2">
                     <YoshiiFractionLegend />
                     <label className="flex items-center gap-1 text-xs font-bold text-gray-700 cursor-pointer bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 shadow-sm hover:bg-emerald-100 transition">
@@ -708,30 +707,30 @@ const YoshiiPlanView = () => {
                             const qtyPerNum = Number(currentQtyPer) || 0;
                             const rowTot = calculateRowTotal(model);
 
-                            // ★ 型式合計の端数チェック: 入数があり、合計が割り切れない場合に薄赤背景
+                            // 型式合計の端数チェック: 入数があり、合計が割り切れない場合に薄赤背景
                             const isRowTotError = qtyPerNum > 0 && rowTot > 0 && (rowTot % qtyPerNum !== 0);
                             const rowTotStyle = isRowTotError ? { backgroundColor: '#fee2e2' } : {};
 
                             return (
                                 <tr key={model} onDragOver={e => handleModelDragOver(e, model)} onDrop={e => handleModelDrop(e, model)} className={`hover:bg-emerald-50 border-b table-row-compact ${dragOverModel === model ? 'border-t-2 border-t-emerald-600 bg-emerald-100' : ''}`}>
-                                    {/* 移動ハンドル: 管理者のみドラッグ可能。仕入先ユーザーには「-」表示で非表示化 */}
+                                    {/* 移動ハンドル: 管理者のみドラッグ可能。仕入先ユーザーには「-」表示 */}
                                     <td draggable={canFullEdit} onDragStart={e => handleModelDragStart(e, model)} className={`border font-bold text-xs sticky left-0 bg-white z-10 text-center p-0 ${canFullEdit ? 'drag-handle text-gray-400 hover:text-emerald-600 cursor-grab active:cursor-grabbing' : 'text-gray-300 cursor-default'}`}>
                                         {canFullEdit ? '≡' : '-'}
                                     </td>
                                     
-                                    {/* 仕入先コード: 管理者のみ編集可能、仕入先ユーザーはテキスト表示 */}
-                                    <td className="border text-xs text-center sticky left-[32px] bg-white z-10 w-[55px] min-w-[55px] p-0 font-mono">
+                                    {/* 仕入先コード: 管理者のみ編集可能、仕入先ユーザーはグレー背景＆テキスト表示 */}
+                                    <td className={`border text-xs text-center sticky left-[32px] z-10 w-[55px] min-w-[55px] p-0 font-mono ${isVendorUser ? 'bg-gray-100' : 'bg-white'}`}>
                                         {canFullEdit ? (
                                             <LocalInput value={currentVendorCode} originalValue={(matchModelDetails.originals || {}).vendorCode} originalMeta={(matchModelDetails.originalMetas || {}).vendorCode} onChange={(v, orig) => handleModelDetailChange(model, 'vendorCode', v)} className="w-full text-xs text-center font-mono input-compact"/>
                                         ) : (
-                                            <span className="text-gray-700 text-xs">{currentVendorCode || '-'}</span>
+                                            <span className="text-gray-600 text-xs font-semibold">{currentVendorCode || '-'}</span>
                                         )}
                                     </td>
                                     
                                     {/* 型式 */}
                                     <td className="border text-xs sticky left-[87px] bg-white z-10 text-left pl-2 p-0 font-bold">{model}</td>
                                     
-                                    {/* 入数 (型式の右・幅45px): ★仕入先ユーザーでも編集可能（直接親のupdateModelDetailを呼ぶ安全設計） */}
+                                    {/* 入数 (型式の右・幅45px): ★仕入先ユーザーでも白背景で編集可能 */}
                                     <td className="border text-xs text-center sticky left-[197px] bg-white z-10 w-[45px] min-w-[45px] p-0">
                                         <input 
                                             type="number" 
@@ -753,21 +752,21 @@ const YoshiiPlanView = () => {
                                         />
                                     </td>
 
-                                    {/* 品名: 管理者のみ編集可能、仕入先ユーザーはテキスト表示 */}
-                                    <td className="border text-xs text-left min-w-[220px] whitespace-nowrap p-0 px-1">
+                                    {/* 品名: 管理者のみ編集可能、仕入先ユーザーはグレー背景＆テキスト表示 */}
+                                    <td className={`border text-xs text-left min-w-[220px] whitespace-nowrap p-0 px-1 ${isVendorUser ? 'bg-gray-100' : 'bg-white'}`}>
                                         {canFullEdit ? (
                                             <LocalInput value={currentProdName} originalValue={(matchModelDetails.originals || {}).productName} originalMeta={(matchModelDetails.originalMetas || {}).productName} onChange={(v, orig) => handleModelDetailChange(model, 'productName', v)} listId="auto_yoshii_productNames" className="w-full text-xs text-left px-1 input-compact"/>
                                         ) : (
-                                            <span className="text-gray-800 text-xs">{currentProdName || '-'}</span>
+                                            <span className="text-gray-700 text-xs">{currentProdName || '-'}</span>
                                         )}
                                     </td>
 
-                                    {/* JANコード: 管理者のみ編集可能、仕入先ユーザーはテキスト表示 */}
-                                    <td className="border text-xs text-center min-w-[95px] max-w-[100px] p-0 font-mono">
+                                    {/* JANコード: 管理者のみ編集可能、仕入先ユーザーはグレー背景＆テキスト表示 */}
+                                    <td className={`border text-xs text-center min-w-[95px] max-w-[100px] p-0 font-mono ${isVendorUser ? 'bg-gray-100' : 'bg-white'}`}>
                                         {canFullEdit ? (
                                             <LocalInput value={currentJanCode} originalValue={(matchModelDetails.originals || {}).janCode} originalMeta={(matchModelDetails.originalMetas || {}).janCode} onChange={(v, orig) => handleModelDetailChange(model, 'janCode', v)} className="w-full text-xs text-center font-mono input-compact"/>
                                         ) : (
-                                            <span className="text-gray-700 text-xs">{currentJanCode || '-'}</span>
+                                            <span className="text-gray-600 text-xs">{currentJanCode || '-'}</span>
                                         )}
                                     </td>
 
@@ -782,14 +781,18 @@ const YoshiiPlanView = () => {
                                         const displayVal = (effectiveVal === '' || Number(effectiveVal) === 0) ? '' : effectiveVal;
                                         const historyList = plan?.qtyHistory || [];
 
-                                        // ★ 各月セルの端数チェック: 入数があり、計画数が割り切れない場合に薄赤背景
+                                        // 各月セルの端数チェック: 入数があり、計画数が割り切れない場合に薄赤背景
                                         const cellQty = Number(displayVal) || 0;
                                         const isCellError = qtyPerNum > 0 && cellQty > 0 && (cellQty % qtyPerNum !== 0);
-                                        const cellStyle = isCellError ? { backgroundColor: '#fee2e2' } : {};
+                                        
+                                        // 端数エラー(#fee2e2)を最優先、それ以外で仕入先ならグレー(#f3f4f6)、それ以外は白
+                                        const cellStyle = isCellError 
+                                            ? { backgroundColor: '#fee2e2' } 
+                                            : (isVendorUser ? { backgroundColor: '#f3f4f6' } : {});
 
                                         return (
-                                            <td key={mo} className="matrix-td px-0.5 align-top p-0 w-[58px] min-w-[58px] table-row-compact" style={cellStyle}>
-                                                {/* 計画数セル: 管理者のみ入力ボックス、仕入先ユーザーは閲覧専用の数値テキスト表示 */}
+                                            <td key={mo} className={`matrix-td px-0.5 align-top p-0 w-[58px] min-w-[58px] table-row-compact ${!isCellError && isVendorUser ? 'bg-gray-100' : ''}`} style={cellStyle}>
+                                                {/* 計画数セル: 管理者のみ入力ボックス、仕入先ユーザーはグレー背景＆数値テキスト表示 */}
                                                 {canFullEdit ? (
                                                     <LocalInput 
                                                         type="number" 
@@ -802,7 +805,7 @@ const YoshiiPlanView = () => {
                                                         placeholder="-"
                                                     />
                                                 ) : (
-                                                    <div className="w-full h-[20px] flex items-center justify-end pr-1 font-mono text-xs text-gray-800">
+                                                    <div className="w-full h-[20px] flex items-center justify-end pr-1 font-mono text-xs text-gray-700">
                                                         {displayVal ? Number(displayVal).toLocaleString() : '-'}
                                                     </div>
                                                 )}
@@ -819,7 +822,7 @@ const YoshiiPlanView = () => {
                                                                         <span className="font-mono text-emerald-300">{hist.qty.toLocaleString()} 台</span>
                                                                         <div className="flex items-center gap-1">
                                                                             <span className="text-[9px] text-slate-300">{hist.date || ctx.getFormattedShortDate()}</span>
-                                                                            {/* ★ 管理者のみ×ボタンを表示。仕入先には非表示 */}
+                                                                            {/* 管理者のみ×ボタンを表示 */}
                                                                             {canFullEdit && (
                                                                                 <button onClick={() => handleDeleteHistory(plan.id, hIdx, model, mo)} className="text-red-400 hover:text-red-200 font-bold ml-1 text-xs" title="この履歴を削除">×</button>
                                                                             )}
@@ -834,8 +837,8 @@ const YoshiiPlanView = () => {
                                         );
                                     })}
 
-                                    {/* 備考: 管理者のみ編集可能、仕入先ユーザーはテキスト表示 */}
-                                    <td className="border text-xs text-left min-w-[150px] p-0 px-1">
+                                    {/* 備考: 管理者のみ編集可能、仕入先ユーザーはグレー背景＆テキスト表示 */}
+                                    <td className={`border text-xs text-left min-w-[150px] p-0 px-1 ${isVendorUser ? 'bg-gray-100' : 'bg-white'}`}>
                                         {canFullEdit ? (
                                             <LocalTextArea value={currentNotes} originalValue={(matchModelDetails.originals || {}).notes} originalMeta={(matchModelDetails.originalMetas || {}).notes} onChange={(v, orig) => handleModelDetailChange(model, 'notes', v)} isCompact={!showHistory}/>
                                         ) : (
@@ -1196,7 +1199,7 @@ const YoshiiAllocationView = () => {
                         </div>
                     </div>
 
-                    {/* ★ 2行目右側: 端数発生の警告表示 凡例バッジ */}
+                    {/* 2行目右側: 端数発生の警告表示 凡例バッジ */}
                     <YoshiiFractionLegend />
                 </div>
             </div>

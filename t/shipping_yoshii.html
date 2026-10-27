@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>吉井電気 製品出荷管理システム (WebVer. 128)</title>
+    <title>吉井電気 製品出荷管理システム (WebVer. 129)</title>
     
     <!-- React 18 (cdnjs: 安定版固定) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
@@ -22,7 +22,7 @@
 
     <!-- ★重要: 外部モジュール読み込み前に共通定数・関数を定義★ -->
     <script>
-        const SYSTEM_VERSION = 'WebVer. 128';
+        const SYSTEM_VERSION = 'WebVer. 129';
 
         // 型式名正規化関数（外部JSより先に定義してReferenceErrorを防止）
         function normalizeModelCode(str) {
@@ -375,7 +375,8 @@
                         canEdit: matchedRule.canEdit
                     });
                 } else {
-                    setErrorMsg('パスワードが一致しません。権限表に定義されたパスワードを入力してください。');
+                    // ★ 工場・仕入先向けに自然な文言へ修正
+                    setErrorMsg('パスワードが一致しません。指定のパスワードを入力してください。');
                 }
             };
 
