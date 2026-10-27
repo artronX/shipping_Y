@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>吉井電気 製品出荷管理システム (WebVer. 125)</title>
+    <title>吉井電気 製品出荷管理システム (WebVer. 126)</title>
     
     <!-- React 18 (cdnjs: 安定版固定) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
@@ -19,6 +19,20 @@
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+    <!-- ★重要: 外部モジュール読み込み前に共通定数・関数を定義★ -->
+    <script>
+        const SYSTEM_VERSION = 'WebVer. 126';
+
+        // 型式名正規化関数（外部JSより先に定義してReferenceErrorを防止）
+        function normalizeModelCode(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/[‐-―−－–—\-]/g, '')
+                .replace(/\s+/g, '')
+                .toUpperCase();
+        }
+    </script>
 
     <style>
         @media print {
@@ -175,10 +189,6 @@
 <body class="bg-gray-100 text-gray-800">
     <div id="root"></div>
 
-    <script>
-        const SYSTEM_VERSION = 'WebVer. 125';
-    </script>
-
     <!-- 1. 基本UI・モーダル共通モジュール -->
     <script type="text/babel" src="shipping_components.js"></script>
     <!-- 2. Excel/印刷エクスポートモジュール -->
@@ -215,75 +225,76 @@
             return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
         };
 
-        // ハッシュ化済み権限マトリクス（出荷管理権限一覧.xlsxより生成）
-const AUTH_TABLE = [
-    {
-        hashes: ['5579cdc6320d1718cd7c5f40c65230f504ef19055c16e919a0183298ddc32805'],
-        role: 'ADMIN_ALL',
-        label: '東亜全体 (全画面編集)',
-        allowedViews: ['yoshii_plan', 'yoshii_alloc', 'yoshii_ship', 'yoshii_drayage'],
-        editableViews: ['yoshii_plan', 'yoshii_alloc', 'yoshii_ship', 'yoshii_drayage'],
-        vendorRestriction: null,
-        canEdit: true
-    },
-    {
-        hashes: [
-            '47900fcf9d6bccf97bcafa06c788cf92ef418f855e47bd3a57a6f2b6c6ae9037',
-            '1df4ee4fe023087aba3d91e6e7a589ef60c6e4fdd0beb653e5bdd30a7cc5d83d'
-        ],
-        role: 'READ_ONLY',
-        label: '閲覧専用',
-        allowedViews: ['yoshii_plan', 'yoshii_alloc', 'yoshii_ship', 'yoshii_drayage'],
-        editableViews: [],
-        vendorRestriction: null,
-        canEdit: false
-    },
-    {
-        hashes: ['16bdf5696aa28e37f4feba4e6addbbccefeb0d277adaad62341942c74522586d'],
-        role: 'VENDOR_JP',
-        label: 'JP専用 (出荷日程編集/割振り閲覧)',
-        allowedViews: ['yoshii_alloc', 'yoshii_ship'],
-        editableViews: ['yoshii_ship'],
-        vendorRestriction: 'JP',
-        canEdit: true
-    },
-    {
-        hashes: ['09601fab9012fdf12499952140117516683995014bec9dd15cafe0cdb6cb4005'],
-        role: 'VENDOR_GM',
-        label: 'GM専用 (出荷日程編集/割振り閲覧)',
-        allowedViews: ['yoshii_alloc', 'yoshii_ship'],
-        editableViews: ['yoshii_ship'],
-        vendorRestriction: 'GM',
-        canEdit: true
-    },
-    {
-        hashes: ['b7b32aa228848392ed901100150a59ba680f4e10a81c564a617e15f8a18953f7'],
-        role: 'VENDOR_LDS',
-        label: 'LDS専用 (出荷日程編集/割振り閲覧)',
-        allowedViews: ['yoshii_alloc', 'yoshii_ship'],
-        editableViews: ['yoshii_ship'],
-        vendorRestriction: 'LDS',
-        canEdit: true
-    },
-    {
-        hashes: ['5af306260c101af52e30743755566709b0ebd3e0368321c8058b592e5530c996'],
-        role: 'VENDOR_SLT',
-        label: 'SLT専用 (出荷日程編集/割振り閲覧)',
-        allowedViews: ['yoshii_alloc', 'yoshii_ship'],
-        editableViews: ['yoshii_ship'],
-        vendorRestriction: 'SLT',
-        canEdit: true
-    },
-    {
-        hashes: ['d61ec598b505d37324b46365777d9e7f917b0fc37ec065c3659af84a4e584741'],
-        role: 'DRAYAGE_YO',
-        label: 'ドレージ (YO) 専用',
-        allowedViews: ['yoshii_drayage'],
-        editableViews: ['yoshii_drayage'],
-        vendorRestriction: 'YO',
-        canEdit: true
-    }
-];
+        // ハッシュ化済み権限マトリクス（平文コメント完全除去版）
+        const AUTH_TABLE = [
+            {
+                hashes: ['5579cdc6320d1718cd7c5f40c65230f504ef19055c16e919a0183298ddc32805'],
+                role: 'ADMIN_ALL',
+                label: '東亜全体 (全画面編集)',
+                allowedViews: ['yoshii_plan', 'yoshii_alloc', 'yoshii_ship', 'yoshii_drayage'],
+                editableViews: ['yoshii_plan', 'yoshii_alloc', 'yoshii_ship', 'yoshii_drayage'],
+                vendorRestriction: null,
+                canEdit: true
+            },
+            {
+                hashes: [
+                    '47900fcf9d6bccf97bcafa06c788cf92ef418f855e47bd3a57a6f2b6c6ae9037',
+                    '1df4ee4fe023087aba3d91e6e7a589ef60c6e4fdd0beb653e5bdd30a7cc5d83d'
+                ],
+                role: 'READ_ONLY',
+                label: '閲覧専用',
+                allowedViews: ['yoshii_plan', 'yoshii_alloc', 'yoshii_ship', 'yoshii_drayage'],
+                editableViews: [],
+                vendorRestriction: null,
+                canEdit: false
+            },
+            {
+                hashes: ['16bdf5696aa28e37f4feba4e6addbbccefeb0d277adaad62341942c74522586d'],
+                role: 'VENDOR_JP',
+                label: 'JP専用 (出荷日程編集/割振り閲覧)',
+                allowedViews: ['yoshii_alloc', 'yoshii_ship'],
+                editableViews: ['yoshii_ship'],
+                vendorRestriction: 'JP',
+                canEdit: true
+            },
+            {
+                hashes: ['09601fab9012fdf12499952140117516683995014bec9dd15cafe0cdb6cb4005'],
+                role: 'VENDOR_GM',
+                label: 'GM専用 (出荷日程編集/割振り閲覧)',
+                allowedViews: ['yoshii_alloc', 'yoshii_ship'],
+                editableViews: ['yoshii_ship'],
+                vendorRestriction: 'GM',
+                canEdit: true
+            },
+            {
+                hashes: ['b7b32aa228848392ed901100150a59ba680f4e10a81c564a617e15f8a18953f7'],
+                role: 'VENDOR_LDS',
+                label: 'LDS専用 (出荷日程編集/割振り閲覧)',
+                allowedViews: ['yoshii_alloc', 'yoshii_ship'],
+                editableViews: ['yoshii_ship'],
+                vendorRestriction: 'LDS',
+                canEdit: true
+            },
+            {
+                hashes: ['5af306260c101af52e30743755566709b0ebd3e0368321c8058b592e5530c996'],
+                role: 'VENDOR_SLT',
+                label: 'SLT専用 (出荷日程編集/割振り閲覧)',
+                allowedViews: ['yoshii_alloc', 'yoshii_ship'],
+                editableViews: ['yoshii_ship'],
+                vendorRestriction: 'SLT',
+                canEdit: true
+            },
+            {
+                hashes: ['d61ec598b505d37324b46365777d9e7f917b0fc37ec065c3659af84a4e584741'],
+                role: 'DRAYAGE_YO',
+                label: 'ドレージ (YO) 専用',
+                allowedViews: ['yoshii_drayage'],
+                editableViews: ['yoshii_drayage'],
+                vendorRestriction: 'YO',
+                canEdit: true
+            }
+        ];
+
         const INITIAL_MASTER_DATA = {
             hitachi: { ports: ["東京", "神戸", "博多", "名古屋"], destinations: ["栃木", "五光物流", "高砂倉庫"], models: ["HFK-CV1B", "HFK-CS5000C", "HFK-VS6000T"], modelDetails: {} },
             yoshii: { ports: ["東京", "神戸", "博多", "名古屋"], destinations: ["吉井電気太田物流センター", "NXNP様 西日本", "東日本GLC 浦安Ⅲ"], models: ["ALC-06SK", "ALC-S14", "KS-LC24C"], productNames: ["ｱﾋﾞﾃﾗｯックス LEDｼｰﾘﾝｸﾞ L6畳", "ｱﾋﾞﾃﾗｯックス LEDｼｰﾘﾝｸﾞ L8畳"], modelDetails: {}, modelOrder: {} },
@@ -342,7 +353,7 @@ const AUTH_TABLE = [
                     return;
                 }
 
-                // 入力されたパスワードをSHA-256ハッシュに変換して照合
+                // 入力パスワードをハッシュ化して照合
                 const inputHash = await hashPassword(cleanPass);
 
                 let matchedRule = null;
@@ -636,14 +647,14 @@ const AUTH_TABLE = [
                 } catch (e) { console.error("Log Error:", e); }
             };
 
-            // 管理者ログ閲覧もハッシュ値照合に修正
+            // 管理者ログ閲覧もハッシュ値照合
             const handleOpenLogs = async () => {
                 const password = prompt("管理者パスワードを入力してください:");
                 if (!password) return;
                 const inputHash = await hashPassword(password.trim());
                 // '0617' のSHA-256ハッシュ値
                 const adminPinHash = '2a1c68bab4a7c58f210f0ce36a3371aa4f90e9a36ca7a8c5f85bc0e8db098e42';
-                
+
                 if (inputHash === adminPinHash) {
                     setIsLogModalOpen(true);
                 } else {
