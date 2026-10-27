@@ -1,15 +1,16 @@
 // shipping_views_plan.js
 // =========================================================
 // shipping_views_plan.js - 出荷計画・割振り画面モジュール
-// ★ WebVer. 129 対応 / _js061 仕入先非編集セルグレー化(入数のみ白地編集可)&不要UI非表示&凡例2行目完全版
+// ★ WebVer. 129 対応 / _js062 計画画面・割振り画面 非編集セル完全グレー化(bg-gray-200)版
 // ★ 最上行ファイル名識別コメント保持 (// shipping_views_plan.js)
-// ★ 1. 仕入先ログイン時: 入数列のみ白地で入力可能、その他の編集不可セル(仕入先コード/品名/JAN/計画数/備考)はグレー(bg-gray-100)表示。
-// ★ 2. 各月セルの端数警告(#fee2e2)はグレーより優先して薄赤表示。
-// ★ 3. 仕入先ユーザー: [+型式追加], [✏型式編集], [≡], [×削除] などの操作UIを完全非表示。
-// ★ 4. 計画画面 & 割振り画面: 2行目右側に [■ 端数発生の警告表示] 凡例を配置。
+// ★ 1. 計画画面: 仕入先ログイン時は「入数」列のみ白地編集可能、型式・仕入先・品名・JAN・計画数・備考を濃いグレー(bg-gray-200)で統一。
+// ★ 2. 割振り画面: 仕入先ログイン時は全データ行(管理番号・到着港・割振数)を濃いグレー(bg-gray-200)かつ入力・プルダウン不可の閲覧専用化。
+// ★ 3. 各月セルの端数警告(#fee2e2)はグレーより優先して薄赤表示。
+// ★ 4. 仕入先ユーザー: [+型式追加], [✏型式編集], [≡], [×削除] などの操作UIを完全非表示。
+// ★ 5. 計画画面 & 割振り画面: 2行目右側に [■ 端数発生の警告表示] 凡例を配置。
 // =========================================================
 
-const JS_PLAN_VERSION = '_js061';
+const JS_PLAN_VERSION = '_js062';
 
 // 【共通コンポーネント: 端数警告の凡例バッジ (2行目右側用)】
 const YoshiiFractionLegend = () => (
@@ -714,23 +715,23 @@ const YoshiiPlanView = () => {
                             return (
                                 <tr key={model} onDragOver={e => handleModelDragOver(e, model)} onDrop={e => handleModelDrop(e, model)} className={`hover:bg-emerald-50 border-b table-row-compact ${dragOverModel === model ? 'border-t-2 border-t-emerald-600 bg-emerald-100' : ''}`}>
                                     {/* 移動ハンドル: 管理者のみドラッグ可能。仕入先ユーザーには「-」表示 */}
-                                    <td draggable={canFullEdit} onDragStart={e => handleModelDragStart(e, model)} className={`border font-bold text-xs sticky left-0 bg-white z-10 text-center p-0 ${canFullEdit ? 'drag-handle text-gray-400 hover:text-emerald-600 cursor-grab active:cursor-grabbing' : 'text-gray-300 cursor-default'}`}>
+                                    <td draggable={canFullEdit} onDragStart={e => handleModelDragStart(e, model)} className={`border font-bold text-xs sticky left-0 bg-white z-10 text-center p-0 ${canFullEdit ? 'drag-handle text-gray-400 hover:text-emerald-600 cursor-grab active:cursor-grabbing' : 'text-gray-400 cursor-default bg-gray-200'}`}>
                                         {canFullEdit ? '≡' : '-'}
                                     </td>
                                     
-                                    {/* 仕入先コード: 管理者のみ編集可能、仕入先ユーザーはグレー背景＆テキスト表示 */}
-                                    <td className={`border text-xs text-center sticky left-[32px] z-10 w-[55px] min-w-[55px] p-0 font-mono ${isVendorUser ? 'bg-gray-100' : 'bg-white'}`}>
+                                    {/* 仕入先コード: 管理者のみ編集可能、仕入先ユーザーは濃いグレー背景(bg-gray-200) */}
+                                    <td className={`border text-xs text-center sticky left-[32px] z-10 w-[55px] min-w-[55px] p-0 font-mono ${isVendorUser ? 'bg-gray-200 text-gray-700 font-bold' : 'bg-white'}`}>
                                         {canFullEdit ? (
                                             <LocalInput value={currentVendorCode} originalValue={(matchModelDetails.originals || {}).vendorCode} originalMeta={(matchModelDetails.originalMetas || {}).vendorCode} onChange={(v, orig) => handleModelDetailChange(model, 'vendorCode', v)} className="w-full text-xs text-center font-mono input-compact"/>
                                         ) : (
-                                            <span className="text-gray-600 text-xs font-semibold">{currentVendorCode || '-'}</span>
+                                            <span className="text-gray-700 text-xs font-bold">{currentVendorCode || '-'}</span>
                                         )}
                                     </td>
                                     
-                                    {/* 型式 */}
-                                    <td className="border text-xs sticky left-[87px] bg-white z-10 text-left pl-2 p-0 font-bold">{model}</td>
+                                    {/* 型式: 仕入先ユーザーは濃いグレー背景(bg-gray-200) */}
+                                    <td className={`border text-xs sticky left-[87px] z-10 text-left pl-2 p-0 font-bold ${isVendorUser ? 'bg-gray-200 text-gray-800' : 'bg-white'}`}>{model}</td>
                                     
-                                    {/* 入数 (型式の右・幅45px): ★仕入先ユーザーでも白背景で編集可能 */}
+                                    {/* 入数 (型式の右・幅45px): ★仕入先ユーザーでも真っ白背景(bg-white)で編集可能！ */}
                                     <td className="border text-xs text-center sticky left-[197px] bg-white z-10 w-[45px] min-w-[45px] p-0">
                                         <input 
                                             type="number" 
@@ -752,21 +753,21 @@ const YoshiiPlanView = () => {
                                         />
                                     </td>
 
-                                    {/* 品名: 管理者のみ編集可能、仕入先ユーザーはグレー背景＆テキスト表示 */}
-                                    <td className={`border text-xs text-left min-w-[220px] whitespace-nowrap p-0 px-1 ${isVendorUser ? 'bg-gray-100' : 'bg-white'}`}>
+                                    {/* 品名: 管理者のみ編集可能、仕入先ユーザーは濃いグレー背景(bg-gray-200) */}
+                                    <td className={`border text-xs text-left min-w-[220px] whitespace-nowrap p-0 px-1 ${isVendorUser ? 'bg-gray-200' : 'bg-white'}`}>
                                         {canFullEdit ? (
                                             <LocalInput value={currentProdName} originalValue={(matchModelDetails.originals || {}).productName} originalMeta={(matchModelDetails.originalMetas || {}).productName} onChange={(v, orig) => handleModelDetailChange(model, 'productName', v)} listId="auto_yoshii_productNames" className="w-full text-xs text-left px-1 input-compact"/>
                                         ) : (
-                                            <span className="text-gray-700 text-xs">{currentProdName || '-'}</span>
+                                            <span className="text-gray-800 text-xs font-medium">{currentProdName || '-'}</span>
                                         )}
                                     </td>
 
-                                    {/* JANコード: 管理者のみ編集可能、仕入先ユーザーはグレー背景＆テキスト表示 */}
-                                    <td className={`border text-xs text-center min-w-[95px] max-w-[100px] p-0 font-mono ${isVendorUser ? 'bg-gray-100' : 'bg-white'}`}>
+                                    {/* JANコード: 管理者のみ編集可能、仕入先ユーザーは濃いグレー背景(bg-gray-200) */}
+                                    <td className={`border text-xs text-center min-w-[95px] max-w-[100px] p-0 font-mono ${isVendorUser ? 'bg-gray-200' : 'bg-white'}`}>
                                         {canFullEdit ? (
                                             <LocalInput value={currentJanCode} originalValue={(matchModelDetails.originals || {}).janCode} originalMeta={(matchModelDetails.originalMetas || {}).janCode} onChange={(v, orig) => handleModelDetailChange(model, 'janCode', v)} className="w-full text-xs text-center font-mono input-compact"/>
                                         ) : (
-                                            <span className="text-gray-600 text-xs">{currentJanCode || '-'}</span>
+                                            <span className="text-gray-700 text-xs font-mono">{currentJanCode || '-'}</span>
                                         )}
                                     </td>
 
@@ -785,14 +786,14 @@ const YoshiiPlanView = () => {
                                         const cellQty = Number(displayVal) || 0;
                                         const isCellError = qtyPerNum > 0 && cellQty > 0 && (cellQty % qtyPerNum !== 0);
                                         
-                                        // 端数エラー(#fee2e2)を最優先、それ以外で仕入先ならグレー(#f3f4f6)、それ以外は白
+                                        // 端数エラー(#fee2e2)を最優先、それ以外で仕入先なら明確なグレー(#e5e7eb)
                                         const cellStyle = isCellError 
                                             ? { backgroundColor: '#fee2e2' } 
-                                            : (isVendorUser ? { backgroundColor: '#f3f4f6' } : {});
+                                            : (isVendorUser ? { backgroundColor: '#e5e7eb' } : {});
 
                                         return (
-                                            <td key={mo} className={`matrix-td px-0.5 align-top p-0 w-[58px] min-w-[58px] table-row-compact ${!isCellError && isVendorUser ? 'bg-gray-100' : ''}`} style={cellStyle}>
-                                                {/* 計画数セル: 管理者のみ入力ボックス、仕入先ユーザーはグレー背景＆数値テキスト表示 */}
+                                            <td key={mo} className={`matrix-td px-0.5 align-top p-0 w-[58px] min-w-[58px] table-row-compact ${!isCellError && isVendorUser ? 'bg-gray-200' : ''}`} style={cellStyle}>
+                                                {/* 計画数セル: 管理者のみ入力ボックス、仕入先ユーザーは濃いグレー背景＆数値テキスト表示 */}
                                                 {canFullEdit ? (
                                                     <LocalInput 
                                                         type="number" 
@@ -805,7 +806,7 @@ const YoshiiPlanView = () => {
                                                         placeholder="-"
                                                     />
                                                 ) : (
-                                                    <div className="w-full h-[20px] flex items-center justify-end pr-1 font-mono text-xs text-gray-700">
+                                                    <div className="w-full h-[20px] flex items-center justify-end pr-1 font-mono text-xs text-gray-800 font-bold">
                                                         {displayVal ? Number(displayVal).toLocaleString() : '-'}
                                                     </div>
                                                 )}
@@ -837,12 +838,12 @@ const YoshiiPlanView = () => {
                                         );
                                     })}
 
-                                    {/* 備考: 管理者のみ編集可能、仕入先ユーザーはグレー背景＆テキスト表示 */}
-                                    <td className={`border text-xs text-left min-w-[150px] p-0 px-1 ${isVendorUser ? 'bg-gray-100' : 'bg-white'}`}>
+                                    {/* 備考: 管理者のみ編集可能、仕入先ユーザーは濃いグレー背景(bg-gray-200) */}
+                                    <td className={`border text-xs text-left min-w-[150px] p-0 px-1 ${isVendorUser ? 'bg-gray-200' : 'bg-white'}`}>
                                         {canFullEdit ? (
                                             <LocalTextArea value={currentNotes} originalValue={(matchModelDetails.originals || {}).notes} originalMeta={(matchModelDetails.originalMetas || {}).notes} onChange={(v, orig) => handleModelDetailChange(model, 'notes', v)} isCompact={!showHistory}/>
                                         ) : (
-                                            <div className="text-gray-700 text-xs py-0.5 whitespace-pre-wrap break-words">{currentNotes || ''}</div>
+                                            <div className="text-gray-800 text-xs py-0.5 whitespace-pre-wrap break-words">{currentNotes || ''}</div>
                                         )}
                                     </td>
                                 </tr>
@@ -1095,6 +1096,7 @@ const YoshiiAllocationView = () => {
     });
 
     const handleAllocationValueChange = (container, masterModel, val, orig) => {
+        if (!canFullEdit) return;
         const currentAllocs = container.allocations || {};
         const newQty = val === '' ? 0 : Number(val);
         const updatedAllocs = { ...currentAllocs, [masterModel]: newQty };
@@ -1258,15 +1260,31 @@ const YoshiiAllocationView = () => {
                                         onDragEnd={ctx.handleDragEnd}
                                         className={`hover:bg-emerald-50 table-row-compact ${ctx.dragOverRowId === container.id ? (ctx.dragDirection === 'top' ? 'drag-over-top' : 'drag-over-bottom') : ''} ${ctx.draggedRowId === container.id ? 'dragging-row' : ''}`}
                                     >
-                                        <td draggable={!!container.id && canFullEdit} onDragStart={(e) => ctx.handleDragStart(e, container.id, 'containers')} className={`p-0.5 border bg-white sticky left-0 z-20 text-center font-bold text-base no-print ${canFullEdit ? 'drag-handle text-gray-400 hover:text-emerald-600 cursor-grab active:cursor-grabbing' : 'text-gray-300 cursor-default'}`}>
+                                        <td draggable={!!container.id && canFullEdit} onDragStart={(e) => ctx.handleDragStart(e, container.id, 'containers')} className={`p-0.5 border sticky left-0 z-20 text-center font-bold text-base no-print ${canFullEdit ? 'bg-white drag-handle text-gray-400 hover:text-emerald-600 cursor-grab active:cursor-grabbing' : 'bg-gray-200 text-gray-400 cursor-default'}`}>
                                             {canFullEdit ? '≡' : '-'}
                                         </td>
-                                        <td className="p-0.5 border bg-white sticky left-10 z-20 text-[11px] font-medium whitespace-nowrap">コンテナ {idx + 1}</td>
-                                        <td className="matrix-td px-0 sticky left-[104px] bg-white z-20 table-row-compact">
-                                            <LocalInput value={container.managementNo} originalValue={(container.originals || {}).managementNo} originalMeta={(container.originalMetas || {}).managementNo} onChange={(v, orig) => ctx.updateContainer(container.id, { managementNo: v, originals: { ...(container.originals || {}), managementNo: container.originals?.managementNo !== undefined ? container.originals.managementNo : orig }, originalMetas: { ...(container.originalMetas || {}), managementNo: container.originalMetas?.managementNo !== undefined ? container.originalMetas.managementNo : `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}` } }, ctx.yoshiiAllocMonth, 'yoshii', '管理番号')} className="matrix-input text-center text-xs font-bold input-compact" dataGridId={`y-alloc-${idx}-0`} onGridKeyDown={handleGridNav} />
+                                        <td className={`p-0.5 border sticky left-10 z-20 text-[11px] font-medium whitespace-nowrap ${isVendorUser ? 'bg-gray-200 text-gray-700' : 'bg-white'}`}>コンテナ {idx + 1}</td>
+                                        
+                                        {/* 管理番号: 仕入先は濃いグレー背景(bg-gray-200)&テキスト表示 */}
+                                        <td className={`matrix-td px-0 sticky left-[104px] z-20 table-row-compact ${isVendorUser ? 'bg-gray-200' : 'bg-white'}`}>
+                                            {canFullEdit ? (
+                                                <LocalInput value={container.managementNo} originalValue={(container.originals || {}).managementNo} originalMeta={(container.originalMetas || {}).managementNo} onChange={(v, orig) => ctx.updateContainer(container.id, { managementNo: v, originals: { ...(container.originals || {}), managementNo: container.originals?.managementNo !== undefined ? container.originals.managementNo : orig }, originalMetas: { ...(container.originalMetas || {}), managementNo: container.originalMetas?.managementNo !== undefined ? container.originalMetas.managementNo : `${ctx.getFormattedShortDate()} ${ctx.operatorName || '未設定'}` } }, ctx.yoshiiAllocMonth, 'yoshii', '管理番号')} className="matrix-input text-center text-xs font-bold input-compact" dataGridId={`y-alloc-${idx}-0`} onGridKeyDown={handleGridNav} />
+                                            ) : (
+                                                <div className="w-full h-[20px] flex items-center justify-center font-bold text-xs text-gray-800">
+                                                    {container.managementNo || '-'}
+                                                </div>
+                                            )}
                                         </td>
-                                        <td className="matrix-td px-0 sticky left-[194px] bg-white z-20 table-row-compact">
-                                            <DynamicSelect value={container.port} originalValue={(container.originals || {}).port} originalMeta={(container.originalMetas || {}).port} onChange={(val, cat, orig) => ctx.handleSelectChange(container.id, 'port', true, 'yoshii', false, '到着港')(val, cat, orig)} category="ports" options={ctx.masterData.yoshii.ports} dataGridId={`y-alloc-${idx}-1`} onGridKeyDown={handleGridNav} autoFocus={focusTargetIdx === idx} onAutoFocused={() => setFocusTargetIdx(null)} className="w-full text-xs border-none bg-transparent outline-none text-center min-w-0 px-0 input-compact" />
+
+                                        {/* 到着港: 仕入先は濃いグレー背景(bg-gray-200)&テキスト表示 */}
+                                        <td className={`matrix-td px-0 sticky left-[194px] z-20 table-row-compact ${isVendorUser ? 'bg-gray-200' : 'bg-white'}`}>
+                                            {canFullEdit ? (
+                                                <DynamicSelect value={container.port} originalValue={(container.originals || {}).port} originalMeta={(container.originalMetas || {}).port} onChange={(val, cat, orig) => ctx.handleSelectChange(container.id, 'port', true, 'yoshii', false, '到着港')(val, cat, orig)} category="ports" options={ctx.masterData.yoshii.ports} dataGridId={`y-alloc-${idx}-1`} onGridKeyDown={handleGridNav} autoFocus={focusTargetIdx === idx} onAutoFocused={() => setFocusTargetIdx(null)} className="w-full text-xs border-none bg-transparent outline-none text-center min-w-0 px-0 input-compact" />
+                                            ) : (
+                                                <div className="w-full h-[20px] flex items-center justify-center text-xs font-semibold text-gray-800">
+                                                    {container.port || '-'}
+                                                </div>
+                                            )}
                                         </td>
                                         
                                         {models.map((m, mIdx) => {
@@ -1281,22 +1299,30 @@ const YoshiiAllocationView = () => {
                                             // 割振数が入数で割り切れない場合にエラー判定
                                             const isError = qtyPer > 0 && Number(cellValue) > 0 && (Number(cellValue) % qtyPer !== 0);
                                             
-                                            // 赤枠なし、背景色のみを適用
-                                            const cellStyle = isError ? { backgroundColor: '#fee2e2' } : {};
+                                            // 端数エラー(#fee2e2)を最優先、それ以外で仕入先なら濃いグレー(#e5e7eb)
+                                            const cellStyle = isError 
+                                                ? { backgroundColor: '#fee2e2' } 
+                                                : (isVendorUser ? { backgroundColor: '#e5e7eb' } : {});
 
                                             return (
-                                                <td key={m} className={`matrix-td px-0.5 ${getModelColWidth(m)} table-row-compact`} style={cellStyle}>
-                                                    <LocalInput 
-                                                        type="number" 
-                                                        value={cellValue} 
-                                                        originalValue={(container.originals?.allocations || {})[m]} 
-                                                        originalMeta={(container.originalMetas?.allocations || {})[m]} 
-                                                        onChange={(v, orig) => handleAllocationValueChange(container, m, v, orig)} 
-                                                        className="matrix-input text-emerald-900 font-mono pr-1 text-right text-xs input-compact bg-transparent" 
-                                                        style={cellStyle}
-                                                        dataGridId={`y-alloc-${idx}-${mIdx + 2}`} 
-                                                        onGridKeyDown={handleGridNav} 
-                                                    />
+                                                <td key={m} className={`matrix-td px-0.5 ${getModelColWidth(m)} table-row-compact ${!isError && isVendorUser ? 'bg-gray-200' : ''}`} style={cellStyle}>
+                                                    {canFullEdit ? (
+                                                        <LocalInput 
+                                                            type="number" 
+                                                            value={cellValue} 
+                                                            originalValue={(container.originals?.allocations || {})[m]} 
+                                                            originalMeta={(container.originalMetas?.allocations || {})[m]} 
+                                                            onChange={(v, orig) => handleAllocationValueChange(container, m, v, orig)} 
+                                                            className="matrix-input text-emerald-900 font-mono pr-1 text-right text-xs input-compact bg-transparent" 
+                                                            style={cellStyle}
+                                                            dataGridId={`y-alloc-${idx}-${mIdx + 2}`} 
+                                                            onGridKeyDown={handleGridNav} 
+                                                        />
+                                                    ) : (
+                                                        <div className="w-full h-[20px] flex items-center justify-end pr-1 font-mono text-xs text-gray-800 font-bold">
+                                                            {cellValue ? Number(cellValue).toLocaleString() : ''}
+                                                        </div>
+                                                    )}
                                                 </td>
                                             );
                                         })}
