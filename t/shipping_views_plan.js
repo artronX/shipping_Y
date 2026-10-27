@@ -1,16 +1,16 @@
 // shipping_views_plan.js
 // =========================================================
 // shipping_views_plan.js - 出荷計画・割振り画面モジュール
-// ★ WebVer. 127 対応 / _js059 仕入先計画画面閲覧(入数のみダイレクト編集可)&不要UI非表示&凡例2行目完全統合版
+// ★ WebVer. 128 対応 / _js060 仕入先計画閲覧(入数のみ正規編集可)&不要UI非表示&凡例2行目完全版
 // ★ 最上行ファイル名識別コメント保持 (// shipping_views_plan.js)
-// ★ 1. 入数セル: LocalInputのcanEdit制限をバイパスするダイレクトinputを採用し、仕入先ユーザーでも確実に編集・保存可能。
+// ★ 1. 親(HTML)のupdateModelDetailと正しく連携し、仕入先ユーザーでも入数を安全かつ確実に更新。
 // ★ 2. 仕入先ユーザー: 計画数、品名、JAN、備考、仕入先コードは閲覧専用化。
 // ★ 3. 仕入先ユーザー: [+型式追加], [✏型式編集], [≡], [×削除] などの操作UIを完全非表示。
 // ★ 4. 計画画面 & 割振り画面: 2行目右側に [■ 端数発生の警告表示] 凡例を配置。
 // ★ 5. 端数赤背景チェック(#fee2e2)および楽観的UI更新を完全維持。
 // =========================================================
 
-const JS_PLAN_VERSION = '_js059';
+const JS_PLAN_VERSION = '_js060';
 
 // 【共通コンポーネント: 端数警告の凡例バッジ (2行目右側用)】
 const YoshiiFractionLegend = () => (
@@ -224,7 +224,7 @@ const YoshiiPlanView = () => {
     const isVendorUser = Boolean(ctx.authUser && ctx.authUser.vendorRestriction);
     const canFullEdit = Boolean(ctx.authUser && ctx.authUser.canEdit && !isVendorUser);
 
-    // 楽観的UI更新ステート: 入力確定直後の値を即座に握り、非同期中の再描画による値消失を完全に防ぐ
+    // 楽観的UI更新ステート
     const [localQuantities, setLocalQuantities] = React.useState({});
 
     const handleExecuteExport = ({ mode, selectedYear: selYr, singleMonth: sgMo, startMonth: sMo, endMonth: eMo }) => {
@@ -419,8 +419,8 @@ const YoshiiPlanView = () => {
         return plan?.quantity !== undefined && plan?.quantity !== null ? plan.quantity : '';
     };
 
+    // マスタ情報更新: 入数は仕入先ユーザーでも許可、その他は管理者のみ
     const handleModelDetailChange = async (model, field, value) => {
-        // 仕入先ユーザーは「qtyPerCarton（入数）」のみ更新可能
         if (isVendorUser && field !== 'qtyPerCarton') return;
 
         if (field === 'vendorCode' && value && value.trim() !== '') {
@@ -442,20 +442,8 @@ const YoshiiPlanView = () => {
             }
         }
 
+        // 親（HTML側）の正規更新関数を呼ぶだけ
         await ctx.updateModelDetail('yoshii', model, field, value);
-
-        const normTarget = normalizeModelCode(model);
-        const matchingPlans = yoshiiPlans.filter(p => normalizeModelCode(p.model) === normTarget);
-        const batch = firebase.firestore().batch();
-        matchingPlans.forEach(p => {
-            batch.update(firebase.firestore().collection('shipments').doc(p.id), {
-                [field]: value,
-                updatedAt: new Date().toISOString()
-            });
-        });
-        if (matchingPlans.length > 0) {
-            await batch.commit();
-        }
     };
 
     const handleAddNewModelSubmit = async (e) => {
@@ -630,7 +618,7 @@ const YoshiiPlanView = () => {
                         )}
                     </div>
 
-                    {/* ★ 東亜全体管理者のみ「+型式追加」「✏型式編集」を表示。仕入先ユーザーには非表示 */}
+                    {/* ★ 管理者のみ「+型式追加」「✏型式編集」を表示。仕入先ユーザーには非表示 */}
                     {canFullEdit && (
                         <>
                             <button onClick={() => setIsAddModalOpen(true)} className="bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-0.5 rounded text-xs font-bold shadow transition">+ 型式追加</button>
@@ -743,12 +731,12 @@ const YoshiiPlanView = () => {
                                     {/* 型式 */}
                                     <td className="border text-xs sticky left-[87px] bg-white z-10 text-left pl-2 p-0 font-bold">{model}</td>
                                     
-                                    {/* 入数 (型式の右・幅45px): ★LocalInputの制限をバイパスし、仕入先ユーザーでもダイレクト入力・保存可能！ */}
+                                    {/* 入数 (型式の右・幅45px): ★仕入先ユーザーでも編集可能（直接親のupdateModelDetailを呼ぶ安全設計） */}
                                     <td className="border text-xs text-center sticky left-[197px] bg-white z-10 w-[45px] min-w-[45px] p-0">
                                         <input 
                                             type="number" 
-                                            defaultValue={currentQtyPer !== undefined && currentQtyPer !== null ? currentQtyPer : ''} 
                                             key={`${model}_${currentQtyPer}`}
+                                            defaultValue={currentQtyPer !== undefined && currentQtyPer !== null ? currentQtyPer : ''} 
                                             onBlur={(e) => {
                                                 const val = e.target.value.trim();
                                                 if (String(currentQtyPer) !== val) {
@@ -1310,7 +1298,7 @@ const YoshiiAllocationView = () => {
                                             );
                                         })}
                                         
-                                        {/* ★ 管理者のみ削除(×)ボタンを表示。仕入先ユーザーには非表示 */}
+                                        {/* 管理者のみ削除(×)ボタンを表示。仕入先ユーザーには非表示 */}
                                         {canFullEdit && (
                                             <td className="p-0.5 border text-center align-middle whitespace-nowrap relative no-print">
                                                 <button tabIndex="-1" onClick={() => setDeleteConfirmTarget(deleteConfirmTarget === idx ? null : idx)} className="text-red-500 hover:text-red-700 font-bold text-lg leading-none" title="削除">×</button>

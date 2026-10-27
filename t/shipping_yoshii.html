@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>吉井電気 製品出荷管理システム (WebVer. 127)</title>
+    <title>吉井電気 製品出荷管理システム (WebVer. 128)</title>
     
     <!-- React 18 (cdnjs: 安定版固定) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
@@ -22,7 +22,7 @@
 
     <!-- ★重要: 外部モジュール読み込み前に共通定数・関数を定義★ -->
     <script>
-        const SYSTEM_VERSION = 'WebVer. 127';
+        const SYSTEM_VERSION = 'WebVer. 128';
 
         // 型式名正規化関数（外部JSより先に定義してReferenceErrorを防止）
         function normalizeModelCode(str) {
@@ -226,7 +226,6 @@
         };
 
         // ハッシュ化済み権限マトリクス
-        // ★ 各仕入先ロールの allowedViews に 'yoshii_plan' を追加して計画画面の閲覧を許可
         const AUTH_TABLE = [
             {
                 hashes: ['5579cdc6320d1718cd7c5f40c65230f504ef19055c16e919a0183298ddc32805'],
@@ -763,31 +762,50 @@
                 }).catch(e => console.error(e));
             };
 
+            // ★ HTML側の中心更新関数: 仕入先の入数(qtyPerCarton)更新を正規に通過・保存・ログ記録
             const updateModelDetail = async (company, model, field, value) => {
-                // 仕入先ユーザーも「入数(qtyPerCarton)」の更新は許可する
-                const isVendor = authUser && authUser.vendorRestriction;
-                if (authUser && !authUser.canEdit && !(isVendor && field === 'qtyPerCarton')) return;
+                const isVendorQtyUpdate = authUser && authUser.vendorRestriction && field === 'qtyPerCarton';
+                if (authUser && !authUser.canEdit && !isVendorQtyUpdate) return;
                 
-                const currentCompanyMaster = masterData[company] || {};
-                const currentDetails = currentCompanyMaster.modelDetails || {};
-                const modelObj = currentDetails[model] || {};
-                
-                const updatedDetails = {
-                    ...currentDetails,
-                    [model]: {
-                        ...modelObj,
-                        [field]: value
+                try {
+                    const currentCompanyMaster = masterData[company] || {};
+                    const currentDetails = currentCompanyMaster.modelDetails || {};
+                    const modelObj = currentDetails[model] || {};
+                    
+                    const updatedDetails = {
+                        ...currentDetails,
+                        [model]: {
+                            ...modelObj,
+                            [field]: value
+                        }
+                    };
+                    const newMaster = {
+                        ...masterData,
+                        [company]: {
+                            ...currentCompanyMaster,
+                            modelDetails: updatedDetails
+                        }
+                    };
+                    await db.collection('shipping_settings').doc('master_data_v5').set(newMaster, { merge: true });
+
+                    // shipments コレクションの該当型式データも一括同期
+                    const normTarget = normalizeModelCode(model);
+                    const matchingPlans = plans.filter(p => p.company === company && normalizeModelCode(p.model) === normTarget);
+                    if (matchingPlans.length > 0) {
+                        const batch = db.batch();
+                        matchingPlans.forEach(p => {
+                            batch.update(db.collection('shipments').doc(p.id), {
+                                [field]: value,
+                                updatedAt: new Date().toISOString()
+                            });
+                        });
+                        await batch.commit();
                     }
-                };
-                const newMaster = {
-                    ...masterData,
-                    [company]: {
-                        ...currentCompanyMaster,
-                        modelDetails: updatedDetails
-                    }
-                };
-                await db.collection('shipping_settings').doc('master_data_v5').set(newMaster, { merge: true });
-                logOperation(getSheetLabel(company, currentView), '修正', `型式 [${model}] の ${field} を更新`);
+
+                    logOperation(getSheetLabel(company, currentView), '修正', `型式 [${model}] の ${field === 'qtyPerCarton' ? '入数' : field} を更新`);
+                } catch (e) {
+                    console.error("updateModelDetail error:", e);
+                }
             };
 
             const addMasterItem = async (company, listKey, itemValue) => {
@@ -962,7 +980,7 @@
                             </div>
 
                             <div className="flex items-center gap-3">
-                                {/* ★ 東亜全体管理者(ADMIN_ALL)のみ歯車ボタン(⚙)を表示 */}
+                                {/* 東亜全体管理者(ADMIN_ALL)のみ歯車ボタン(⚙)を表示 */}
                                 {authUser && authUser.role === 'ADMIN_ALL' && (
                                     <button 
                                         onClick={handleOpenLogs} 
